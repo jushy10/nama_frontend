@@ -54,7 +54,10 @@ npm run dev      # start the dev server (http://localhost:5173)
 ├── eslint.config.js        # ESLint (flat config) + Prettier integration
 ├── .prettierrc.json        # Prettier options
 ├── tsconfig*.json          # TypeScript config (incl. @/ path alias)
-└── vite.config.ts          # Vite config (React, Tailwind, alias, Vitest)
+├── vite.config.ts          # Vite config (React, Tailwind, alias, Vitest)
+├── Dockerfile              # Multi-stage build → nginx static server
+├── nginx.conf              # SPA routing fallback + gzip + /health
+└── .dockerignore
 ```
 
 ## Path alias
@@ -67,3 +70,52 @@ import Home from '@/pages/Home'
 
 The alias is configured in both `vite.config.ts` (`resolve.alias`) and
 `tsconfig.app.json` (`compilerOptions.paths`).
+
+## Docker
+
+The app is packaged as a static site served by nginx via a multi-stage build
+(Node builds the bundle, nginx serves `dist/`). The final image is small and
+has no Node runtime.
+
+```bash
+# Build the image
+docker build -t nama-frontend .
+
+# Run locally (maps container port 80 → host 8080)
+docker run --rm -p 8080:80 nama-frontend
+# → http://localhost:8080   (health check: http://localhost:8080/health)
+```
+
+`nginx.conf` falls back to `index.html` for unmatched routes so React Router
+client-side routes resolve on direct navigation / refresh.
+
+### Deploying to ECS
+
+1. **Build & push** to ECR:
+
+   ```bash
+   AWS_REGION=us-east-1
+   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+   REPO=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/nama-frontend
+
+   aws ecr create-repository --repository-name nama-frontend --region $AWS_REGION
+   aws ecr get-login-password --region $AWS_REGION \
+     | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+   docker build -t $REPO:latest .
+   docker push $REPO:latest
+   ```
+
+   > On Apple Silicon / ARM, build for the Fargate platform with
+   > `docker build --platform linux/amd64 ...` (or set the task's CPU
+   > architecture to `ARM64`).
+
+2. **Task definition** — container port `80`. Point the ALB target group's
+   health check at `/health`.
+
+3. **Service** — run behind an Application Load Balancer; the target group
+   forwards to container port `80`.
+
+> **Note:** Vite inlines `import.meta.env.VITE_*` values at **build time**, not
+> at container start. Per-environment config must be passed as build args and
+> baked into the image (e.g. one image per environment), not via ECS runtime
+> environment variables.
