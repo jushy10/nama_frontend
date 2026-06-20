@@ -119,3 +119,66 @@ client-side routes resolve on direct navigation / refresh.
 > at container start. Per-environment config must be passed as build args and
 > baked into the image (e.g. one image per environment), not via ECS runtime
 > environment variables.
+
+## CI/CD — build & push to ECR
+
+[`.github/workflows/ecr-push.yml`](.github/workflows/ecr-push.yml) builds the
+image and pushes it to Amazon ECR on every push to `main` (and via manual
+**Run workflow**). It authenticates with **GitHub OIDC** — no long-lived AWS
+keys are stored. Each run pushes two tags: `latest` and the commit SHA.
+
+### One-time setup
+
+1. **Create the ECR repository:**
+
+   ```bash
+   aws ecr create-repository --repository-name nama-frontend
+   ```
+
+2. **Create the GitHub OIDC provider** in AWS (once per account), if it doesn't
+   already exist:
+
+   ```bash
+   aws iam create-open-id-connect-provider \
+     --url https://token.actions.githubusercontent.com \
+     --client-id-list sts.amazonaws.com
+   ```
+
+3. **Create an IAM role** the workflow can assume, with this trust policy
+   (replace `<ACCOUNT_ID>` and the repo if forked):
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Principal": {
+           "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+         },
+         "Action": "sts:AssumeRoleWithWebIdentity",
+         "Condition": {
+           "StringEquals": {
+             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+           },
+           "StringLike": {
+             "token.actions.githubusercontent.com:sub": "repo:jushy10/nama_frontend:*"
+           }
+         }
+       }
+     ]
+   }
+   ```
+
+   Attach a policy allowing ECR push (the managed
+   `AmazonEC2ContainerRegistryPowerUser` policy is sufficient).
+
+4. **Add the role ARN** as a repository secret named `AWS_ROLE_ARN`
+   (_Settings → Secrets and variables → Actions_).
+
+5. Adjust `AWS_REGION` / `ECR_REPOSITORY` in the workflow's `env:` block if they
+   differ from `us-east-1` / `nama-frontend`.
+
+> To also deploy automatically after the push (render a new task definition and
+> update the ECS service via `aws-actions/amazon-ecs-deploy-task-definition`),
+> add a deploy job — happy to wire that up when the cluster/service exist.

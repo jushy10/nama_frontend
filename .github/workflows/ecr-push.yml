@@ -1,0 +1,61 @@
+name: Build and push to Amazon ECR
+
+# Builds the Docker image and pushes it to Amazon ECR on every push to main.
+#
+# Required one-time setup (see the README "CI/CD" section for details):
+#   1. Create the ECR repository:
+#        aws ecr create-repository --repository-name nama-frontend
+#   2. Configure GitHub OIDC in AWS and create an IAM role that trusts this
+#      repo and is allowed to push to ECR (no long-lived AWS keys needed).
+#   3. Add the role ARN as a repository secret named AWS_ROLE_ARN.
+#   4. Adjust AWS_REGION / ECR_REPOSITORY below if they differ.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: nama-frontend
+
+concurrency:
+  group: ecr-push-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  id-token: write # required to request the OIDC token for AWS auth
+  contents: read
+
+jobs:
+  build-and-push:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
