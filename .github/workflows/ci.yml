@@ -1,0 +1,48 @@
+name: CI
+run-name: CI · ${{ github.ref_name }}
+
+# Lightweight checks that run on every push to main and every PR.
+# Pure Node — no browser, no Docker — so it finishes in well under a minute
+# on a standard GitHub-hosted ubuntu runner.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, typecheck & test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` is the CI-friendly install: deterministic, lockfile-driven,
+      # and faster than `npm install`. The setup-node cache above reuses the
+      # npm download cache across runs.
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc -b
+
+      - name: Test
+        run: npm run test:run

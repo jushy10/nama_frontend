@@ -26,6 +26,15 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Test files and test utilities aren't part of the HMR component graph, so
+    // the Fast Refresh rule about mixing component and non-component exports
+    // (e.g. re-exporting Testing Library from test-utils) doesn't apply.
+    files: ['**/*.{test,spec}.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
   // Keep this last so it disables stylistic rules that conflict with Prettier.
   prettier,
 )
