@@ -9,8 +9,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Build the production bundle.
+# Build the production bundle. Vite inlines VITE_* env vars at build time, so
+# the API URL is supplied as a build arg and exported before the build runs.
 COPY . .
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
 RUN npm run build
 
 # ---- Runtime stage ----

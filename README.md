@@ -78,104 +78,66 @@ The app is packaged as a static site served by nginx via a multi-stage build
 has no Node runtime.
 
 ```bash
-# Build the image
-docker build -t nama-frontend .
+# Build the image (pass the API URL — Vite bakes it in at build time)
+docker build --build-arg VITE_API_URL=https://api.namainsights.com -t nama-frontend .
 
 # Run locally (maps container port 80 → host 8080)
 docker run --rm -p 8080:80 nama-frontend
-# → http://localhost:8080   (health check: http://localhost:8080/health)
+# → http://localhost:8080   ( / and /health both return 200 )
 ```
 
-`nginx.conf` falls back to `index.html` for unmatched routes so React Router
-client-side routes resolve on direct navigation / refresh.
+`nginx.conf` falls back to `index.html` for unmatched routes (`try_files $uri
+$uri/ /index.html`), so React Router deep links resolve on refresh and the ALB
+health check on `/` returns `200`.
 
-### Deploying to ECS
+**Container contract** (what ECS / the ALB target group expect):
 
-1. **Build & push** to ECR:
+- **Port:** `80` (HTTP; TLS terminates at the ALB)
+- **Health check:** `GET /` → `200` (or the lightweight `GET /health` → `200 ok`)
 
-   ```bash
-   AWS_REGION=us-east-1
-   ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-   REPO=$ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/nama-frontend
-
-   aws ecr create-repository --repository-name nama-frontend --region $AWS_REGION
-   aws ecr get-login-password --region $AWS_REGION \
-     | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
-   docker build -t $REPO:latest .
-   docker push $REPO:latest
-   ```
-
-   > On Apple Silicon / ARM, build for the Fargate platform with
-   > `docker build --platform linux/amd64 ...` (or set the task's CPU
-   > architecture to `ARM64`).
-
-2. **Task definition** — container port `80`. Point the ALB target group's
-   health check at `/health`.
-
-3. **Service** — run behind an Application Load Balancer; the target group
-   forwards to container port `80`.
-
-> **Note:** Vite inlines `import.meta.env.VITE_*` values at **build time**, not
-> at container start. Per-environment config must be passed as build args and
-> baked into the image (e.g. one image per environment), not via ECS runtime
-> environment variables.
+> **Build-time config:** Vite inlines `import.meta.env.VITE_*` at **build time**,
+> not at container start. `VITE_API_URL` is passed as a `--build-arg` and baked
+> into the image (see the Dockerfile build stage and the CI workflow). Reference
+> it in code as `import.meta.env.VITE_API_URL`.
 
 ## CI/CD — build, push & deploy
 
-[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push
-to `main` (and via manual **Run workflow**) and:
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) ("Build & Deploy
+Frontend"):
 
-1. Builds the Docker image and **pushes it to Amazon ECR** — `linux/amd64`,
-   tagged `:latest` (moving) and `:<commit-sha>` (immutable).
-2. **Triggers a rolling deployment** of the existing ECS service
-   (`aws ecs update-service --force-new-deployment`) and waits for it to
-   stabilize.
+- **On pull requests** — builds the image only (validation; no push).
+- **On push to `main`** (and manual **Run workflow**) — builds, pushes to ECR
+  (`:latest` and `:<commit-sha>`), then rolls the ECS service onto the new image
+  with `aws ecs update-service --force-new-deployment`. If the service isn't
+  `ACTIVE` yet it's skipped gracefully (the service pulls `:latest` on first
+  launch).
 
-It authenticates with **GitHub OIDC** — no long-lived AWS keys are stored.
+`VITE_API_URL` is passed as a build arg, so the API base URL is baked into the
+bundle at build time.
 
 ### Division of responsibility
 
-The **task definition, ECS service, cluster, IAM roles, and ALB are managed by
-Terraform** (in the backend repo). This workflow does **not** create or modify
-them — it only pushes a new image and forces the service to redeploy.
-
-For the redeploy to pick up the new image, the Terraform task definition must
-reference the **moving tag** this workflow pushes:
-
-```
-<account>.dkr.ecr.<region>.amazonaws.com/nama-frontend:latest
-```
-
-Because the tag string never changes, Terraform sees no diff and a
-`--force-new-deployment` re-pulls `:latest` — no new task definition revision is
-registered, so there's **no Terraform drift**.
-
-> **Rollback:** pin the task definition's image to a specific `:<sha>` in
-> Terraform and apply.
-
-### What the Terraform (backend) repo must provide
-
-- The task definition's container image set to the ECR repo with the `:latest`
-  tag (above).
-- A **GitHub OIDC provider** and an **IAM role** the workflow assumes, whose
-  trust policy allows this repo
-  (`repo:jushy10/nama_frontend:*` on `token.actions.githubusercontent.com`), with
-  permissions for **ECR push** (e.g. `AmazonEC2ContainerRegistryPowerUser`) plus:
-
-  ```json
-  {
-    "Effect": "Allow",
-    "Action": ["ecs:UpdateService", "ecs:DescribeServices"],
-    "Resource": "*"
-  }
-  ```
-
-  (No `iam:PassRole` / `RegisterTaskDefinition` needed — this workflow never
-  registers a task definition.)
+The **ECR repository, ECS service, cluster, and ALB are created by the backend
+repo's Terraform** (`module "frontend" { name = "nama-frontend-dev" }`). This
+workflow waits for the ECR repo to exist, pushes the image, and forces a
+redeploy — it does not manage infrastructure. The Terraform task definition
+references the moving `:latest` tag this pushes, so a forced deployment re-pulls
+the new image with no task-definition churn.
 
 ### What to set in this repo
 
-1. Add the IAM role ARN as a repository secret named `AWS_ROLE_ARN`
-   (_Settings → Secrets and variables → Actions_).
-2. Adjust the `env:` block in `deploy.yml` (`AWS_REGION`, `ECR_REPOSITORY`,
-   `ECS_CLUSTER`, `ECS_SERVICE`) to match the names Terraform created.
+Under _Settings → Secrets and variables → Actions_:
+
+| Kind     | Name                    | Value                                                                           |
+| -------- | ----------------------- | ------------------------------------------------------------------------------- |
+| Secret   | `AWS_ACCESS_KEY_ID`     | the `nama-ci` user's key (its `nama-*` policy already covers `nama-frontend-*`) |
+| Secret   | `AWS_SECRET_ACCESS_KEY` | the `nama-ci` user's secret                                                     |
+| Variable | `AWS_REGION`            | optional; defaults to `us-east-1`                                               |
+
+The `env:` block in `deploy.yml` pins `ECR_REPOSITORY` / `ECS_CLUSTER` /
+`ECS_SERVICE` to `nama-frontend-dev` and `VITE_API_URL` to the backend API —
+adjust if the infra names differ.
+
+> **Backend CORS:** once the frontend is live, the FastAPI backend must include
+> `https://namainsights.com` and `https://www.namainsights.com` in its
+> `CORSMiddleware` `allow_origins`, or the browser will block API calls.
