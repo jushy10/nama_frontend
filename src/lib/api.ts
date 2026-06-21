@@ -29,9 +29,16 @@ export class ApiError extends Error {
   }
 }
 
-// Baked in at build time (see VITE_API_URL); falls back to the public API so
-// `npm run dev` works without extra setup.
-const API_BASE = import.meta.env.VITE_API_URL || 'https://api.namainsights.com'
+// Baked in at build time (see VITE_API_URL). In dev there's no VITE_API_URL, so
+// we fall back to a relative "/api" prefix that the Vite dev server proxies to
+// the real API (see vite.config.ts). That keeps dev requests same-origin and
+// sidesteps CORS, with no extra setup.
+const API_BASE = import.meta.env.VITE_API_URL || '/api'
+
+/** URL of the company logo image (PNG) for a ticker symbol. */
+export function stockLogoUrl(symbol: string): string {
+  return `${API_BASE}/stocks/${encodeURIComponent(symbol)}/logo`
+}
 
 /** Fetch a single stock snapshot by ticker symbol. */
 export async function getStock(symbol: string): Promise<Stock> {
