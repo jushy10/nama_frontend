@@ -1,6 +1,7 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import Home from '@/pages/Home'
 import About from '@/pages/About'
+import Stocks from '@/pages/Stocks'
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   `text-sm font-medium transition-colors ${
@@ -41,6 +42,9 @@ function App() {
             <NavLink to="/" className={linkClass} end>
               Home
             </NavLink>
+            <NavLink to="/stocks" className={linkClass}>
+              Stocks
+            </NavLink>
             <NavLink to="/about" className={linkClass}>
               About
             </NavLink>
@@ -57,6 +61,7 @@ function App() {
       <main className="flex-1">
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/stocks" element={<Stocks />} />
           <Route path="/about" element={<About />} />
         </Routes>
       </main>
