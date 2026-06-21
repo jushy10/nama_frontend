@@ -120,23 +120,38 @@ client-side routes resolve on direct navigation / refresh.
 > baked into the image (e.g. one image per environment), not via ECS runtime
 > environment variables.
 
-## CI/CD — build & push to ECR
+## CI/CD — build, push & deploy
 
-[`.github/workflows/ecr-push.yml`](.github/workflows/ecr-push.yml) builds the
-image and pushes it to Amazon ECR on every push to `main` (and via manual
-**Run workflow**). It authenticates with **GitHub OIDC** — no long-lived AWS
-keys are stored. Each run pushes two tags: `latest` and the commit SHA.
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push
+to `main` (and via manual **Run workflow**) and:
 
-### One-time setup
+1. Builds the Docker image and **pushes it to Amazon ECR** (tags `latest` and the
+   commit SHA, `linux/amd64`).
+2. Renders the new image into [`ecs/task-definition.json`](ecs/task-definition.json)
+   (a new task definition revision).
+3. **Deploys to ECS** by updating the service, waiting for it to stabilize.
 
-1. **Create the ECR repository:**
+It authenticates with **GitHub OIDC** — no long-lived AWS keys are stored.
 
-   ```bash
-   aws ecr create-repository --repository-name nama-frontend
-   ```
+The task definition tells ECS _how to run_ the image (container port `80`,
+CPU/memory, the `/health` check, CloudWatch logs). The `image` field is a
+placeholder — CI replaces it on each run.
 
-2. **Create the GitHub OIDC provider** in AWS (once per account), if it doesn't
-   already exist:
+### AWS resources this expects to exist
+
+This workflow **deploys to** existing infrastructure; it does not create it.
+Provision these once (console, Terraform, or AWS Copilot):
+
+- An **ECR repository** — `aws ecr create-repository --repository-name nama-frontend`
+- An **ECS cluster** and a **Fargate service** behind an ALB whose target group
+  health-checks `/health` and forwards to container port `80`
+- An **`ecsTaskExecutionRole`** (managed policy `AmazonECSTaskExecutionRolePolicy`)
+- A **CloudWatch log group** matching the task definition —
+  `aws logs create-log-group --log-group-name /ecs/nama-frontend`
+
+### One-time GitHub → AWS setup
+
+1. **Create the GitHub OIDC provider** in AWS (once per account), if absent:
 
    ```bash
    aws iam create-open-id-connect-provider \
@@ -144,8 +159,8 @@ keys are stored. Each run pushes two tags: `latest` and the commit SHA.
      --client-id-list sts.amazonaws.com
    ```
 
-3. **Create an IAM role** the workflow can assume, with this trust policy
-   (replace `<ACCOUNT_ID>` and the repo if forked):
+2. **Create an IAM role** for the workflow with this trust policy (replace
+   `<ACCOUNT_ID>`; adjust the repo if forked):
 
    ```json
    {
@@ -170,15 +185,41 @@ keys are stored. Each run pushes two tags: `latest` and the commit SHA.
    }
    ```
 
-   Attach a policy allowing ECR push (the managed
-   `AmazonEC2ContainerRegistryPowerUser` policy is sufficient).
+   Give the role **ECR push** permissions (managed
+   `AmazonEC2ContainerRegistryPowerUser`) plus this **ECS deploy** policy
+   (`iam:PassRole` lets ECS assume the task execution role):
 
-4. **Add the role ARN** as a repository secret named `AWS_ROLE_ARN`
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [
+       {
+         "Effect": "Allow",
+         "Action": [
+           "ecs:RegisterTaskDefinition",
+           "ecs:DescribeTaskDefinition",
+           "ecs:DescribeServices",
+           "ecs:UpdateService"
+         ],
+         "Resource": "*"
+       },
+       {
+         "Effect": "Allow",
+         "Action": "iam:PassRole",
+         "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole"
+       }
+     ]
+   }
+   ```
+
+3. **Add the role ARN** as a repository secret named `AWS_ROLE_ARN`
    (_Settings → Secrets and variables → Actions_).
 
-5. Adjust `AWS_REGION` / `ECR_REPOSITORY` in the workflow's `env:` block if they
-   differ from `us-east-1` / `nama-frontend`.
+4. **Fill in the placeholders:** set `<ACCOUNT_ID>` (and the region, if not
+   `us-east-1`) in `ecs/task-definition.json`, and adjust the `env:` block in
+   `deploy.yml` (`AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`,
+   `CONTAINER_NAME`) to match your AWS resource names.
 
-> To also deploy automatically after the push (render a new task definition and
-> update the ECS service via `aws-actions/amazon-ecs-deploy-task-definition`),
-> add a deploy job — happy to wire that up when the cluster/service exist.
+> The `CONTAINER_NAME` in the workflow must match the container `name` in
+> `ecs/task-definition.json` (both `nama-frontend`) for the image to be injected
+> correctly.

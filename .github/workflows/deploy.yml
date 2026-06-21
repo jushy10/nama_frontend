@@ -1,0 +1,87 @@
+name: Build, push, and deploy to ECS
+
+# Builds the Docker image, pushes it to Amazon ECR, then deploys it to ECS by
+# registering a new task definition revision and updating the service.
+#
+# Runs on every push to main (and via manual "Run workflow"). Authenticates
+# with GitHub OIDC — no long-lived AWS keys are stored.
+#
+# Required one-time setup (see the README "CI/CD" section for full details):
+#   1. ECR repository, ECS cluster + service, and an `ecsTaskExecutionRole`.
+#   2. A CloudWatch log group matching ecs/task-definition.json (/ecs/nama-frontend).
+#   3. GitHub OIDC provider + an IAM role allowed to push to ECR, register task
+#      definitions, update the ECS service, and pass the task roles.
+#   4. Add the role ARN as the repository secret AWS_ROLE_ARN.
+#   5. Fill in <ACCOUNT_ID> (and region) in ecs/task-definition.json, and adjust
+#      the env values below to match your AWS resources.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: nama-frontend
+  ECS_CLUSTER: nama-cluster
+  ECS_SERVICE: nama-frontend
+  ECS_TASK_DEFINITION: ecs/task-definition.json
+  CONTAINER_NAME: nama-frontend
+
+# Don't cancel an in-flight deploy; let it finish.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # required to request the OIDC token for AWS auth
+  contents: read
+
+jobs:
+  deploy:
+    name: Build, push, and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Render new image into the task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: ${{ env.ECS_TASK_DEFINITION }}
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Deploy to Amazon ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
