@@ -16,7 +16,7 @@ describe('App routing', () => {
   it('renders the home page by default', () => {
     renderApp()
     expect(
-      screen.getByRole('heading', { name: /vite \+ react \+ typescript/i }),
+      screen.getByRole('heading', { name: /make smarter stock decisions/i }),
     ).toBeInTheDocument()
   })
 
