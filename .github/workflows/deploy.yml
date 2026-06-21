@@ -1,19 +1,21 @@
 name: Build, push, and deploy to ECS
 
-# Builds the Docker image, pushes it to Amazon ECR, then deploys it to ECS by
-# registering a new task definition revision and updating the service.
+# Builds the Docker image, pushes it to Amazon ECR, then triggers a rolling
+# deployment of the existing ECS service so it pulls the new image.
+#
+# The ECS task definition, service, cluster, roles, and ALB are managed by
+# Terraform (in the backend repo) — this workflow does NOT manage them. The
+# task definition must reference the moving tag this pushes (e.g. ":latest"),
+# so a forced deployment re-pulls the updated image without registering a new
+# task definition revision (no Terraform drift).
 #
 # Runs on every push to main (and via manual "Run workflow"). Authenticates
 # with GitHub OIDC — no long-lived AWS keys are stored.
 #
-# Required one-time setup (see the README "CI/CD" section for full details):
-#   1. ECR repository, ECS cluster + service, and an `ecsTaskExecutionRole`.
-#   2. A CloudWatch log group matching ecs/task-definition.json (/ecs/nama-frontend).
-#   3. GitHub OIDC provider + an IAM role allowed to push to ECR, register task
-#      definitions, update the ECS service, and pass the task roles.
-#   4. Add the role ARN as the repository secret AWS_ROLE_ARN.
-#   5. Fill in <ACCOUNT_ID> (and region) in ecs/task-definition.json, and adjust
-#      the env values below to match your AWS resources.
+# Required setup (see the README "CI/CD" section for details):
+#   - The Terraform-managed IAM role (AWS_ROLE_ARN secret) must allow ECR push
+#     plus ecs:UpdateService and ecs:DescribeServices.
+#   - Set the env values below to match your AWS resources.
 
 on:
   push:
@@ -25,8 +27,6 @@ env:
   ECR_REPOSITORY: nama-frontend
   ECS_CLUSTER: nama-cluster
   ECS_SERVICE: nama-frontend
-  ECS_TASK_DEFINITION: ecs/task-definition.json
-  CONTAINER_NAME: nama-frontend
 
 # Don't cancel an in-flight deploy; let it finish.
 concurrency:
@@ -55,33 +55,31 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           platforms: linux/amd64
           push: true
+          # ":latest" is the moving tag the Terraform task definition references;
+          # ":<sha>" is an immutable tag for traceability / rollback.
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Render new image into the task definition
-        id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: ${{ env.ECS_TASK_DEFINITION }}
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+      - name: Force a new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster "$ECS_CLUSTER" \
+            --service "$ECS_SERVICE" \
+            --force-new-deployment \
+            --query 'service.{name:serviceName,taskDef:taskDefinition,desired:desiredCount}' \
+            --output table
 
-      - name: Deploy to Amazon ECS
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
-        with:
-          task-definition: ${{ steps.render.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Wait for the service to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "$ECS_SERVICE"

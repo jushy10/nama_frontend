@@ -125,101 +125,57 @@ client-side routes resolve on direct navigation / refresh.
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) runs on every push
 to `main` (and via manual **Run workflow**) and:
 
-1. Builds the Docker image and **pushes it to Amazon ECR** (tags `latest` and the
-   commit SHA, `linux/amd64`).
-2. Renders the new image into [`ecs/task-definition.json`](ecs/task-definition.json)
-   (a new task definition revision).
-3. **Deploys to ECS** by updating the service, waiting for it to stabilize.
+1. Builds the Docker image and **pushes it to Amazon ECR** — `linux/amd64`,
+   tagged `:latest` (moving) and `:<commit-sha>` (immutable).
+2. **Triggers a rolling deployment** of the existing ECS service
+   (`aws ecs update-service --force-new-deployment`) and waits for it to
+   stabilize.
 
 It authenticates with **GitHub OIDC** — no long-lived AWS keys are stored.
 
-The task definition tells ECS _how to run_ the image (container port `80`,
-CPU/memory, the `/health` check, CloudWatch logs). The `image` field is a
-placeholder — CI replaces it on each run.
+### Division of responsibility
 
-### AWS resources this expects to exist
+The **task definition, ECS service, cluster, IAM roles, and ALB are managed by
+Terraform** (in the backend repo). This workflow does **not** create or modify
+them — it only pushes a new image and forces the service to redeploy.
 
-This workflow **deploys to** existing infrastructure; it does not create it.
-Provision these once (console, Terraform, or AWS Copilot):
+For the redeploy to pick up the new image, the Terraform task definition must
+reference the **moving tag** this workflow pushes:
 
-- An **ECR repository** — `aws ecr create-repository --repository-name nama-frontend`
-- An **ECS cluster** and a **Fargate service** behind an ALB whose target group
-  health-checks `/health` and forwards to container port `80`
-- An **`ecsTaskExecutionRole`** (managed policy `AmazonECSTaskExecutionRolePolicy`)
-- A **CloudWatch log group** matching the task definition —
-  `aws logs create-log-group --log-group-name /ecs/nama-frontend`
+```
+<account>.dkr.ecr.<region>.amazonaws.com/nama-frontend:latest
+```
 
-### One-time GitHub → AWS setup
+Because the tag string never changes, Terraform sees no diff and a
+`--force-new-deployment` re-pulls `:latest` — no new task definition revision is
+registered, so there's **no Terraform drift**.
 
-1. **Create the GitHub OIDC provider** in AWS (once per account), if absent:
+> **Rollback:** pin the task definition's image to a specific `:<sha>` in
+> Terraform and apply.
 
-   ```bash
-   aws iam create-open-id-connect-provider \
-     --url https://token.actions.githubusercontent.com \
-     --client-id-list sts.amazonaws.com
-   ```
+### What the Terraform (backend) repo must provide
 
-2. **Create an IAM role** for the workflow with this trust policy (replace
-   `<ACCOUNT_ID>`; adjust the repo if forked):
+- The task definition's container image set to the ECR repo with the `:latest`
+  tag (above).
+- A **GitHub OIDC provider** and an **IAM role** the workflow assumes, whose
+  trust policy allows this repo
+  (`repo:jushy10/nama_frontend:*` on `token.actions.githubusercontent.com`), with
+  permissions for **ECR push** (e.g. `AmazonEC2ContainerRegistryPowerUser`) plus:
 
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Principal": {
-           "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
-         },
-         "Action": "sts:AssumeRoleWithWebIdentity",
-         "Condition": {
-           "StringEquals": {
-             "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
-           },
-           "StringLike": {
-             "token.actions.githubusercontent.com:sub": "repo:jushy10/nama_frontend:*"
-           }
-         }
-       }
-     ]
-   }
-   ```
+  ```json
+  {
+    "Effect": "Allow",
+    "Action": ["ecs:UpdateService", "ecs:DescribeServices"],
+    "Resource": "*"
+  }
+  ```
 
-   Give the role **ECR push** permissions (managed
-   `AmazonEC2ContainerRegistryPowerUser`) plus this **ECS deploy** policy
-   (`iam:PassRole` lets ECS assume the task execution role):
+  (No `iam:PassRole` / `RegisterTaskDefinition` needed — this workflow never
+  registers a task definition.)
 
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Effect": "Allow",
-         "Action": [
-           "ecs:RegisterTaskDefinition",
-           "ecs:DescribeTaskDefinition",
-           "ecs:DescribeServices",
-           "ecs:UpdateService"
-         ],
-         "Resource": "*"
-       },
-       {
-         "Effect": "Allow",
-         "Action": "iam:PassRole",
-         "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/ecsTaskExecutionRole"
-       }
-     ]
-   }
-   ```
+### What to set in this repo
 
-3. **Add the role ARN** as a repository secret named `AWS_ROLE_ARN`
+1. Add the IAM role ARN as a repository secret named `AWS_ROLE_ARN`
    (_Settings → Secrets and variables → Actions_).
-
-4. **Fill in the placeholders:** set `<ACCOUNT_ID>` (and the region, if not
-   `us-east-1`) in `ecs/task-definition.json`, and adjust the `env:` block in
-   `deploy.yml` (`AWS_REGION`, `ECR_REPOSITORY`, `ECS_CLUSTER`, `ECS_SERVICE`,
-   `CONTAINER_NAME`) to match your AWS resource names.
-
-> The `CONTAINER_NAME` in the workflow must match the container `name` in
-> `ecs/task-definition.json` (both `nama-frontend`) for the image to be injected
-> correctly.
+2. Adjust the `env:` block in `deploy.yml` (`AWS_REGION`, `ECR_REPOSITORY`,
+   `ECS_CLUSTER`, `ECS_SERVICE`) to match the names Terraform created.
