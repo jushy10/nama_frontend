@@ -45,6 +45,13 @@ describe('Stocks search', () => {
     expect(screen.getByText('$209.97')).toBeInTheDocument()
     // The symbol is normalized to upper-case before the request.
     expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/stocks/NVDA'))
+
+    // The company logo is rendered from the logo endpoint.
+    const logo = screen.getByRole('img', { name: /nvda logo/i })
+    expect(logo).toHaveAttribute(
+      'src',
+      expect.stringContaining('/stocks/NVDA/logo'),
+    )
   })
 
   it('shows an error message when the symbol is not found', async () => {

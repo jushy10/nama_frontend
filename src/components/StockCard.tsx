@@ -1,4 +1,5 @@
-import type { Stock } from '@/lib/api'
+import { useState } from 'react'
+import { stockLogoUrl, type Stock } from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null
@@ -25,18 +26,34 @@ export default function StockCard({ stock }: { stock: Stock }) {
   const changeColor = up ? 'text-emerald-400' : 'text-red-400'
   const sign = up ? '+' : ''
   const asOf = stock.as_of ? new Date(stock.as_of).toLocaleString() : '—'
+  const [logoFailed, setLogoFailed] = useState(false)
 
   return (
     <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-6 shadow-lg">
       <div className="flex items-start justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-white">{stock.symbol}</h2>
-          {stock.name && <p className="text-sm text-gray-400">{stock.name}</p>}
-          {stock.exchange && (
-            <span className="mt-1 inline-block rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
-              {stock.exchange}
-            </span>
+        <div className="flex items-start gap-4">
+          {!logoFailed && (
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
+              <img
+                src={stockLogoUrl(stock.symbol)}
+                alt={`${stock.symbol} logo`}
+                className="h-full w-full object-contain"
+                loading="lazy"
+                onError={() => setLogoFailed(true)}
+              />
+            </div>
           )}
+          <div>
+            <h2 className="text-2xl font-bold text-white">{stock.symbol}</h2>
+            {stock.name && (
+              <p className="text-sm text-gray-400">{stock.name}</p>
+            )}
+            {stock.exchange && (
+              <span className="mt-1 inline-block rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
+                {stock.exchange}
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right">
           <div className="text-3xl font-bold text-white tabular-nums">
