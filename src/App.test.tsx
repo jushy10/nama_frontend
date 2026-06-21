@@ -1,30 +1,28 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { renderWithProviders, screen } from '@/test/test-utils'
 import App from '@/App'
-
-function renderApp() {
-  return render(
-    <MemoryRouter initialEntries={['/']}>
-      <App />
-    </MemoryRouter>,
-  )
-}
 
 describe('App routing', () => {
   it('renders the home page by default', () => {
-    renderApp()
+    renderWithProviders(<App />)
+
     expect(
       screen.getByRole('heading', { name: /make smarter stock decisions/i }),
     ).toBeInTheDocument()
   })
 
   it('navigates to the about page', async () => {
-    const user = userEvent.setup()
-    renderApp()
+    const { user } = renderWithProviders(<App />)
 
     await user.click(screen.getByRole('link', { name: /about/i }))
+
+    expect(
+      screen.getByRole('heading', { name: /^about$/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the about page directly from its route', () => {
+    renderWithProviders(<App />, { initialEntries: ['/about'] })
 
     expect(
       screen.getByRole('heading', { name: /^about$/i }),

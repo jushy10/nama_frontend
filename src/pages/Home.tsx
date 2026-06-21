@@ -11,9 +11,7 @@ const features: Feature[] = [
     title: 'Real-time market data',
     description:
       'Live prices, volume, and the day’s biggest movers across thousands of equities — refreshed by the second.',
-    icon: (
-      <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />
-    ),
+    icon: <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
   },
   {
     title: 'AI-powered analysis',
@@ -27,9 +25,7 @@ const features: Feature[] = [
     title: 'Portfolio tracking',
     description:
       'Connect your holdings and get personalized alerts the moment something needs your attention.',
-    icon: (
-      <path d="M3 3v18h18M18 9l-5 5-3-3-4 4" />
-    ),
+    icon: <path d="M3 3v18h18M18 9l-5 5-3-3-4 4" />,
   },
 ]
 

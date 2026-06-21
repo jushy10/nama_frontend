@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { renderWithProviders, screen } from '@/test/test-utils'
 import Home from '@/pages/Home'
 
 describe('Home', () => {
   it('renders the hero headline', () => {
-    render(<Home />)
+    renderWithProviders(<Home />)
 
     expect(
       screen.getByRole('heading', {
@@ -14,7 +14,7 @@ describe('Home', () => {
   })
 
   it('lists the core features', () => {
-    render(<Home />)
+    renderWithProviders(<Home />)
 
     expect(
       screen.getByRole('heading', { name: /real-time market data/i }),
