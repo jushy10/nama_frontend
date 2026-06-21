@@ -1,0 +1,89 @@
+name: Build & Deploy Frontend
+run-name: Build & deploy frontend · ${{ github.ref_name }}
+
+# PRs            -> build the image only (validate).
+# Merge to main  -> build, push to ECR, roll the ECS service.
+# The ECR repo + ECS service are created by the backend repo's Terraform.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  # These match module "frontend" { name = "nama-frontend-dev" } in the infra repo.
+  ECR_REPOSITORY: nama-frontend-dev
+  ECS_CLUSTER: nama-frontend-dev
+  ECS_SERVICE: nama-frontend-dev
+  # Vite bakes env vars at BUILD time, so the API URL is a build arg (see below).
+  VITE_API_URL: https://api.namainsights.com
+
+jobs:
+  validate:
+    name: Validate build
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image (no push)
+        run: docker build --build-arg VITE_API_URL="$VITE_API_URL" -t "$ECR_REPOSITORY:ci" .
+
+  deploy:
+    name: Build & deploy
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # First deploy can start before Terraform has created the ECR repo — wait.
+      - name: Wait for the ECR repository
+        run: |
+          for i in $(seq 1 60); do
+            if aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
+              echo "ECR repository '$ECR_REPOSITORY' is ready."; exit 0
+            fi
+            echo "Waiting for ECR repository '$ECR_REPOSITORY' ($i/60)…"; sleep 15
+          done
+          echo "Timed out. Make sure the infra repo's Terraform has created it."; exit 1
+
+      - name: Log in to Amazon ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          docker build --build-arg VITE_API_URL="$VITE_API_URL" \
+            -t "$REGISTRY/$ECR_REPOSITORY:latest" \
+            -t "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" .
+          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
+          docker push "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+
+      - name: Roll the ECS service onto the new image
+        run: |
+          status=$(aws ecs describe-services \
+            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
+            --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
+          if [ "$status" = "ACTIVE" ]; then
+            aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --force-new-deployment
+          else
+            echo "ECS service not ACTIVE yet (status: $status) — it will pull :latest on first launch."
+          fi
