@@ -1,4 +1,12 @@
-import { useState } from 'react'
+import {
+  Avatar,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Typography,
+} from '@mui/material'
 import { stockLogoUrl, type Stock } from '@/lib/api'
 
 const fmt = (n: number | null) =>
@@ -14,71 +22,113 @@ const fmtInt = (n: number | null) =>
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-gray-800/60 px-3 py-2">
-      <dt className="text-xs tracking-wide text-gray-500 uppercase">{label}</dt>
-      <dd className="mt-0.5 font-medium text-gray-100 tabular-nums">{value}</dd>
-    </div>
+    <Box sx={{ borderRadius: 2, bgcolor: 'rgba(255,255,255,0.04)', px: 1.5, py: 1 }}>
+      <Typography
+        component="dt"
+        variant="caption"
+        sx={{
+          color: 'text.secondary',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        component="dd"
+        sx={{ m: 0, mt: 0.25, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}
+      >
+        {value}
+      </Typography>
+    </Box>
   )
 }
 
 export default function StockCard({ stock }: { stock: Stock }) {
   const up = (stock.change ?? 0) >= 0
-  const changeColor = up ? 'text-emerald-400' : 'text-red-400'
+  const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
   const asOf = stock.as_of ? new Date(stock.as_of).toLocaleString() : '—'
-  const [logoFailed, setLogoFailed] = useState(false)
 
   return (
-    <div className="rounded-2xl border border-gray-700 bg-gray-900/60 p-6 shadow-lg">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-4">
-          {!logoFailed && (
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1.5">
-              <img
-                src={stockLogoUrl(stock.symbol)}
-                alt={`${stock.symbol} logo`}
-                className="h-full w-full object-contain"
-                loading="lazy"
-                onError={() => setLogoFailed(true)}
-              />
-            </div>
-          )}
-          <div>
-            <h2 className="text-2xl font-bold text-white">{stock.symbol}</h2>
-            {stock.name && (
-              <p className="text-sm text-gray-400">{stock.name}</p>
-            )}
-            {stock.exchange && (
-              <span className="mt-1 inline-block rounded bg-gray-700 px-2 py-0.5 text-xs text-gray-300">
-                {stock.exchange}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="text-3xl font-bold text-white tabular-nums">
-            ${fmt(stock.price)}
-          </div>
-          <div className={`text-sm font-medium tabular-nums ${changeColor}`}>
-            {sign}
-            {fmt(stock.change)} ({sign}
-            {fmt(stock.change_percent)}%)
-          </div>
-        </div>
-      </div>
+    <Card variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+      <CardContent sx={{ p: 3 }}>
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+            <Avatar
+              variant="rounded"
+              src={stockLogoUrl(stock.symbol)}
+              alt={`${stock.symbol} logo`}
+              slotProps={{ img: { loading: 'lazy', style: { objectFit: 'contain' } } }}
+              sx={{ width: 56, height: 56, bgcolor: '#fff', color: '#111', p: 0.75 }}
+            >
+              {stock.symbol.charAt(0)}
+            </Avatar>
+            <Box>
+              <Typography variant="h5" component="h2" sx={{ fontWeight: 700 }}>
+                {stock.symbol}
+              </Typography>
+              {stock.name && (
+                <Typography variant="body2" color="text.secondary">
+                  {stock.name}
+                </Typography>
+              )}
+              {stock.exchange && (
+                <Chip
+                  label={stock.exchange}
+                  size="small"
+                  sx={{ mt: 0.5, height: 20, fontSize: '0.7rem' }}
+                />
+              )}
+            </Box>
+          </Stack>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+              ${fmt(stock.price)}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 500, color: changeColor, fontVariantNumeric: 'tabular-nums' }}
+            >
+              {sign}
+              {fmt(stock.change)} ({sign}
+              {fmt(stock.change_percent)}%)
+            </Typography>
+          </Box>
+        </Stack>
 
-      <dl className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Stat label="Open" value={fmt(stock.open)} />
-        <Stat label="High" value={fmt(stock.high)} />
-        <Stat label="Low" value={fmt(stock.low)} />
-        <Stat label="Prev Close" value={fmt(stock.previous_close)} />
-        <Stat label="Bid" value={fmt(stock.bid)} />
-        <Stat label="Ask" value={fmt(stock.ask)} />
-        <Stat label="Spread" value={fmt(stock.spread)} />
-        <Stat label="Volume" value={fmtInt(stock.volume)} />
-      </dl>
+        <Box
+          component="dl"
+          sx={{
+            mt: 3,
+            mb: 0,
+            display: 'grid',
+            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+            gap: 1,
+          }}
+        >
+          <Stat label="Open" value={fmt(stock.open)} />
+          <Stat label="High" value={fmt(stock.high)} />
+          <Stat label="Low" value={fmt(stock.low)} />
+          <Stat label="Prev Close" value={fmt(stock.previous_close)} />
+          <Stat label="Bid" value={fmt(stock.bid)} />
+          <Stat label="Ask" value={fmt(stock.ask)} />
+          <Stat label="Spread" value={fmt(stock.spread)} />
+          <Stat label="Volume" value={fmtInt(stock.volume)} />
+        </Box>
 
-      <p className="mt-4 text-right text-xs text-gray-500">As of {asOf}</p>
-    </div>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', mt: 2, textAlign: 'right' }}
+        >
+          As of {asOf}
+        </Typography>
+      </CardContent>
+    </Card>
   )
 }
