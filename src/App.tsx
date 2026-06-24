@@ -117,7 +117,10 @@ function App() {
             <IconButton
               aria-label="Open navigation menu"
               onClick={() => setDrawerOpen(true)}
-              sx={{ display: { xs: 'inline-flex', md: 'none' }, color: 'text.primary' }}
+              sx={{
+                display: { xs: 'inline-flex', md: 'none' },
+                color: 'text.primary',
+              }}
             >
               <MenuIcon />
             </IconButton>
@@ -129,7 +132,9 @@ function App() {
         anchor="right"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        slotProps={{ paper: { sx: { width: 260, bgcolor: 'background.paper' } } }}
+        slotProps={{
+          paper: { sx: { width: 260, bgcolor: 'background.paper' } },
+        }}
       >
         <Box sx={{ p: 2 }}>
           <Brand />

@@ -1,5 +1,13 @@
 import type { ReactNode } from 'react'
-import { Avatar, Box, Card, CardContent, Chip, Stack, Typography } from '@mui/material'
+import {
+  Avatar,
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Typography,
+} from '@mui/material'
 import MemoryIcon from '@mui/icons-material/Memory'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import MonitorHeartIcon from '@mui/icons-material/MonitorHeart'
@@ -84,7 +92,11 @@ function PerformanceStrip({
           >
             <Typography
               variant="caption"
-              sx={{ color: 'text.secondary', display: 'block', fontSize: '0.65rem' }}
+              sx={{
+                color: 'text.secondary',
+                display: 'block',
+                fontSize: '0.65rem',
+              }}
             >
               {label}
             </Typography>

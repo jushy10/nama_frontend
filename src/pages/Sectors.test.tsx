@@ -14,7 +14,14 @@ const sectorsSample = {
       change_percent: -0.64,
       previous_close: 184.16,
       as_of: '2026-06-24T18:31:33.886477Z',
-      performance: { '1w': -1.41, '1m': 1.53, '3m': 33.88, '6m': 25.13, ytd: 27.19, '1y': -25.95 },
+      performance: {
+        '1w': -1.41,
+        '1m': 1.53,
+        '3m': 33.88,
+        '6m': 25.13,
+        ytd: 27.19,
+        '1y': -25.95,
+      },
     },
     {
       sector: 'Industrials',
@@ -24,7 +31,14 @@ const sectorsSample = {
       change_percent: 1.3,
       previous_close: 178.14,
       as_of: '2026-06-24T18:31:06.395507Z',
-      performance: { '1w': 0.5, '1m': 5.11, '3m': 9.32, '6m': 14.62, ytd: 16.37, '1y': 24.41 },
+      performance: {
+        '1w': 0.5,
+        '1m': 5.11,
+        '3m': 9.32,
+        '6m': 14.62,
+        ytd: 16.37,
+        '1y': 24.41,
+      },
     },
     {
       sector: 'Energy',
@@ -34,7 +48,14 @@ const sectorsSample = {
       change_percent: -1.93,
       previous_close: 54.45,
       as_of: '2026-06-24T18:30:32.085662Z',
-      performance: { '1w': -2.36, '1m': -10.18, '3m': -11.85, '6m': 20.37, ytd: 19.41, '1y': -37.1 },
+      performance: {
+        '1w': -2.36,
+        '1m': -10.18,
+        '3m': -11.85,
+        '6m': 20.37,
+        ytd: 19.41,
+        '1y': -37.1,
+      },
     },
   ],
 }
@@ -43,7 +64,11 @@ function stubFetch(payload: unknown) {
   vi.stubGlobal(
     'fetch',
     vi.fn(() =>
-      Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(payload) }),
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(payload),
+      }),
     ),
   )
 }
@@ -79,12 +104,16 @@ describe('Sectors page', () => {
     await screen.findByText('Technology')
 
     // Default YTD order: Technology (27.19) > Energy (19.41) > Industrials (16.37).
-    const ytdOrder = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    const ytdOrder = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent)
     expect(ytdOrder).toEqual(['Technology', 'Energy', 'Industrials'])
 
     // Switch to 3M: Technology (33.88) > Industrials (9.32) > Energy (-11.85).
     await user.click(screen.getByRole('button', { name: '3M' }))
-    const m3Order = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
+    const m3Order = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent)
     expect(m3Order).toEqual(['Technology', 'Industrials', 'Energy'])
     expect(screen.getAllByText(/3m return/i).length).toBe(3)
   })
@@ -95,11 +124,14 @@ describe('Sectors page', () => {
       vi.fn().mockResolvedValue({
         ok: false,
         status: 500,
-        json: () => Promise.resolve({ detail: 'Upstream sector feed unavailable.' }),
+        json: () =>
+          Promise.resolve({ detail: 'Upstream sector feed unavailable.' }),
       }),
     )
     render(<Sectors />)
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/upstream sector feed/i)
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /upstream sector feed/i,
+    )
   })
 })

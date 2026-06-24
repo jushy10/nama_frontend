@@ -116,7 +116,10 @@ export default function Sectors() {
           sx={{ mt: 2, flexWrap: 'wrap', color: 'text.secondary' }}
         >
           <Typography variant="body2">
-            <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
+            <Box
+              component="span"
+              sx={{ color: 'success.main', fontWeight: 600 }}
+            >
               {up} up
             </Box>{' '}
             ·{' '}
