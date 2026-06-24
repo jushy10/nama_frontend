@@ -55,7 +55,11 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
     <Box>
       <Typography
         variant="caption"
-        sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+        sx={{
+          color: 'text.secondary',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
       >
         Performance
       </Typography>
@@ -69,7 +73,12 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
       >
         {PERF_WINDOWS.map(({ key, label }) => {
           const v = perf[key]
-          const color = v == null ? 'text.secondary' : v >= 0 ? 'success.main' : 'error.main'
+          const color =
+            v == null
+              ? 'text.secondary'
+              : v >= 0
+                ? 'success.main'
+                : 'error.main'
           return (
             <Box
               key={key}
@@ -81,10 +90,20 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
                 textAlign: 'center',
               }}
             >
-              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.secondary', display: 'block' }}
+              >
                 {label}
               </Typography>
-              <Typography sx={{ fontWeight: 600, color, fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem' }}>
+              <Typography
+                sx={{
+                  fontWeight: 600,
+                  color,
+                  fontVariantNumeric: 'tabular-nums',
+                  fontSize: '0.85rem',
+                }}
+              >
                 {fmtPct(v)}
               </Typography>
             </Box>
@@ -97,7 +116,14 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ borderRadius: 2, bgcolor: 'rgba(255,255,255,0.04)', px: 1.5, py: 1 }}>
+    <Box
+      sx={{
+        borderRadius: 2,
+        bgcolor: 'rgba(255,255,255,0.04)',
+        px: 1.5,
+        py: 1,
+      }}
+    >
       <Typography
         component="dt"
         variant="caption"
@@ -111,7 +137,12 @@ function Stat({ label, value }: { label: string; value: string }) {
       </Typography>
       <Typography
         component="dd"
-        sx={{ m: 0, mt: 0.25, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}
+        sx={{
+          m: 0,
+          mt: 0.25,
+          fontWeight: 500,
+          fontVariantNumeric: 'tabular-nums',
+        }}
       >
         {value}
       </Typography>
@@ -138,8 +169,16 @@ export default function StockCard({ stock }: { stock: Stock }) {
               variant="rounded"
               src={stockLogoUrl(stock.symbol)}
               alt={`${stock.symbol} logo`}
-              slotProps={{ img: { loading: 'lazy', style: { objectFit: 'contain' } } }}
-              sx={{ width: 56, height: 56, bgcolor: '#fff', color: '#111', p: 0.75 }}
+              slotProps={{
+                img: { loading: 'lazy', style: { objectFit: 'contain' } },
+              }}
+              sx={{
+                width: 56,
+                height: 56,
+                bgcolor: '#fff',
+                color: '#111',
+                p: 0.75,
+              }}
             >
               {stock.symbol.charAt(0)}
             </Avatar>
@@ -162,12 +201,19 @@ export default function StockCard({ stock }: { stock: Stock }) {
             </Box>
           </Stack>
           <Box sx={{ textAlign: 'right' }}>
-            <Typography variant="h4" sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+            <Typography
+              variant="h4"
+              sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+            >
               ${fmt(stock.price)}
             </Typography>
             <Typography
               variant="body2"
-              sx={{ fontWeight: 500, color: changeColor, fontVariantNumeric: 'tabular-nums' }}
+              sx={{
+                fontWeight: 500,
+                color: changeColor,
+                fontVariantNumeric: 'tabular-nums',
+              }}
             >
               {sign}
               {fmt(stock.change)} ({sign}
@@ -196,7 +242,10 @@ export default function StockCard({ stock }: { stock: Stock }) {
           <Stat label="Volume" value={fmtInt(stock.volume)} />
           <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
           <Stat label="Div Yield" value={fmtYield(stock.dividend_yield)} />
-          <Stat label="Div / Share" value={fmtDollars(stock.dividend_per_share)} />
+          <Stat
+            label="Div / Share"
+            value={fmtDollars(stock.dividend_per_share)}
+          />
         </Box>
 
         {stock.performance && (

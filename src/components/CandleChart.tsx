@@ -11,7 +11,10 @@ const PAD = { top: 14, right: 58, bottom: 26, left: 10 }
 const VOL_BAND = 54 // height reserved for the volume histogram at the bottom
 
 const fmtPrice = (n: number) =>
-  n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
 
 const fmtAxis = (n: number) =>
   n.toLocaleString('en-US', { maximumFractionDigits: n < 10 ? 2 : 0 })
@@ -19,13 +22,25 @@ const fmtAxis = (n: number) =>
 const fmtVol = (n: number | null) =>
   n == null
     ? '—'
-    : n.toLocaleString('en-US', { notation: 'compact', maximumFractionDigits: 1 })
+    : n.toLocaleString('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      })
 
 function fmtDate(ts: string, intraday: boolean) {
   const d = new Date(ts)
   return intraday
-    ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-    : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })
+    ? d.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      })
+    : d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: '2-digit',
+      })
 }
 
 interface Props {
@@ -73,12 +88,16 @@ export default function CandleChart({ candles, timeframe }: Props) {
     const bodyW = Math.max(1, Math.min(slot * 0.68, 13))
 
     const x = (i: number) => PAD.left + slot * (i + 0.5)
-    const y = (p: number) => PAD.top + (1 - (p - min) / (max - min || 1)) * priceH
+    const y = (p: number) =>
+      PAD.top + (1 - (p - min) / (max - min || 1)) * priceH
     const volTop = PAD.top + priceH
     const volY = (v: number) => volTop + VOL_BAND - (v / maxVol) * VOL_BAND
 
     const tickN = 4
-    const priceTicks = Array.from({ length: tickN + 1 }, (_, i) => min + ((max - min) * i) / tickN)
+    const priceTicks = Array.from(
+      { length: tickN + 1 },
+      (_, i) => min + ((max - min) * i) / tickN,
+    )
     const dateN = Math.min(6, n)
     const dateIdx = Array.from({ length: dateN }, (_, i) =>
       Math.round((i * (n - 1)) / Math.max(dateN - 1, 1)),
@@ -114,7 +133,13 @@ export default function CandleChart({ candles, timeframe }: Props) {
       <Box component="span" sx={{ color: axis }}>
         {label}
       </Box>{' '}
-      <Box component="span" sx={{ color: color ?? 'text.primary', fontVariantNumeric: 'tabular-nums' }}>
+      <Box
+        component="span"
+        sx={{
+          color: color ?? 'text.primary',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
         {value}
       </Box>
     </Box>
@@ -141,7 +166,11 @@ export default function CandleChart({ candles, timeframe }: Props) {
         {legendCell('H', fmtPrice(c.high))}
         {legendCell('L', fmtPrice(c.low))}
         {legendCell('C', fmtPrice(c.close), cUp ? up : down)}
-        {legendCell('', `${cUp ? '+' : ''}${chgPct.toFixed(2)}%`, cUp ? up : down)}
+        {legendCell(
+          '',
+          `${cUp ? '+' : ''}${chgPct.toFixed(2)}%`,
+          cUp ? up : down,
+        )}
         {legendCell('Vol', fmtVol(c.volume))}
       </Stack>
 
@@ -151,19 +180,44 @@ export default function CandleChart({ candles, timeframe }: Props) {
         preserveAspectRatio="none"
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
-        sx={{ width: '100%', height: 'auto', display: 'block', touchAction: 'none', cursor: 'crosshair' }}
+        sx={{
+          width: '100%',
+          height: 'auto',
+          display: 'block',
+          touchAction: 'none',
+          cursor: 'crosshair',
+        }}
       >
         {/* horizontal gridlines + price axis labels (right) */}
         {priceTicks.map((p, i) => (
           <g key={`p${i}`}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={y(p)} y2={y(p)} stroke={grid} strokeWidth={1} />
-            <text x={W - PAD.right + 6} y={y(p) + 3.5} fontSize={11} fill={axis}>
+            <line
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={y(p)}
+              y2={y(p)}
+              stroke={grid}
+              strokeWidth={1}
+            />
+            <text
+              x={W - PAD.right + 6}
+              y={y(p) + 3.5}
+              fontSize={11}
+              fill={axis}
+            >
               {fmtAxis(p)}
             </text>
           </g>
         ))}
         {/* divider above the volume band */}
-        <line x1={PAD.left} x2={W - PAD.right} y1={volTop} y2={volTop} stroke={grid} strokeWidth={1} />
+        <line
+          x1={PAD.left}
+          x2={W - PAD.right}
+          y1={volTop}
+          y2={volTop}
+          stroke={grid}
+          strokeWidth={1}
+        />
 
         {/* date axis labels — pin the first/last to the plot edges and anchor
             them inward so they never spill past the viewBox and get clipped. */}
@@ -173,7 +227,14 @@ export default function CandleChart({ candles, timeframe }: Props) {
           const anchor = isFirst ? 'start' : isLast ? 'end' : 'middle'
           const tx = isFirst ? PAD.left : isLast ? W - PAD.right : x(i)
           return (
-            <text key={`d${i}`} x={tx} y={H - 8} fontSize={11} fill={axis} textAnchor={anchor}>
+            <text
+              key={`d${i}`}
+              x={tx}
+              y={H - 8}
+              fontSize={11}
+              fill={axis}
+              textAnchor={anchor}
+            >
               {fmtDate(candles[i].timestamp, intraday)}
             </text>
           )
@@ -204,8 +265,21 @@ export default function CandleChart({ candles, timeframe }: Props) {
           const h = Math.max(1, Math.abs(yc - yo))
           return (
             <g key={`c${i}`}>
-              <line x1={x(i)} x2={x(i)} y1={y(d.high)} y2={y(d.low)} stroke={color} strokeWidth={1} />
-              <rect x={x(i) - bodyW / 2} y={top} width={bodyW} height={h} fill={color} />
+              <line
+                x1={x(i)}
+                x2={x(i)}
+                y1={y(d.high)}
+                y2={y(d.low)}
+                stroke={color}
+                strokeWidth={1}
+              />
+              <rect
+                x={x(i) - bodyW / 2}
+                y={top}
+                width={bodyW}
+                height={h}
+                fill={color}
+              />
             </g>
           )
         })}
@@ -213,7 +287,16 @@ export default function CandleChart({ candles, timeframe }: Props) {
         {/* hover crosshair */}
         {hover != null && (
           <g pointerEvents="none">
-            <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={H - PAD.bottom} stroke={axis} strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
+            <line
+              x1={x(hover)}
+              x2={x(hover)}
+              y1={PAD.top}
+              y2={H - PAD.bottom}
+              stroke={axis}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.6}
+            />
           </g>
         )}
       </Box>

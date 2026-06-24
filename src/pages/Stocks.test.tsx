@@ -22,7 +22,14 @@ const sample = {
   market_cap: 3_210_000_000_000,
   dividend_per_share: 0.04,
   dividend_yield: 0.02,
-  performance: { '1w': 3.1, '1m': -1.2, '3m': 8.4, '6m': 15.0, ytd: 22.3, '1y': 40.1 },
+  performance: {
+    '1w': 3.1,
+    '1m': -1.2,
+    '3m': 8.4,
+    '6m': 15.0,
+    ytd: 22.3,
+    '1y': 40.1,
+  },
 }
 
 const candlesSample = {
@@ -30,8 +37,26 @@ const candlesSample = {
   timeframe: '1Day',
   count: 2,
   candles: [
-    { time: 1718668800, timestamp: '2026-06-17T00:00:00Z', open: 200, high: 210, low: 198, close: 205, volume: 1_000_000, direction: 'up' },
-    { time: 1718755200, timestamp: '2026-06-18T00:00:00Z', open: 205, high: 212, low: 204, close: 209.97, volume: 1_200_000, direction: 'up' },
+    {
+      time: 1718668800,
+      timestamp: '2026-06-17T00:00:00Z',
+      open: 200,
+      high: 210,
+      low: 198,
+      close: 205,
+      volume: 1_000_000,
+      direction: 'up',
+    },
+    {
+      time: 1718755200,
+      timestamp: '2026-06-18T00:00:00Z',
+      open: 205,
+      high: 212,
+      low: 204,
+      close: 209.97,
+      volume: 1_200_000,
+      direction: 'up',
+    },
   ],
 }
 

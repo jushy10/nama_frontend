@@ -146,7 +146,11 @@ export async function getStock(symbol: string): Promise<Stock> {
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
 export async function getCandles(
   symbol: string,
-  opts: { range?: ChartRange; timeframe?: Timeframe; signal?: AbortSignal } = {},
+  opts: {
+    range?: ChartRange
+    timeframe?: Timeframe
+    signal?: AbortSignal
+  } = {},
 ): Promise<CandleSeries> {
   const range = opts.range ?? '6M'
   const timeframe = opts.timeframe ?? defaultTimeframe(range)

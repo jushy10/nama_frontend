@@ -34,8 +34,14 @@ function Brand() {
       }}
     >
       <ShowChartIcon sx={{ color: 'primary.light' }} />
-      <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}>
-        Nama <Box component="span" sx={{ color: 'primary.light' }}>Insights</Box>
+      <Typography
+        variant="h6"
+        sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
+      >
+        Nama{' '}
+        <Box component="span" sx={{ color: 'primary.light' }}>
+          Insights
+        </Box>
       </Typography>
     </Box>
   )
@@ -81,7 +87,10 @@ function App() {
                     fontWeight: 500,
                     minWidth: 0,
                     p: 0,
-                    '&:hover': { color: 'text.primary', bgcolor: 'transparent' },
+                    '&:hover': {
+                      color: 'text.primary',
+                      bgcolor: 'transparent',
+                    },
                     '&.active': { color: 'text.primary' },
                   }}
                 >

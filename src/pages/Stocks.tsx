@@ -89,11 +89,16 @@ export default function Stocks() {
 
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
-      <Typography variant="h4" component="h1" sx={{ color: 'primary.light', fontWeight: 700 }}>
+      <Typography
+        variant="h4"
+        component="h1"
+        sx={{ color: 'primary.light', fontWeight: 700 }}
+      >
         Stock Search
       </Typography>
       <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
-        Enter a ticker symbol for a live snapshot and candlestick chart from Alpaca.
+        Enter a ticker symbol for a live snapshot and candlestick chart from
+        Alpaca.
       </Typography>
 
       <Stack
@@ -138,26 +143,43 @@ export default function Stocks() {
           <Stack spacing={3}>
             <StockCard stock={status.stock} />
 
-            <Card variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+            <Card
+              variant="outlined"
+              sx={{ borderColor: 'rgba(255,255,255,0.12)' }}
+            >
               <CardContent sx={{ p: 3 }}>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}
                   spacing={1.5}
-                  sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' }, mb: 2 }}
+                  sx={{
+                    justifyContent: 'space-between',
+                    alignItems: { sm: 'center' },
+                    mb: 2,
+                  }}
                 >
-                  <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                  <Typography
+                    variant="h6"
+                    component="h2"
+                    sx={{ fontWeight: 600 }}
+                  >
                     Price chart
                   </Typography>
                   <ToggleButtonGroup
                     size="small"
                     exclusive
                     value={range}
-                    onChange={(_, value: ChartRange | null) => value && setRange(value)}
+                    onChange={(_, value: ChartRange | null) =>
+                      value && setRange(value)
+                    }
                     aria-label="Chart range"
                     sx={{ flexWrap: 'wrap' }}
                   >
                     {RANGE_OPTIONS.map((r) => (
-                      <ToggleButton key={r} value={r} sx={{ px: 1.5, py: 0.25 }}>
+                      <ToggleButton
+                        key={r}
+                        value={r}
+                        sx={{ px: 1.5, py: 0.25 }}
+                      >
                         {r}
                       </ToggleButton>
                     ))}
@@ -165,7 +187,13 @@ export default function Stocks() {
                 </Stack>
 
                 {candle.state === 'loading' && (
-                  <Stack sx={{ alignItems: 'center', justifyContent: 'center', minHeight: 280 }}>
+                  <Stack
+                    sx={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      minHeight: 280,
+                    }}
+                  >
                     <CircularProgress />
                   </Stack>
                 )}
