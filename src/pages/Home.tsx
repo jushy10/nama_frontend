@@ -1,4 +1,18 @@
 import type { ReactNode } from 'react'
+import {
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Chip,
+  Container,
+  Paper,
+  Stack,
+  Typography,
+} from '@mui/material'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
 
 type Feature = {
   title: string
@@ -11,21 +25,19 @@ const features: Feature[] = [
     title: 'Real-time market data',
     description:
       'Live prices, volume, and the day’s biggest movers across thousands of equities — refreshed by the second.',
-    icon: <path d="M3 3v18h18M7 14l4-4 3 3 5-6" />,
+    icon: <TrendingUpIcon />,
   },
   {
     title: 'AI-powered analysis',
     description:
       'Plain-English summaries of earnings, filings, and sentiment so you understand what’s moving and why.',
-    icon: (
-      <path d="M12 3a4 4 0 0 0-4 4 4 4 0 0 0-2 7 4 4 0 0 0 6 5 4 4 0 0 0 6-5 4 4 0 0 0-2-7 4 4 0 0 0-4-4ZM12 8v8M9 12h6" />
-    ),
+    icon: <AutoAwesomeIcon />,
   },
   {
     title: 'Portfolio tracking',
     description:
       'Connect your holdings and get personalized alerts the moment something needs your attention.',
-    icon: <path d="M3 3v18h18M18 9l-5 5-3-3-4 4" />,
+    icon: <AccountBalanceWalletIcon />,
   },
 ]
 
@@ -37,67 +49,121 @@ const stats = [
 
 function FeatureCard({ title, description, icon }: Feature) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-6 transition-colors hover:border-indigo-500/40">
-      <div className="mb-4 inline-flex rounded-lg bg-indigo-500/10 p-2.5">
-        <svg
-          viewBox="0 0 24 24"
-          className="h-6 w-6 text-indigo-400"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={1.8}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
+    <Card
+      variant="outlined"
+      sx={{
+        height: '100%',
+        bgcolor: 'rgba(255,255,255,0.03)',
+        borderColor: 'rgba(255,255,255,0.1)',
+        transition: 'border-color 150ms',
+        '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Box
+          sx={{
+            display: 'inline-flex',
+            p: 1.25,
+            mb: 2,
+            borderRadius: 2,
+            bgcolor: 'rgba(99,102,241,0.1)',
+            color: 'primary.light',
+          }}
         >
           {icon}
-        </svg>
-      </div>
-      <h3 className="mb-2 text-lg font-semibold text-white">{title}</h3>
-      <p className="text-sm leading-relaxed text-gray-400">{description}</p>
-    </div>
+        </Box>
+        <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+          {description}
+        </Typography>
+      </CardContent>
+    </Card>
   )
 }
 
 function SampleCard() {
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-gradient-to-b from-white/10 to-white/[0.02] p-6 shadow-2xl shadow-indigo-950/40">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-lg font-semibold text-white">NVDA</p>
-          <p className="text-xs text-gray-400">NVIDIA Corp</p>
-        </div>
-        <div className="text-right">
-          <p className="text-lg font-semibold text-white">$128.40</p>
-          <p className="text-xs font-medium text-emerald-400">+2.41%</p>
-        </div>
-      </div>
+    <Card
+      variant="outlined"
+      sx={{
+        width: '100%',
+        maxWidth: 360,
+        borderColor: 'rgba(255,255,255,0.1)',
+        background:
+          'linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(255,255,255,0.02))',
+        boxShadow: '0 25px 50px -12px rgba(30,27,75,0.4)',
+      }}
+    >
+      <CardContent sx={{ p: 3 }}>
+        <Stack
+          direction="row"
+          sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
+        >
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              NVDA
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              NVIDIA Corp
+            </Typography>
+          </Box>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              $128.40
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 500 }}>
+              +2.41%
+            </Typography>
+          </Box>
+        </Stack>
 
-      <svg
-        viewBox="0 0 300 80"
-        className="mt-5 h-20 w-full"
-        preserveAspectRatio="none"
-        aria-hidden="true"
-      >
-        <polyline
-          points="0,60 40,52 80,58 120,40 160,44 200,28 240,30 300,12"
-          fill="none"
-          stroke="#34d399"
-          strokeWidth={2}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+        <Box
+          component="svg"
+          viewBox="0 0 300 80"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+          sx={{ mt: 2.5, height: 80, width: '100%' }}
+        >
+          <polyline
+            points="0,60 40,52 80,58 120,40 160,44 200,28 240,30 300,12"
+            fill="none"
+            stroke="#34d399"
+            strokeWidth={2}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </Box>
 
-      <div className="mt-5 rounded-lg border border-indigo-500/20 bg-indigo-500/10 p-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-indigo-300">
-          AI Insight
-        </p>
-        <p className="mt-1 text-sm text-gray-200">
-          Momentum stays strong into earnings, with rising volume and improving
-          sentiment across analyst notes.
-        </p>
-      </div>
-    </div>
+        <Box
+          sx={{
+            mt: 2.5,
+            p: 1.5,
+            borderRadius: 2,
+            border: 1,
+            borderColor: 'rgba(99,102,241,0.2)',
+            bgcolor: 'rgba(99,102,241,0.1)',
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 500,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+              color: 'primary.light',
+            }}
+          >
+            AI Insight
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.5, color: 'text.primary' }}>
+            Momentum stays strong into earnings, with rising volume and improving
+            sentiment across analyst notes.
+          </Typography>
+        </Box>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -105,92 +171,154 @@ function Home() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div
-          className="pointer-events-none absolute -top-40 left-1/2 h-96 w-[40rem] -translate-x-1/2 rounded-full bg-indigo-600/20 blur-3xl"
+      <Box sx={{ position: 'relative', overflow: 'hidden' }}>
+        <Box
           aria-hidden="true"
+          sx={{
+            pointerEvents: 'none',
+            position: 'absolute',
+            top: -160,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            height: 384,
+            width: 640,
+            borderRadius: '50%',
+            bgcolor: 'rgba(79,70,229,0.2)',
+            filter: 'blur(96px)',
+          }}
         />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 py-20 lg:grid-cols-2 lg:py-28">
-          <div>
-            <span className="inline-flex items-center rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-300">
-              Now in early access
-            </span>
-            <h1 className="mt-5 text-4xl font-bold tracking-tight text-white sm:text-5xl">
-              Make smarter stock decisions, faster.
-            </h1>
-            <p className="mt-5 max-w-xl text-lg leading-relaxed text-gray-400">
-              Nama Insights turns raw market data into clear, AI-powered
-              analysis — so you always know what’s moving and why, without the
-              noise.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#waitlist"
-                className="rounded-md bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
+        <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 10, lg: 14 } }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' },
+              gap: 6,
+              alignItems: 'center',
+            }}
+          >
+            <Box>
+              <Chip
+                label="Now in early access"
+                size="small"
+                sx={{
+                  color: 'primary.light',
+                  bgcolor: 'rgba(99,102,241,0.1)',
+                  border: 1,
+                  borderColor: 'rgba(99,102,241,0.3)',
+                }}
+              />
+              <Typography
+                variant="h2"
+                component="h1"
+                sx={{ mt: 2.5, fontSize: { xs: '2.25rem', sm: '3rem' } }}
               >
-                Start for free
-              </a>
-              <a
-                href="#features"
-                className="rounded-md border border-white/15 px-5 py-2.5 text-sm font-semibold text-gray-200 transition-colors hover:bg-white/5"
+                Make smarter stock decisions, faster.
+              </Typography>
+              <Typography
+                variant="h6"
+                component="p"
+                color="text.secondary"
+                sx={{ mt: 2.5, maxWidth: 560, fontWeight: 400, lineHeight: 1.7 }}
               >
-                See how it works
-              </a>
-            </div>
-          </div>
+                Nama Insights turns raw market data into clear, AI-powered analysis
+                — so you always know what’s moving and why, without the noise.
+              </Typography>
+              <Stack direction="row" spacing={1.5} sx={{ mt: 4, flexWrap: 'wrap' }}>
+                <Button href="#waitlist" variant="contained" size="large">
+                  Start for free
+                </Button>
+                <Button href="#features" variant="outlined" color="inherit" size="large">
+                  See how it works
+                </Button>
+              </Stack>
+            </Box>
 
-          <div className="flex justify-center lg:justify-end">
-            <SampleCard />
-          </div>
-        </div>
-      </section>
+            <Box sx={{ display: 'flex', justifyContent: { xs: 'center', lg: 'flex-end' } }}>
+              <SampleCard />
+            </Box>
+          </Box>
+        </Container>
+      </Box>
 
       {/* Stats */}
-      <section className="border-y border-white/5 bg-white/[0.02]">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-8 px-6 py-10 sm:grid-cols-3">
-          {stats.map((stat) => (
-            <div key={stat.label} className="text-center">
-              <p className="text-3xl font-bold text-white">{stat.value}</p>
-              <p className="mt-1 text-sm text-gray-400">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <Box
+        sx={{
+          borderTop: 1,
+          borderBottom: 1,
+          borderColor: 'divider',
+          bgcolor: 'rgba(255,255,255,0.02)',
+        }}
+      >
+        <Container maxWidth="lg" sx={{ py: 5 }}>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
+              gap: 4,
+            }}
+          >
+            {stats.map((stat) => (
+              <Box key={stat.label} sx={{ textAlign: 'center' }}>
+                <Typography variant="h4" sx={{ fontWeight: 700 }}>
+                  {stat.value}
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {stat.label}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        </Container>
+      </Box>
 
       {/* Features */}
-      <section id="features" className="mx-auto max-w-6xl px-6 py-20">
-        <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white">
+      <Container id="features" maxWidth="lg" sx={{ py: 10 }}>
+        <Box sx={{ maxWidth: 640, mx: 'auto', textAlign: 'center' }}>
+          <Typography variant="h3" component="h2">
             Everything you need to stay ahead
-          </h2>
-          <p className="mt-4 text-gray-400">
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 2 }}>
             Built for investors who want signal, not spreadsheets.
-          </p>
-        </div>
-        <div className="mt-12 grid gap-6 md:grid-cols-3">
+          </Typography>
+        </Box>
+        <Box
+          sx={{
+            mt: 6,
+            display: 'grid',
+            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
+            gap: 3,
+          }}
+        >
           {features.map((feature) => (
             <FeatureCard key={feature.title} {...feature} />
           ))}
-        </div>
-      </section>
+        </Box>
+      </Container>
 
       {/* CTA */}
-      <section id="waitlist" className="mx-auto max-w-6xl px-6 pb-24">
-        <div className="rounded-2xl border border-indigo-500/20 bg-gradient-to-r from-indigo-600/20 to-purple-600/10 px-8 py-14 text-center">
-          <h2 className="text-3xl font-bold tracking-tight text-white">
+      <Container id="waitlist" maxWidth="lg" sx={{ pb: 12 }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            px: { xs: 4, sm: 8 },
+            py: 7,
+            textAlign: 'center',
+            borderColor: 'rgba(99,102,241,0.2)',
+            background:
+              'linear-gradient(to right, rgba(79,70,229,0.2), rgba(168,85,247,0.1))',
+          }}
+        >
+          <Typography variant="h3" component="h2">
             Ready to see the market more clearly?
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-gray-300">
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 2, maxWidth: 560, mx: 'auto' }}>
             Join the early access list and be the first to try Nama Insights.
-          </p>
-          <a
-            href="#"
-            className="mt-8 inline-flex rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-indigo-500"
-          >
+          </Typography>
+          <Button href="#" variant="contained" size="large" sx={{ mt: 4 }}>
             Get early access
-          </a>
-        </div>
-      </section>
+          </Button>
+        </Paper>
+      </Container>
     </>
   )
 }

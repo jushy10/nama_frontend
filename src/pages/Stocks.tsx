@@ -1,4 +1,14 @@
 import { useState, type FormEvent } from 'react'
+import {
+  Alert,
+  Box,
+  Button,
+  CircularProgress,
+  Container,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import { ApiError, getStock, type Stock } from '@/lib/api'
 import StockCard from '@/components/StockCard'
 
@@ -30,46 +40,51 @@ export default function Stocks() {
     }
   }
 
-  return (
-    <div className="mx-auto max-w-2xl p-8">
-      <h1 className="mb-2 text-3xl font-bold text-indigo-500">Stock Search</h1>
-      <p className="mb-6 text-gray-400">
-        Enter a ticker symbol to see a live snapshot from Alpaca.
-      </p>
+  const loading = status.state === 'loading'
 
-      <form onSubmit={onSubmit} className="flex gap-2">
-        <input
-          type="text"
+  return (
+    <Container maxWidth="sm" sx={{ py: 6 }}>
+      <Typography variant="h4" component="h1" sx={{ color: 'primary.light', fontWeight: 700 }}>
+        Stock Search
+      </Typography>
+      <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+        Enter a ticker symbol to see a live snapshot from Alpaca.
+      </Typography>
+
+      <Stack component="form" direction="row" spacing={1} onSubmit={onSubmit}>
+        <TextField
+          label="Ticker symbol"
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
           placeholder="e.g. AAPL"
-          aria-label="Ticker symbol"
           autoFocus
-          className="flex-1 rounded-md border border-gray-700 bg-gray-800 px-4 py-2 text-white uppercase placeholder:text-gray-500 placeholder:normal-case focus:border-indigo-500 focus:outline-none"
+          fullWidth
+          slotProps={{ htmlInput: { style: { textTransform: 'uppercase' } } }}
         />
-        <button
+        <Button
           type="submit"
-          disabled={status.state === 'loading' || !symbol.trim()}
-          className="rounded-md bg-indigo-600 px-5 py-2 font-medium text-white transition-colors hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+          variant="contained"
+          size="large"
+          disabled={loading || !symbol.trim()}
+          sx={{ flexShrink: 0 }}
         >
-          {status.state === 'loading' ? 'Searching…' : 'Search'}
-        </button>
-      </form>
+          {loading ? 'Searching…' : 'Search'}
+        </Button>
+      </Stack>
 
-      <div className="mt-8">
-        {status.state === 'loading' && (
-          <p className="text-center text-gray-400">Loading…</p>
+      <Box sx={{ mt: 4 }}>
+        {loading && (
+          <Stack sx={{ alignItems: 'center', py: 2 }}>
+            <CircularProgress />
+          </Stack>
         )}
         {status.state === 'error' && (
-          <div
-            role="alert"
-            className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-red-300"
-          >
+          <Alert severity="error" variant="outlined">
             {status.message}
-          </div>
+          </Alert>
         )}
         {status.state === 'success' && <StockCard stock={status.stock} />}
-      </div>
-    </div>
+      </Box>
+    </Container>
   )
 }
