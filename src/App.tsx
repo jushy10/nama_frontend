@@ -1,21 +1,31 @@
+import { useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import {
   AppBar,
   Box,
   Button,
   Container,
+  Divider,
+  Drawer,
+  IconButton,
+  List,
+  ListItemButton,
+  ListItemText,
   Stack,
   Toolbar,
   Typography,
 } from '@mui/material'
+import MenuIcon from '@mui/icons-material/Menu'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import Home from '@/pages/Home'
 import About from '@/pages/About'
 import Stocks from '@/pages/Stocks'
+import Sectors from '@/pages/Sectors'
 
 const navItems = [
   { label: 'Home', to: '/', end: true },
   { label: 'Stocks', to: '/stocks', end: false },
+  { label: 'Sectors', to: '/sectors', end: false },
   { label: 'About', to: '/about', end: false },
 ]
 
@@ -48,6 +58,8 @@ function Brand() {
 }
 
 function App() {
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   return (
     <Box
       sx={{
@@ -70,10 +82,11 @@ function App() {
         <Container maxWidth="lg">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             <Brand />
+            {/* Desktop: inline nav. Mobile (xs–sm): collapses to a drawer. */}
             <Stack
               direction="row"
-              spacing={{ xs: 2, sm: 3 }}
-              sx={{ alignItems: 'center' }}
+              spacing={3}
+              sx={{ alignItems: 'center', display: { xs: 'none', md: 'flex' } }}
             >
               {navItems.map((item) => (
                 <Button
@@ -101,14 +114,65 @@ function App() {
                 Get started
               </Button>
             </Stack>
+            <IconButton
+              aria-label="Open navigation menu"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ display: { xs: 'inline-flex', md: 'none' }, color: 'text.primary' }}
+            >
+              <MenuIcon />
+            </IconButton>
           </Toolbar>
         </Container>
       </AppBar>
+
+      <Drawer
+        anchor="right"
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        slotProps={{ paper: { sx: { width: 260, bgcolor: 'background.paper' } } }}
+      >
+        <Box sx={{ p: 2 }}>
+          <Brand />
+        </Box>
+        <Divider />
+        <List>
+          {navItems.map((item) => (
+            <ListItemButton
+              key={item.to}
+              component={NavLink}
+              to={item.to}
+              end={item.end}
+              onClick={() => setDrawerOpen(false)}
+              sx={{
+                color: 'text.secondary',
+                '&.active': {
+                  color: 'text.primary',
+                  bgcolor: 'rgba(99,102,241,0.12)',
+                },
+              }}
+            >
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
+        <Box sx={{ px: 2, mt: 1 }}>
+          <Button
+            href="#waitlist"
+            variant="contained"
+            color="primary"
+            fullWidth
+            onClick={() => setDrawerOpen(false)}
+          >
+            Get started
+          </Button>
+        </Box>
+      </Drawer>
 
       <Box component="main" sx={{ flex: 1 }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/stocks" element={<Stocks />} />
+          <Route path="/sectors" element={<Sectors />} />
           <Route path="/about" element={<About />} />
         </Routes>
       </Box>

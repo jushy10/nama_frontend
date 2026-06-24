@@ -32,6 +32,37 @@ export interface Stock {
   performance: StockPerformance | null
 }
 
+/**
+ * A market sector, tracked via its SPDR Select Sector ETF (XLK, XLF, …).
+ * `change`/`change_percent` are the move for the current session; `performance`
+ * holds the trailing returns over longer windows.
+ */
+export interface Sector {
+  sector: string
+  symbol: string
+  price: number
+  change: number | null
+  change_percent: number | null
+  previous_close: number | null
+  as_of: string | null
+  performance: StockPerformance | null
+}
+
+export interface SectorsResponse {
+  count: number
+  sectors: Sector[]
+}
+
+/** Trailing-return windows in display order, for selectors and strips. */
+export const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
+  { key: '1w', label: '1W' },
+  { key: '1m', label: '1M' },
+  { key: '3m', label: '3M' },
+  { key: '6m', label: '6M' },
+  { key: 'ytd', label: 'YTD' },
+  { key: '1y', label: '1Y' },
+]
+
 /** One OHLC candlestick. `time` is UNIX epoch seconds (UTC). */
 export interface Candle {
   time: number
@@ -141,6 +172,17 @@ export async function getStock(symbol: string): Promise<Stock> {
   const res = await fetch(`${API_BASE}/stocks/${encodeURIComponent(symbol)}`)
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as Stock
+}
+
+/** Fetch the day's snapshot for every tracked market sector. */
+export async function getSectors(signal?: AbortSignal): Promise<Sector[]> {
+  const res = await fetch(`${API_BASE}/sectors`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as SectorsResponse
+  if (!Array.isArray(data?.sectors)) {
+    throw new ApiError(res.status, 'Malformed sectors response')
+  }
+  return data.sectors
 }
 
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
