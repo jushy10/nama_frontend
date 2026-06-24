@@ -75,7 +75,11 @@ function FeatureCard({ title, description, icon }: Feature) {
         <Typography variant="h6" component="h3" sx={{ mb: 1 }}>
           {title}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ lineHeight: 1.7 }}
+        >
           {description}
         </Typography>
       </CardContent>
@@ -113,7 +117,10 @@ function SampleCard() {
             <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
               $128.40
             </Typography>
-            <Typography variant="caption" sx={{ color: 'success.main', fontWeight: 500 }}>
+            <Typography
+              variant="caption"
+              sx={{ color: 'success.main', fontWeight: 500 }}
+            >
               +2.41%
             </Typography>
           </Box>
@@ -158,8 +165,8 @@ function SampleCard() {
             AI Insight
           </Typography>
           <Typography variant="body2" sx={{ mt: 0.5, color: 'text.primary' }}>
-            Momentum stays strong into earnings, with rising volume and improving
-            sentiment across analyst notes.
+            Momentum stays strong into earnings, with rising volume and
+            improving sentiment across analyst notes.
           </Typography>
         </Box>
       </CardContent>
@@ -187,7 +194,10 @@ function Home() {
             filter: 'blur(96px)',
           }}
         />
-        <Container maxWidth="lg" sx={{ position: 'relative', py: { xs: 10, lg: 14 } }}>
+        <Container
+          maxWidth="lg"
+          sx={{ position: 'relative', py: { xs: 10, lg: 14 } }}
+        >
           <Box
             sx={{
               display: 'grid',
@@ -218,22 +228,42 @@ function Home() {
                 variant="h6"
                 component="p"
                 color="text.secondary"
-                sx={{ mt: 2.5, maxWidth: 560, fontWeight: 400, lineHeight: 1.7 }}
+                sx={{
+                  mt: 2.5,
+                  maxWidth: 560,
+                  fontWeight: 400,
+                  lineHeight: 1.7,
+                }}
               >
-                Nama Insights turns raw market data into clear, AI-powered analysis
-                — so you always know what’s moving and why, without the noise.
+                Nama Insights turns raw market data into clear, AI-powered
+                analysis — so you always know what’s moving and why, without the
+                noise.
               </Typography>
-              <Stack direction="row" spacing={1.5} sx={{ mt: 4, flexWrap: 'wrap' }}>
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{ mt: 4, flexWrap: 'wrap' }}
+              >
                 <Button href="#waitlist" variant="contained" size="large">
                   Start for free
                 </Button>
-                <Button href="#features" variant="outlined" color="inherit" size="large">
+                <Button
+                  href="#features"
+                  variant="outlined"
+                  color="inherit"
+                  size="large"
+                >
                   See how it works
                 </Button>
               </Stack>
             </Box>
 
-            <Box sx={{ display: 'flex', justifyContent: { xs: 'center', lg: 'flex-end' } }}>
+            <Box
+              sx={{
+                display: 'flex',
+                justifyContent: { xs: 'center', lg: 'flex-end' },
+              }}
+            >
               <SampleCard />
             </Box>
           </Box>
@@ -262,7 +292,11 @@ function Home() {
                 <Typography variant="h4" sx={{ fontWeight: 700 }}>
                   {stat.value}
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
                   {stat.label}
                 </Typography>
               </Box>
@@ -311,7 +345,10 @@ function Home() {
           <Typography variant="h3" component="h2">
             Ready to see the market more clearly?
           </Typography>
-          <Typography color="text.secondary" sx={{ mt: 2, maxWidth: 560, mx: 'auto' }}>
+          <Typography
+            color="text.secondary"
+            sx={{ mt: 2, maxWidth: 560, mx: 'auto' }}
+          >
             Join the early access list and be the first to try Nama Insights.
           </Typography>
           <Button href="#" variant="contained" size="large" sx={{ mt: 4 }}>
