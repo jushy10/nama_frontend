@@ -13,6 +13,7 @@ import {
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet'
+import MarketIndices from '@/components/MarketIndices'
 
 type Feature = {
   title: string
@@ -269,6 +270,9 @@ function Home() {
           </Box>
         </Container>
       </Box>
+
+      {/* Markets today */}
+      <MarketIndices />
 
       {/* Stats */}
       <Box
