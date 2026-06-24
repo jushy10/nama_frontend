@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { stockLogoUrl, type Stock } from '@/lib/api'
+import { stockLogoUrl, type Stock, type StockPerformance } from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null
@@ -19,6 +19,81 @@ const fmt = (n: number | null) =>
 
 const fmtInt = (n: number | null) =>
   n == null ? '—' : n.toLocaleString('en-US')
+
+/** Compact dollar magnitude, e.g. 3.21T / 845.0B / 12.4M. */
+const fmtMoney = (n: number | null) =>
+  n == null
+    ? '—'
+    : '$' +
+      n.toLocaleString('en-US', {
+        notation: 'compact',
+        maximumFractionDigits: 2,
+      })
+
+/** Signed percent for directional figures (returns/changes). */
+const fmtPct = (n: number | null) =>
+  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
+
+/** Unsigned percent — a dividend yield has no direction. */
+const fmtYield = (n: number | null) => (n == null ? '—' : `${n.toFixed(2)}%`)
+
+/** Per-share dollar amount. */
+const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
+
+const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
+  { key: '1w', label: '1W' },
+  { key: '1m', label: '1M' },
+  { key: '3m', label: '3M' },
+  { key: '6m', label: '6M' },
+  { key: 'ytd', label: 'YTD' },
+  { key: '1y', label: '1Y' },
+]
+
+/** Row of trailing-return pills, color-coded green/red by sign. */
+function PerformanceStrip({ perf }: { perf: StockPerformance }) {
+  return (
+    <Box>
+      <Typography
+        variant="caption"
+        sx={{ color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}
+      >
+        Performance
+      </Typography>
+      <Box
+        sx={{
+          mt: 0.75,
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(6, 1fr)' },
+          gap: 1,
+        }}
+      >
+        {PERF_WINDOWS.map(({ key, label }) => {
+          const v = perf[key]
+          const color = v == null ? 'text.secondary' : v >= 0 ? 'success.main' : 'error.main'
+          return (
+            <Box
+              key={key}
+              sx={{
+                borderRadius: 2,
+                bgcolor: 'rgba(255,255,255,0.04)',
+                px: 1,
+                py: 0.75,
+                textAlign: 'center',
+              }}
+            >
+              <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                {label}
+              </Typography>
+              <Typography sx={{ fontWeight: 600, color, fontVariantNumeric: 'tabular-nums', fontSize: '0.85rem' }}>
+                {fmtPct(v)}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Box>
+  )
+}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -119,7 +194,16 @@ export default function StockCard({ stock }: { stock: Stock }) {
           <Stat label="Ask" value={fmt(stock.ask)} />
           <Stat label="Spread" value={fmt(stock.spread)} />
           <Stat label="Volume" value={fmtInt(stock.volume)} />
+          <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
+          <Stat label="Div Yield" value={fmtYield(stock.dividend_yield)} />
+          <Stat label="Div / Share" value={fmtDollars(stock.dividend_per_share)} />
         </Box>
+
+        {stock.performance && (
+          <Box sx={{ mt: 2.5 }}>
+            <PerformanceStrip perf={stock.performance} />
+          </Box>
+        )}
 
         <Typography
           variant="caption"
