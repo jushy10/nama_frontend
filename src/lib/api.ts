@@ -99,6 +99,48 @@ export interface CandleSeries {
   candles: Candle[]
 }
 
+/** Where the latest RSI sits relative to the overbought/oversold thresholds. */
+export type RsiSignal = 'oversold' | 'overbought' | 'neutral'
+
+/** One RSI reading. `time` is UNIX epoch seconds (UTC); `value` is 0–100. */
+export interface RsiPoint {
+  time: number
+  timestamp: string
+  value: number
+}
+
+/**
+ * A Relative Strength Index series. `latest` is the most recent reading (null
+ * when the window is too short to compute one); `signal` classifies it against
+ * `overbought`/`oversold` (conventionally 70/30).
+ */
+export interface RsiSeries {
+  symbol: string
+  timeframe: string
+  period: number
+  count: number
+  latest: number | null
+  signal: RsiSignal
+  overbought: number
+  oversold: number
+  points: RsiPoint[]
+}
+
+/** A trading suggestion derived from RSI: one of three plain calls. */
+export type RsiAction = 'Buy' | 'Sell' | 'Hold'
+
+/**
+ * Map an RSI series to a Buy/Sell/Hold call: oversold (cheap, may rebound) →
+ * Buy, overbought (hot, may cool) → Sell, anything between → Hold. Returns null
+ * when there's no reading to judge.
+ */
+export function rsiVerdict(rsi: RsiSeries): RsiAction | null {
+  if (rsi.latest == null) return null
+  if (rsi.latest <= rsi.oversold) return 'Buy'
+  if (rsi.latest >= rsi.overbought) return 'Sell'
+  return 'Hold'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
@@ -247,6 +289,36 @@ export async function getCandles(
   const data = (await res.json()) as CandleSeries
   if (!Array.isArray(data?.candles)) {
     throw new ApiError(res.status, 'Malformed candle response')
+  }
+  return data
+}
+
+/**
+ * Fetch the RSI series for a ticker. Defaults to the textbook setup — a 14-bar
+ * window on daily candles over the last month — which is enough history to land
+ * a current reading plus a short trend.
+ */
+export async function getRsi(
+  symbol: string,
+  opts: {
+    range?: ChartRange
+    timeframe?: Timeframe
+    period?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<RsiSeries> {
+  const timeframe = opts.timeframe ?? '1Day'
+  const range = opts.range ?? '1M'
+  const period = opts.period ?? 14
+  const qs = new URLSearchParams({ timeframe, range, period: String(period) })
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/rsi?${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as RsiSeries
+  if (!Array.isArray(data?.points)) {
+    throw new ApiError(res.status, 'Malformed RSI response')
   }
   return data
 }
