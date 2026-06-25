@@ -51,7 +51,10 @@ export function ColorModeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const theme = useMemo(() => createAppTheme(mode), [mode])
-  const value = useMemo(() => ({ mode, toggleColorMode }), [mode, toggleColorMode])
+  const value = useMemo(
+    () => ({ mode, toggleColorMode }),
+    [mode, toggleColorMode],
+  )
 
   return (
     <ColorModeContext.Provider value={value}>

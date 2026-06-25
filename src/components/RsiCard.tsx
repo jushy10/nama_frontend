@@ -79,7 +79,8 @@ function Gauge({ rsi, color }: { rsi: RsiSeries; color: string }) {
             height: 16,
             borderRadius: 1,
             bgcolor: color,
-            boxShadow: (theme) => `0 0 0 2px ${theme.palette.background.default}`,
+            boxShadow: (theme) =>
+              `0 0 0 2px ${theme.palette.background.default}`,
           }}
         />
       </Box>
