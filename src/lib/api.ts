@@ -63,6 +63,23 @@ export const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
   { key: '1y', label: '1Y' },
 ]
 
+/** Sector timeframe key: the day's move (`1d`) plus the trailing windows. */
+export type SectorWindow = '1d' | keyof StockPerformance
+
+/**
+ * Windows for the sector timeframe selector. `1D` is the current session's move
+ * (`change_percent`); the rest are trailing returns from `performance`.
+ */
+export const SECTOR_WINDOWS: { key: SectorWindow; label: string }[] = [
+  { key: '1d', label: '1D' },
+  ...PERF_WINDOWS,
+]
+
+/** A sector's return over one window; `1D` reads the current session's move. */
+export function sectorReturn(s: Sector, key: SectorWindow): number | null {
+  return key === '1d' ? s.change_percent : (s.performance?.[key] ?? null)
+}
+
 /** One OHLC candlestick. `time` is UNIX epoch seconds (UTC). */
 export interface Candle {
   time: number

@@ -73,6 +73,34 @@ function stubFetch(payload: unknown) {
   )
 }
 
+/** Routes `/sectors` to the sample and `/stocks/{symbol}` to a per-ticker stub. */
+function stubRoutedFetch(
+  sectors: unknown,
+  stockBySymbol: Record<string, unknown>,
+) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const u = String(url)
+      const m = u.match(/\/stocks\/([^/?]+)/)
+      const payload = m
+        ? (stockBySymbol[decodeURIComponent(m[1])] ?? {
+            symbol: decodeURIComponent(m[1]),
+            name: null,
+            price: 0,
+            change: null,
+            change_percent: null,
+          })
+        : sectors
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(payload),
+      })
+    }),
+  )
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Sectors page', () => {
@@ -116,6 +144,45 @@ describe('Sectors page', () => {
       .map((h) => h.textContent)
     expect(m3Order).toEqual(['Technology', 'Industrials', 'Energy'])
     expect(screen.getAllByText(/3m return/i).length).toBe(3)
+  })
+
+  it('sorts by the day move when 1D is selected', async () => {
+    stubFetch(sectorsSample)
+    const user = userEvent.setup()
+    render(<Sectors />)
+
+    await screen.findByText('Technology')
+
+    // 1D order by change_percent: Industrials (1.3) > Technology (-0.64) > Energy (-1.93).
+    await user.click(screen.getByRole('button', { name: '1D' }))
+    const order = screen
+      .getAllByRole('heading', { level: 3 })
+      .map((h) => h.textContent)
+    expect(order).toEqual(['Industrials', 'Technology', 'Energy'])
+    expect(screen.getAllByText(/1d return/i).length).toBe(3)
+  })
+
+  it('opens the holdings dialog with the sector top stocks on click', async () => {
+    stubRoutedFetch(sectorsSample, {
+      AAPL: {
+        symbol: 'AAPL',
+        name: 'Apple Inc.',
+        price: 200.5,
+        change: 2.1,
+        change_percent: 1.06,
+      },
+    })
+    const user = userEvent.setup()
+    render(<Sectors />)
+
+    await screen.findByText('Technology')
+    await user.click(
+      screen.getByRole('button', { name: /view top holdings in technology/i }),
+    )
+
+    expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
+    expect(screen.getByText('AAPL')).toBeInTheDocument()
+    expect(screen.getByText('Top holdings by index weight')).toBeInTheDocument()
   })
 
   it('shows an error message when the request fails', async () => {

@@ -15,22 +15,26 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import {
   ApiError,
   getSectors,
-  PERF_WINDOWS,
+  sectorReturn,
+  SECTOR_WINDOWS,
   type Sector,
-  type StockPerformance,
+  type SectorWindow,
 } from '@/lib/api'
 import SectorCard from '@/components/SectorCard'
+import SectorStocksDialog from '@/components/SectorStocksDialog'
 
 type Status =
   | { state: 'loading' }
   | { state: 'error'; message: string }
   | { state: 'success'; sectors: Sector[] }
 
-type Window = keyof StockPerformance
+type Window = SectorWindow
 
 export default function Sectors() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   const [timeframe, setTimeframe] = useState<Window>('ytd')
+  // The sector whose holdings drill-down is open (null = closed).
+  const [selected, setSelected] = useState<Sector | null>(null)
   // Bumping this re-runs the fetch effect — drives the refresh button.
   const [nonce, setNonce] = useState(0)
 
@@ -50,14 +54,14 @@ export default function Sectors() {
     return () => ac.abort()
   }, [nonce])
 
-  const tf = PERF_WINDOWS.find((w) => w.key === timeframe) ?? PERF_WINDOWS[0]
+  const tf = SECTOR_WINDOWS.find((w) => w.key === timeframe) ?? SECTOR_WINDOWS[0]
 
   // Sort by the selected window, best first; missing values sink to the bottom.
   const sectors = useMemo(() => {
     if (status.state !== 'success') return []
     return [...status.sectors].sort((a, b) => {
-      const av = a.performance?.[timeframe] ?? -Infinity
-      const bv = b.performance?.[timeframe] ?? -Infinity
+      const av = sectorReturn(a, timeframe) ?? -Infinity
+      const bv = sectorReturn(b, timeframe) ?? -Infinity
       return bv - av
     })
   }, [status, timeframe])
@@ -92,8 +96,8 @@ export default function Sectors() {
             Market Sectors
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            How the 11 S&amp;P sectors are moving today, with trailing returns
-            across timeframes.
+            How the 11 S&amp;P sectors are moving today. Pick a timeframe, or open
+            a sector to see its top holdings.
           </Typography>
         </Box>
         {status.state === 'success' && (
@@ -157,7 +161,7 @@ export default function Sectors() {
             aria-label="Performance timeframe"
             sx={{ flexWrap: 'wrap' }}
           >
-            {PERF_WINDOWS.map((w) => (
+            {SECTOR_WINDOWS.map((w) => (
               <ToggleButton key={w.key} value={w.key} sx={{ px: 2, py: 0.5 }}>
                 {w.label}
               </ToggleButton>
@@ -190,11 +194,18 @@ export default function Sectors() {
             }}
           >
             {sectors.map((s) => (
-              <SectorCard key={s.symbol} sector={s} timeframe={tf} />
+              <SectorCard
+                key={s.symbol}
+                sector={s}
+                timeframe={tf}
+                onSelect={() => setSelected(s)}
+              />
             ))}
           </Box>
         )}
       </Box>
+
+      <SectorStocksDialog sector={selected} onClose={() => setSelected(null)} />
     </Container>
   )
 }
