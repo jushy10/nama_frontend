@@ -232,13 +232,6 @@ export default function StockCard({ stock }: { stock: Stock }) {
             gap: 1,
           }}
         >
-          <Stat label="Open" value={fmt(stock.open)} />
-          <Stat label="High" value={fmt(stock.high)} />
-          <Stat label="Low" value={fmt(stock.low)} />
-          <Stat label="Prev Close" value={fmt(stock.previous_close)} />
-          <Stat label="Bid" value={fmt(stock.bid)} />
-          <Stat label="Ask" value={fmt(stock.ask)} />
-          <Stat label="Spread" value={fmt(stock.spread)} />
           <Stat label="Volume" value={fmtInt(stock.volume)} />
           <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
           <Stat label="Div Yield" value={fmtYield(stock.dividend_yield)} />
