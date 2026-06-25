@@ -60,18 +60,39 @@ const candlesSample = {
   ],
 }
 
-/** A fetch stub that answers the candles endpoint and the snapshot separately. */
-function stubFetch(stock: unknown, candles: unknown) {
+const rsiSample = {
+  symbol: 'NVDA',
+  timeframe: '1Day',
+  period: 14,
+  count: 3,
+  latest: 22.81,
+  signal: 'oversold',
+  overbought: 70.0,
+  oversold: 30.0,
+  points: [
+    { time: 1781582400, timestamp: '2026-06-16T04:00:00Z', value: 23.6 },
+    { time: 1781668800, timestamp: '2026-06-17T04:00:00Z', value: 23.67 },
+    { time: 1782273600, timestamp: '2026-06-24T04:00:00Z', value: 22.81 },
+  ],
+}
+
+/** A fetch stub that answers the snapshot, candles, and RSI endpoints apart. */
+function stubFetch(stock: unknown, candles: unknown, rsi: unknown = rsiSample) {
   vi.stubGlobal(
     'fetch',
-    vi.fn((url: string | URL) =>
-      Promise.resolve({
+    vi.fn((url: string | URL) => {
+      const u = String(url)
+      const body = u.includes('/rsi')
+        ? rsi
+        : u.includes('/candles')
+          ? candles
+          : stock
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: () =>
-          Promise.resolve(String(url).includes('/candles') ? candles : stock),
-      }),
-    ),
+        json: () => Promise.resolve(body),
+      })
+    }),
   )
 }
 
@@ -114,6 +135,17 @@ describe('Stocks search', () => {
     expect(await screen.findByText('Vol')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/candles'),
+      expect.anything(),
+    )
+
+    // The RSI card loads and turns the oversold reading into a Buy call.
+    expect(
+      await screen.findByRole('heading', { name: 'RSI' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('22.8')).toBeInTheDocument()
+    expect(screen.getByText('Buy')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/NVDA/rsi'),
       expect.anything(),
     )
   })

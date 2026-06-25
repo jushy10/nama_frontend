@@ -16,13 +16,16 @@ import {
 import {
   ApiError,
   getCandles,
+  getRsi,
   getStock,
   type CandleSeries,
   type ChartRange,
+  type RsiSeries,
   type Stock,
 } from '@/lib/api'
 import StockCard from '@/components/StockCard'
 import CandleChart from '@/components/CandleChart'
+import RsiCard from '@/components/RsiCard'
 
 type Status =
   | { state: 'idle' }
@@ -36,6 +39,12 @@ type CandleStatus =
   | { state: 'error'; message: string }
   | { state: 'success'; series: CandleSeries }
 
+type RsiStatus =
+  | { state: 'idle' }
+  | { state: 'loading' }
+  | { state: 'error'; message: string }
+  | { state: 'success'; series: RsiSeries }
+
 // Curated subset of the API's ranges — the ones worth a one-tap button.
 const RANGE_OPTIONS: ChartRange[] = ['1D', '5D', '1M', '3M', '6M', '1Y', 'YTD']
 
@@ -44,6 +53,7 @@ export default function Stocks() {
   const [status, setStatus] = useState<Status>({ state: 'idle' })
   const [range, setRange] = useState<ChartRange>('6M')
   const [candle, setCandle] = useState<CandleStatus>({ state: 'idle' })
+  const [rsi, setRsi] = useState<RsiStatus>({ state: 'idle' })
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
@@ -84,6 +94,26 @@ export default function Stocks() {
       })
     return () => ac.abort()
   }, [loadedSymbol, range])
+
+  // RSI rides the snapshot, not the chart range — it's a fixed 14-period daily
+  // read, so it only refetches when the symbol changes.
+  useEffect(() => {
+    if (!loadedSymbol) {
+      setRsi({ state: 'idle' })
+      return
+    }
+    const ac = new AbortController()
+    setRsi({ state: 'loading' })
+    getRsi(loadedSymbol, { signal: ac.signal })
+      .then((series) => setRsi({ state: 'success', series }))
+      .catch((err) => {
+        if (ac.signal.aborted) return
+        const message =
+          err instanceof ApiError ? err.message : 'Could not load RSI data.'
+        setRsi({ state: 'error', message })
+      })
+    return () => ac.abort()
+  }, [loadedSymbol])
 
   const loading = status.state === 'loading'
 
@@ -142,6 +172,18 @@ export default function Stocks() {
         {status.state === 'success' && (
           <Stack spacing={3}>
             <StockCard stock={status.stock} />
+
+            {rsi.state === 'loading' && (
+              <Stack sx={{ alignItems: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            )}
+            {rsi.state === 'error' && (
+              <Alert severity="warning" variant="outlined">
+                {rsi.message}
+              </Alert>
+            )}
+            {rsi.state === 'success' && <RsiCard rsi={rsi.series} />}
 
             <Card
               variant="outlined"
