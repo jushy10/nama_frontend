@@ -168,10 +168,27 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 /** Fetch a single stock snapshot by ticker symbol. */
-export async function getStock(symbol: string): Promise<Stock> {
-  const res = await fetch(`${API_BASE}/stocks/${encodeURIComponent(symbol)}`)
+export async function getStock(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<Stock> {
+  const res = await fetch(`${API_BASE}/stocks/${encodeURIComponent(symbol)}`, {
+    signal: opts.signal,
+  })
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as Stock
+}
+
+/**
+ * Fetch several snapshots concurrently, preserving the order of `symbols`. A
+ * symbol that fails (bad ticker, network blip) resolves to `null` instead of
+ * rejecting the whole batch, so one dud never blanks the rest of the row.
+ */
+export async function getStocks(
+  symbols: string[],
+  opts: { signal?: AbortSignal } = {},
+): Promise<(Stock | null)[]> {
+  return Promise.all(symbols.map((s) => getStock(s, opts).catch(() => null)))
 }
 
 /** Fetch the day's snapshot for every tracked market sector. */
