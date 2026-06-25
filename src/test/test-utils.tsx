@@ -2,9 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { ThemeProvider } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
-import theme from '@/theme'
+import { ColorModeProvider } from '@/ColorModeProvider'
 
 interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
   /** Router history stack to start from. Defaults to the home route. */
@@ -28,10 +26,9 @@ export function renderWithProviders(
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
+      <ColorModeProvider>
         <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
-      </ThemeProvider>
+      </ColorModeProvider>
     )
   }
 

@@ -54,8 +54,8 @@ function FeatureCard({ title, description, icon }: Feature) {
       variant="outlined"
       sx={{
         height: '100%',
-        bgcolor: 'rgba(255,255,255,0.03)',
-        borderColor: 'rgba(255,255,255,0.1)',
+        bgcolor: 'action.hover',
+        borderColor: 'divider',
         transition: 'border-color 150ms',
         '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
       }}
@@ -95,9 +95,11 @@ function SampleCard() {
       sx={{
         width: '100%',
         maxWidth: 360,
-        borderColor: 'rgba(255,255,255,0.1)',
-        background:
-          'linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(255,255,255,0.02))',
+        borderColor: 'divider',
+        background: (theme) =>
+          theme.palette.mode === 'dark'
+            ? 'linear-gradient(to bottom, rgba(255,255,255,0.1), rgba(255,255,255,0.02))'
+            : 'linear-gradient(to bottom, rgba(99,102,241,0.08), rgba(99,102,241,0.01))',
         boxShadow: '0 25px 50px -12px rgba(30,27,75,0.4)',
       }}
     >
@@ -280,7 +282,7 @@ function Home() {
           borderTop: 1,
           borderBottom: 1,
           borderColor: 'divider',
-          bgcolor: 'rgba(255,255,255,0.02)',
+          bgcolor: 'action.hover',
         }}
       >
         <Container maxWidth="lg" sx={{ py: 5 }}>

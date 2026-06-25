@@ -51,9 +51,9 @@ function IndexTile({ def, stock }: { def: IndexDef; stock: Stock | null }) {
     <Box
       sx={{
         border: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'divider',
         borderRadius: 2,
-        bgcolor: 'rgba(255,255,255,0.03)',
+        bgcolor: 'action.hover',
         p: 2,
         transition: 'border-color 150ms',
         '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
@@ -120,9 +120,9 @@ function SkeletonTile() {
     <Box
       sx={{
         border: 1,
-        borderColor: 'rgba(255,255,255,0.1)',
+        borderColor: 'divider',
         borderRadius: 2,
-        bgcolor: 'rgba(255,255,255,0.03)',
+        bgcolor: 'action.hover',
         p: 2,
       }}
     >

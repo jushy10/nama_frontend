@@ -52,13 +52,21 @@ function Gauge({ rsi, color }: { rsi: RsiSeries; color: string }) {
           borderRadius: 4,
           // Green oversold zone, neutral middle, red overbought zone, with the
           // hand-offs pinned to the actual thresholds the API reports.
-          background: `linear-gradient(to right,
+          background: (theme) => {
+            // Neutral middle band: light tint on the dark canvas, dark tint
+            // on the light one. Green/red zones read fine in both modes.
+            const mid =
+              theme.palette.mode === 'dark'
+                ? 'rgba(255,255,255,0.07)'
+                : 'rgba(0,0,0,0.06)'
+            return `linear-gradient(to right,
             rgba(52,211,153,0.35) 0%,
             rgba(52,211,153,0.35) ${rsi.oversold}%,
-            rgba(255,255,255,0.07) ${rsi.oversold}%,
-            rgba(255,255,255,0.07) ${rsi.overbought}%,
+            ${mid} ${rsi.oversold}%,
+            ${mid} ${rsi.overbought}%,
             rgba(248,113,113,0.35) ${rsi.overbought}%,
-            rgba(248,113,113,0.35) 100%)`,
+            rgba(248,113,113,0.35) 100%)`
+          },
         }}
       >
         <Box
@@ -71,7 +79,8 @@ function Gauge({ rsi, color }: { rsi: RsiSeries; color: string }) {
             height: 16,
             borderRadius: 1,
             bgcolor: color,
-            boxShadow: '0 0 0 2px rgba(10,10,15,0.9)',
+            boxShadow: (theme) =>
+              `0 0 0 2px ${theme.palette.background.default}`,
           }}
         />
       </Box>
@@ -111,7 +120,7 @@ export default function RsiCard({ rsi }: { rsi: RsiSeries }) {
   const meta = action ? ACTION[action] : null
 
   return (
-    <Card variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+    <Card variant="outlined" sx={{ borderColor: 'divider' }}>
       <CardContent sx={{ p: 3 }}>
         <Stack
           direction="row"
@@ -150,7 +159,7 @@ export default function RsiCard({ rsi }: { rsi: RsiSeries }) {
                   border: '1px solid',
                   borderColor: meta.color,
                   color: meta.color,
-                  bgcolor: 'rgba(255,255,255,0.04)',
+                  bgcolor: 'action.hover',
                   fontWeight: 700,
                   fontSize: '1rem',
                   letterSpacing: '0.02em',

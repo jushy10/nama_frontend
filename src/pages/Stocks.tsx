@@ -185,10 +185,7 @@ export default function Stocks() {
             )}
             {rsi.state === 'success' && <RsiCard rsi={rsi.series} />}
 
-            <Card
-              variant="outlined"
-              sx={{ borderColor: 'rgba(255,255,255,0.12)' }}
-            >
+            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
                 <Stack
                   direction={{ xs: 'column', sm: 'row' }}

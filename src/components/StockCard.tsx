@@ -84,7 +84,7 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
               key={key}
               sx={{
                 borderRadius: 2,
-                bgcolor: 'rgba(255,255,255,0.04)',
+                bgcolor: 'action.hover',
                 px: 1,
                 py: 0.75,
                 textAlign: 'center',
@@ -119,7 +119,7 @@ function Stat({ label, value }: { label: string; value: string }) {
     <Box
       sx={{
         borderRadius: 2,
-        bgcolor: 'rgba(255,255,255,0.04)',
+        bgcolor: 'action.hover',
         px: 1.5,
         py: 1,
       }}
@@ -157,7 +157,7 @@ export default function StockCard({ stock }: { stock: Stock }) {
   const asOf = stock.as_of ? new Date(stock.as_of).toLocaleString() : '—'
 
   return (
-    <Card variant="outlined" sx={{ borderColor: 'rgba(255,255,255,0.12)' }}>
+    <Card variant="outlined" sx={{ borderColor: 'divider' }}>
       <CardContent sx={{ p: 3 }}>
         <Stack
           direction="row"
