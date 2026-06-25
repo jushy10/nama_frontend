@@ -68,7 +68,7 @@ function HoldingRow({ stock }: { stock: Stock }) {
         py: 1,
         px: 1.5,
         borderRadius: 2,
-        bgcolor: 'rgba(255,255,255,0.03)',
+        bgcolor: 'action.hover',
       }}
     >
       <Stack

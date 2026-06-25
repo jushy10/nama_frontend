@@ -86,7 +86,7 @@ export default function SectorCard({
       sx={{
         height: '100%',
         cursor: 'pointer',
-        borderColor: 'rgba(255,255,255,0.12)',
+        borderColor: 'divider',
         transition: 'border-color 150ms',
         '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
         '&:focus-visible': {

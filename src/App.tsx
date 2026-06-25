@@ -17,6 +17,9 @@ import {
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
+import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
+import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
+import { useColorMode } from '@/ColorModeProvider'
 import Home from '@/pages/Home'
 import About from '@/pages/About'
 import Stocks from '@/pages/Stocks'
@@ -57,6 +60,22 @@ function Brand() {
   )
 }
 
+/** Sun/moon icon button that flips the app between light and dark mode. */
+function ColorModeToggle() {
+  const { mode, toggleColorMode } = useColorMode()
+  const isDark = mode === 'dark'
+  return (
+    <IconButton
+      onClick={toggleColorMode}
+      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+    >
+      {isDark ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
+    </IconButton>
+  )
+}
+
 function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -73,7 +92,10 @@ function App() {
         position="sticky"
         elevation={0}
         sx={{
-          bgcolor: 'rgba(10,10,15,0.8)',
+          bgcolor: (theme) =>
+            theme.palette.mode === 'dark'
+              ? 'rgba(10,10,15,0.8)'
+              : 'rgba(247,248,250,0.8)',
           backdropFilter: 'blur(12px)',
           borderBottom: 1,
           borderColor: 'divider',
@@ -110,20 +132,25 @@ function App() {
                   {item.label}
                 </Button>
               ))}
+              <ColorModeToggle />
               <Button href="#waitlist" variant="contained" color="primary">
                 Get started
               </Button>
             </Stack>
-            <IconButton
-              aria-label="Open navigation menu"
-              onClick={() => setDrawerOpen(true)}
-              sx={{
-                display: { xs: 'inline-flex', md: 'none' },
-                color: 'text.primary',
-              }}
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{ alignItems: 'center', display: { xs: 'flex', md: 'none' } }}
             >
-              <MenuIcon />
-            </IconButton>
+              <ColorModeToggle />
+              <IconButton
+                aria-label="Open navigation menu"
+                onClick={() => setDrawerOpen(true)}
+                sx={{ color: 'text.primary' }}
+              >
+                <MenuIcon />
+              </IconButton>
+            </Stack>
           </Toolbar>
         </Container>
       </AppBar>

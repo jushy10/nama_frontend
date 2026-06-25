@@ -187,7 +187,7 @@ export default function Stocks() {
 
             <Card
               variant="outlined"
-              sx={{ borderColor: 'rgba(255,255,255,0.12)' }}
+              sx={{ borderColor: 'divider' }}
             >
               <CardContent sx={{ p: 3 }}>
                 <Stack
