@@ -46,7 +46,16 @@ type RsiStatus =
   | { state: 'success'; series: RsiSeries }
 
 // Curated subset of the API's ranges — the ones worth a one-tap button.
-const RANGE_OPTIONS: ChartRange[] = ['1D', '5D', '1M', '3M', '6M', '1Y', 'YTD']
+const RANGE_OPTIONS: ChartRange[] = [
+  '1D',
+  '5D',
+  '1M',
+  '3M',
+  '6M',
+  '1Y',
+  '5Y',
+  'YTD',
+]
 
 export default function Stocks() {
   const [symbol, setSymbol] = useState('')
