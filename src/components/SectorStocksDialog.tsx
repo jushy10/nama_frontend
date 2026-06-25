@@ -108,7 +108,9 @@ function HoldingRow({ stock }: { stock: Stock }) {
         </Box>
       </Stack>
       <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
-        <Typography sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+        <Typography
+          sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+        >
           ${fmt(stock.price)}
         </Typography>
         <Stack
@@ -197,7 +199,12 @@ export default function SectorStocksDialog({
         <IconButton
           onClick={onClose}
           aria-label="Close"
-          sx={{ position: 'absolute', right: 8, top: 8, color: 'text.secondary' }}
+          sx={{
+            position: 'absolute',
+            right: 8,
+            top: 8,
+            color: 'text.secondary',
+          }}
         >
           <CloseIcon />
         </IconButton>

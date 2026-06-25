@@ -54,7 +54,8 @@ export default function Sectors() {
     return () => ac.abort()
   }, [nonce])
 
-  const tf = SECTOR_WINDOWS.find((w) => w.key === timeframe) ?? SECTOR_WINDOWS[0]
+  const tf =
+    SECTOR_WINDOWS.find((w) => w.key === timeframe) ?? SECTOR_WINDOWS[0]
 
   // Sort by the selected window, best first; missing values sink to the bottom.
   const sectors = useMemo(() => {
@@ -96,8 +97,8 @@ export default function Sectors() {
             Market Sectors
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            How the 11 S&amp;P sectors are moving today. Pick a timeframe, or open
-            a sector to see its top holdings.
+            How the 11 S&amp;P sectors are moving today. Pick a timeframe, or
+            open a sector to see its top holdings.
           </Typography>
         </Box>
         {status.state === 'success' && (
