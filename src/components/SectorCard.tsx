@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import type { KeyboardEvent, ReactNode } from 'react'
 import {
   Avatar,
   Box,
@@ -22,7 +22,8 @@ import CellTowerIcon from '@mui/icons-material/CellTower'
 import CategoryIcon from '@mui/icons-material/Category'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { PERF_WINDOWS, type Sector, type StockPerformance } from '@/lib/api'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import { sectorReturn, type Sector, type SectorWindow } from '@/lib/api'
 
 /** Icon per sector, keyed by the API's sector name. Falls back to a generic. */
 const SECTOR_ICONS: Record<string, ReactNode> = {
@@ -54,87 +55,45 @@ const fmtPct = (n: number | null) =>
 const moveColor = (n: number | null | undefined) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
 
-/** Row of trailing-return pills; the active window is highlighted. */
-function PerformanceStrip({
-  perf,
-  active,
-}: {
-  perf: StockPerformance
-  active: keyof StockPerformance
-}) {
-  return (
-    <Box
-      sx={{
-        display: 'grid',
-        // 3×2 so the widest values (e.g. -11.87%) always fit; six in a row
-        // overflow a narrow card.
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: 0.5,
-      }}
-    >
-      {PERF_WINDOWS.map(({ key, label }) => {
-        const v = perf[key]
-        const isActive = key === active
-        return (
-          <Box
-            key={key}
-            sx={{
-              borderRadius: 1.5,
-              px: 0.5,
-              py: 0.5,
-              textAlign: 'center',
-              border: 1,
-              borderColor: isActive ? 'primary.main' : 'transparent',
-              bgcolor: isActive
-                ? 'rgba(99,102,241,0.12)'
-                : 'rgba(255,255,255,0.03)',
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{
-                color: 'text.secondary',
-                display: 'block',
-                fontSize: '0.65rem',
-              }}
-            >
-              {label}
-            </Typography>
-            <Typography
-              sx={{
-                fontWeight: 600,
-                color: moveColor(v),
-                fontVariantNumeric: 'tabular-nums',
-                fontSize: '0.72rem',
-              }}
-            >
-              {fmtPct(v)}
-            </Typography>
-          </Box>
-        )
-      })}
-    </Box>
-  )
-}
-
 export default function SectorCard({
   sector,
   timeframe,
+  onSelect,
 }: {
   sector: Sector
-  timeframe: { key: keyof StockPerformance; label: string }
+  timeframe: { key: SectorWindow; label: string }
+  onSelect?: () => void
 }) {
   const dayUp = (sector.change_percent ?? 0) >= 0
-  const selected = sector.performance?.[timeframe.key] ?? null
+  // Gain for just the selected window — 1D is the day's move, the rest trailing.
+  const selected = sectorReturn(sector, timeframe.key)
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect?.()
+    }
+  }
 
   return (
     <Card
       variant="outlined"
+      role="button"
+      tabIndex={0}
+      aria-label={`View top holdings in ${sector.sector}`}
+      onClick={onSelect}
+      onKeyDown={handleKeyDown}
       sx={{
         height: '100%',
+        cursor: 'pointer',
         borderColor: 'rgba(255,255,255,0.12)',
         transition: 'border-color 150ms',
         '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 2,
+        },
       }}
     >
       <CardContent
@@ -220,7 +179,7 @@ export default function SectorCard({
           </Box>
         </Stack>
 
-        {/* Hero: the selected timeframe's return */}
+        {/* Hero: the selected timeframe's return — the only window shown */}
         <Box
           sx={{
             borderRadius: 2,
@@ -254,15 +213,28 @@ export default function SectorCard({
           </Typography>
         </Box>
 
-        {/* Full strip of trailing windows, active one highlighted */}
-        {sector.performance && (
-          <Box sx={{ mt: 'auto' }}>
-            <PerformanceStrip
-              perf={sector.performance}
-              active={timeframe.key}
-            />
-          </Box>
-        )}
+        {/* Click affordance for the holdings drill-down */}
+        <Stack
+          direction="row"
+          sx={{
+            mt: 'auto',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            color: 'primary.light',
+          }}
+        >
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            Top holdings
+          </Typography>
+          <ChevronRightIcon fontSize="small" />
+        </Stack>
       </CardContent>
     </Card>
   )
