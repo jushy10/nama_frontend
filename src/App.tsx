@@ -44,22 +44,11 @@ function Brand() {
       }}
     >
       <Box
-        sx={{
-          display: 'inline-flex',
-          p: '4px',
-          borderRadius: 1.5,
-          bgcolor: '#fff',
-          lineHeight: 0,
-          flexShrink: 0,
-        }}
-      >
-        <Box
-          component="img"
-          src="/nama-icon.png"
-          alt="Nama Insights logo"
-          sx={{ height: 44, width: 44, display: 'block' }}
-        />
-      </Box>
+        component="img"
+        src="/nama-icon.png"
+        alt="Nama Insights logo"
+        sx={{ height: 48, width: 48, display: 'block', flexShrink: 0 }}
+      />
       <Typography
         variant="h5"
         sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
