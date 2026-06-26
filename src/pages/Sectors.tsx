@@ -32,7 +32,7 @@ type Window = SectorWindow
 
 export default function Sectors() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
-  const [timeframe, setTimeframe] = useState<Window>('ytd')
+  const [timeframe, setTimeframe] = useState<Window>('1d')
   // The sector whose holdings drill-down is open (null = closed).
   const [selected, setSelected] = useState<Sector | null>(null)
   // Bumping this re-runs the fetch effect — drives the refresh button.
