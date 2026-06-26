@@ -261,6 +261,90 @@ export async function getSectors(signal?: AbortSignal): Promise<Sector[]> {
   return data.sectors
 }
 
+/** Index universe the screener can narrow to. */
+export type StockIndex = 'sp500' | 'nasdaq100'
+
+/** One name in the screener's gainers/losers lists. */
+export interface ScreenedStock {
+  symbol: string
+  name: string | null
+  sector: string | null
+  price: number
+  change: number | null
+  change_percent: number | null
+  previous_close: number | null
+  as_of: string | null
+}
+
+/**
+ * Screener payload: the top gainers and losers for the chosen filters, plus
+ * counts describing how big the matched universe was and how much of it had a
+ * usable quote.
+ */
+export interface ScreenerResult {
+  index: string | null
+  sector: string | null
+  limit: number
+  universe_count: number
+  quoted_count: number
+  as_of: string | null
+  gainers: ScreenedStock[]
+  losers: ScreenedStock[]
+}
+
+/** Index filter options for the screener, in display order. */
+export const SCREENER_INDICES: { value: StockIndex; label: string }[] = [
+  { value: 'sp500', label: 'S&P 500' },
+  { value: 'nasdaq100', label: 'Nasdaq 100' },
+]
+
+/**
+ * The 11 GICS sectors the screener accepts as its `sector` filter (matching is
+ * case-insensitive). These are the official GICS names — note "Information
+ * Technology" and "Health Care" — not the SPDR ETF labels used elsewhere.
+ */
+export const GICS_SECTORS = [
+  'Information Technology',
+  'Health Care',
+  'Financials',
+  'Consumer Discretionary',
+  'Consumer Staples',
+  'Communication Services',
+  'Industrials',
+  'Energy',
+  'Utilities',
+  'Real Estate',
+  'Materials',
+] as const
+
+/**
+ * Fetch the screener's top gainers and losers. `index`/`sector` narrow the
+ * universe (omit either for everything); `limit` is how many names per side,
+ * clamped by the API to 1–50.
+ */
+export async function getScreener(
+  opts: {
+    index?: StockIndex | null
+    sector?: string | null
+    limit?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<ScreenerResult> {
+  const qs = new URLSearchParams()
+  if (opts.index) qs.set('index', opts.index)
+  if (opts.sector) qs.set('sector', opts.sector)
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  const res = await fetch(`${API_BASE}/stocks/screener?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as ScreenerResult
+  if (!Array.isArray(data?.gainers) || !Array.isArray(data?.losers)) {
+    throw new ApiError(res.status, 'Malformed screener response')
+  }
+  return data
+}
+
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
 export async function getCandles(
   symbol: string,
