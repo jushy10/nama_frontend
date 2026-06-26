@@ -456,7 +456,11 @@ export default function Screener() {
                   <TableRow>
                     <TableCell
                       colSpan={6}
-                      sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}
+                      sx={{
+                        py: 5,
+                        textAlign: 'center',
+                        color: 'text.secondary',
+                      }}
                     >
                       No names match these filters.
                     </TableCell>
