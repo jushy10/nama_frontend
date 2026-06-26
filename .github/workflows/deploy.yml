@@ -1,9 +1,13 @@
 name: Build & Deploy Frontend
 run-name: Build & deploy frontend · ${{ github.ref_name }}
 
-# PRs            -> build the image only (validate).
-# Merge to main  -> build, push to ECR, roll the ECS service.
-# The ECR repo + ECS service are created by the backend repo's Terraform.
+# PRs           -> build only (validate the bundle compiles).
+# Merge to main -> build, sync the bundle to S3, invalidate CloudFront.
+#
+# The S3 bucket + CloudFront distribution are created by the backend repo's
+# Terraform (module "frontend" -> static-site-cloudfront). They're resolved at
+# deploy time by bucket-name prefix and CloudFront alias, so nothing here breaks
+# if the infra is destroyed and recreated with a new bucket suffix / distribution.
 
 on:
   push:
@@ -17,14 +21,11 @@ concurrency:
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
-  # These match module "frontend" { name = "nama-frontend-dev" } in the infra repo.
-  ECR_REPOSITORY: nama-frontend-dev
-  ECS_CLUSTER: nama-frontend-dev
-  ECS_SERVICE: nama-frontend-dev
-  # Vite bakes env vars at BUILD time, so the API URL is a build arg (see below).
+  # Vite inlines VITE_* at BUILD time, so the API URL is set before `npm run build`.
   VITE_API_URL: https://api.namainsights.com
 
 jobs:
+  # On pull requests: just prove the bundle builds. No AWS credentials, no upload.
   validate:
     name: Validate build
     if: github.event_name == 'pull_request'
@@ -33,9 +34,15 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - name: Build image (no push)
-        run: docker build --build-arg VITE_API_URL="$VITE_API_URL" -t "$ECR_REPOSITORY:ci" .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build
+        run: npm run build
 
+  # On merge to main (or a manual run): build and publish.
   deploy:
     name: Build & deploy
     if: github.event_name != 'pull_request'
@@ -45,6 +52,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -52,38 +69,43 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # First deploy can start before Terraform has created the ECR repo — wait.
-      - name: Wait for the ECR repository
+      # Find the bucket (name starts with "nama-frontend-dev-") and the
+      # distribution (serves the apex domain) instead of hardcoding ids.
+      - name: Resolve S3 bucket + CloudFront distribution
+        id: target
         run: |
-          for i in $(seq 1 60); do
-            if aws ecr describe-repositories --repository-names "$ECR_REPOSITORY" >/dev/null 2>&1; then
-              echo "ECR repository '$ECR_REPOSITORY' is ready."; exit 0
-            fi
-            echo "Waiting for ECR repository '$ECR_REPOSITORY' ($i/60)…"; sleep 15
-          done
-          echo "Timed out. Make sure the infra repo's Terraform has created it."; exit 1
-
-      - name: Log in to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push image
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-        run: |
-          docker build --build-arg VITE_API_URL="$VITE_API_URL" \
-            -t "$REGISTRY/$ECR_REPOSITORY:latest" \
-            -t "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}" .
-          docker push "$REGISTRY/$ECR_REPOSITORY:latest"
-          docker push "$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
-
-      - name: Roll the ECS service onto the new image
-        run: |
-          status=$(aws ecs describe-services \
-            --cluster "$ECS_CLUSTER" --services "$ECS_SERVICE" \
-            --query 'services[0].status' --output text 2>/dev/null || echo "MISSING")
-          if [ "$status" = "ACTIVE" ]; then
-            aws ecs update-service --cluster "$ECS_CLUSTER" --service "$ECS_SERVICE" --force-new-deployment
-          else
-            echo "ECS service not ACTIVE yet (status: $status) — it will pull :latest on first launch."
+          set -euo pipefail
+          bucket=$(aws s3api list-buckets \
+            --query "Buckets[?starts_with(Name, 'nama-frontend-dev-')].Name | [0]" \
+            --output text)
+          dist=$(aws cloudfront list-distributions \
+            --query "DistributionList.Items[?contains(Aliases.Items, 'namainsights.com')].Id | [0]" \
+            --output text)
+          if [ -z "$bucket" ] || [ "$bucket" = "None" ]; then
+            echo "::error::No bucket matching nama-frontend-dev-* — has the infra been applied?"; exit 1
           fi
+          if [ -z "$dist" ] || [ "$dist" = "None" ]; then
+            echo "::error::No CloudFront distribution for namainsights.com — has the infra been applied?"; exit 1
+          fi
+          echo "bucket=$bucket" >> "$GITHUB_OUTPUT"
+          echo "distribution=$dist" >> "$GITHUB_OUTPUT"
+          echo "Resolved bucket=$bucket distribution=$dist"
+
+      - name: Upload bundle to S3
+        env:
+          BUCKET: ${{ steps.target.outputs.bucket }}
+        run: |
+          set -euo pipefail
+          # Hashed, fingerprinted assets are immutable — cache them hard. Everything
+          # except index.html (which references this build's hashed filenames).
+          aws s3 sync dist "s3://$BUCKET" --delete \
+            --cache-control 'public,max-age=31536000,immutable' \
+            --exclude index.html
+          # index.html must never be cached, so a new deploy is picked up at once.
+          aws s3 cp dist/index.html "s3://$BUCKET/index.html" \
+            --cache-control 'no-cache'
+
+      - name: Invalidate CloudFront
+        env:
+          DIST: ${{ steps.target.outputs.distribution }}
+        run: aws cloudfront create-invalidation --distribution-id "$DIST" --paths '/*'
