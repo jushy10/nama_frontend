@@ -16,7 +16,6 @@ import {
   Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
-import ShowChartIcon from '@mui/icons-material/ShowChart'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
@@ -44,7 +43,23 @@ function Brand() {
         color: 'text.primary',
       }}
     >
-      <ShowChartIcon sx={{ color: 'primary.light' }} />
+      <Box
+        sx={{
+          display: 'inline-flex',
+          p: '3px',
+          borderRadius: 1.5,
+          bgcolor: '#fff',
+          lineHeight: 0,
+          flexShrink: 0,
+        }}
+      >
+        <Box
+          component="img"
+          src="/nama-icon.png"
+          alt="Nama Insights logo"
+          sx={{ height: 32, width: 32, display: 'block' }}
+        />
+      </Box>
       <Typography
         variant="h6"
         sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
