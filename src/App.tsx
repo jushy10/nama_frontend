@@ -21,7 +21,6 @@ import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
 import Home from '@/pages/Home'
-import About from '@/pages/About'
 import Stocks from '@/pages/Stocks'
 import Sectors from '@/pages/Sectors'
 
@@ -29,7 +28,6 @@ const navItems = [
   { label: 'Home', to: '/', end: true },
   { label: 'Stocks', to: '/stocks', end: false },
   { label: 'Sectors', to: '/sectors', end: false },
-  { label: 'About', to: '/about', end: false },
 ]
 
 function Brand() {
@@ -133,9 +131,6 @@ function App() {
                 </Button>
               ))}
               <ColorModeToggle />
-              <Button href="#waitlist" variant="contained" color="primary">
-                Get started
-              </Button>
             </Stack>
             <Stack
               direction="row"
@@ -187,17 +182,6 @@ function App() {
             </ListItemButton>
           ))}
         </List>
-        <Box sx={{ px: 2, mt: 1 }}>
-          <Button
-            href="#waitlist"
-            variant="contained"
-            color="primary"
-            fullWidth
-            onClick={() => setDrawerOpen(false)}
-          >
-            Get started
-          </Button>
-        </Box>
       </Drawer>
 
       <Box component="main" sx={{ flex: 1 }}>
@@ -205,7 +189,6 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/stocks" element={<Stocks />} />
           <Route path="/sectors" element={<Sectors />} />
-          <Route path="/about" element={<About />} />
         </Routes>
       </Box>
 
