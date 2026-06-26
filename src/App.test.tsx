@@ -7,7 +7,7 @@ describe('App routing', () => {
     renderWithProviders(<App />)
 
     expect(
-      screen.getByRole('heading', { name: /make smarter stock decisions/i }),
+      screen.getByRole('heading', { name: /^screener$/i }),
     ).toBeInTheDocument()
   })
 
