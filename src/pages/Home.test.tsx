@@ -3,27 +3,21 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import Home from '@/pages/Home'
 
 describe('Home', () => {
-  it('renders the hero headline', () => {
+  it('renders the market indices and screener sections', () => {
     renderWithProviders(<Home />)
 
     expect(
-      screen.getByRole('heading', {
-        name: /make smarter stock decisions/i,
-      }),
+      screen.getByRole('heading', { name: /markets today/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: /^screener$/i }),
     ).toBeInTheDocument()
   })
 
-  it('lists the core features', () => {
+  it('exposes the screener filters', () => {
     renderWithProviders(<Home />)
 
-    expect(
-      screen.getByRole('heading', { name: /real-time market data/i }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: /ai-powered analysis/i }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: /portfolio tracking/i }),
-    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /gainers/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /losers/i })).toBeInTheDocument()
   })
 })
