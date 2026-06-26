@@ -68,6 +68,9 @@ export default function Stocks() {
   const [range, setRange] = useState<ChartRange>('6M')
   const [candle, setCandle] = useState<CandleStatus>({ state: 'idle' })
   const [rsi, setRsi] = useState<RsiStatus>({ state: 'idle' })
+  // 5Y trailing return — the snapshot's `performance` object stops at 1Y, so we
+  // derive it from the first vs last close of the 5Y daily candle series.
+  const [fiveYearReturn, setFiveYearReturn] = useState<number | null>(null)
 
   // Submitting just writes the ticker to the URL; the fetch below keys off that,
   // so manual searches, deep links, and back/forward all run one code path.
@@ -123,6 +126,31 @@ export default function Stocks() {
       })
     return () => ac.abort()
   }, [loadedSymbol, range])
+
+  // 5Y return rides the symbol, independent of the chart's range selector. A
+  // failed/short series is non-fatal — the pill just falls back to "—".
+  useEffect(() => {
+    if (!loadedSymbol) {
+      setFiveYearReturn(null)
+      return
+    }
+    const ac = new AbortController()
+    setFiveYearReturn(null)
+    getCandles(loadedSymbol, { range: '5Y', signal: ac.signal })
+      .then((series) => {
+        if (ac.signal.aborted) return
+        const c = series.candles
+        const first = c[0]?.close
+        const last = c[c.length - 1]?.close
+        if (c.length >= 2 && first) {
+          setFiveYearReturn(((last - first) / first) * 100)
+        }
+      })
+      .catch(() => {
+        /* non-fatal: the 5Y pill stays at "—" */
+      })
+    return () => ac.abort()
+  }, [loadedSymbol])
 
   // RSI rides the snapshot, not the chart range — it's a fixed 14-period daily
   // read, so it only refetches when the symbol changes.
@@ -200,7 +228,7 @@ export default function Stocks() {
         )}
         {status.state === 'success' && (
           <Stack spacing={3}>
-            <StockCard stock={status.stock} />
+            <StockCard stock={status.stock} fiveYearReturn={fiveYearReturn} />
 
             {rsi.state === 'loading' && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
