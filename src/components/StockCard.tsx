@@ -49,8 +49,60 @@ const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
   { key: '1y', label: '1Y' },
 ]
 
-/** Row of trailing-return pills, color-coded green/red by sign. */
-function PerformanceStrip({ perf }: { perf: StockPerformance }) {
+/** A single color-coded return pill. */
+function PerfPill({ label, value }: { label: string; value: number | null }) {
+  const color =
+    value == null
+      ? 'text.secondary'
+      : value >= 0
+        ? 'success.main'
+        : 'error.main'
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        bgcolor: 'action.hover',
+        px: 1,
+        py: 0.75,
+        textAlign: 'center',
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{ color: 'text.secondary', display: 'block' }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontWeight: 600,
+          color,
+          fontVariantNumeric: 'tabular-nums',
+          fontSize: '0.85rem',
+        }}
+      >
+        {fmtPct(value)}
+      </Typography>
+    </Box>
+  )
+}
+
+/**
+ * Row of trailing-return pills, color-coded green/red by sign. The 5Y return
+ * isn't in the snapshot's `performance` object — it's derived from 5Y candles
+ * upstream and passed in, so it loads a beat later and shows `—` until ready.
+ */
+function PerformanceStrip({
+  perf,
+  fiveYearReturn,
+}: {
+  perf: StockPerformance
+  fiveYearReturn?: number | null
+}) {
+  const entries: { label: string; value: number | null }[] = [
+    ...PERF_WINDOWS.map(({ key, label }) => ({ label, value: perf[key] })),
+    { label: '5Y', value: fiveYearReturn ?? null },
+  ]
   return (
     <Box>
       <Typography
@@ -67,48 +119,13 @@ function PerformanceStrip({ perf }: { perf: StockPerformance }) {
         sx={{
           mt: 0.75,
           display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(3, 1fr)', sm: 'repeat(6, 1fr)' },
+          gridTemplateColumns: { xs: 'repeat(4, 1fr)', sm: 'repeat(7, 1fr)' },
           gap: 1,
         }}
       >
-        {PERF_WINDOWS.map(({ key, label }) => {
-          const v = perf[key]
-          const color =
-            v == null
-              ? 'text.secondary'
-              : v >= 0
-                ? 'success.main'
-                : 'error.main'
-          return (
-            <Box
-              key={key}
-              sx={{
-                borderRadius: 2,
-                bgcolor: 'action.hover',
-                px: 1,
-                py: 0.75,
-                textAlign: 'center',
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{ color: 'text.secondary', display: 'block' }}
-              >
-                {label}
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 600,
-                  color,
-                  fontVariantNumeric: 'tabular-nums',
-                  fontSize: '0.85rem',
-                }}
-              >
-                {fmtPct(v)}
-              </Typography>
-            </Box>
-          )
-        })}
+        {entries.map((e) => (
+          <PerfPill key={e.label} label={e.label} value={e.value} />
+        ))}
       </Box>
     </Box>
   )
@@ -150,7 +167,13 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function StockCard({ stock }: { stock: Stock }) {
+export default function StockCard({
+  stock,
+  fiveYearReturn,
+}: {
+  stock: Stock
+  fiveYearReturn?: number | null
+}) {
   const up = (stock.change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
@@ -243,7 +266,10 @@ export default function StockCard({ stock }: { stock: Stock }) {
 
         {stock.performance && (
           <Box sx={{ mt: 2.5 }}>
-            <PerformanceStrip perf={stock.performance} />
+            <PerformanceStrip
+              perf={stock.performance}
+              fiveYearReturn={fiveYearReturn}
+            />
           </Box>
         )}
 
