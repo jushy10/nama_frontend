@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Avatar,
@@ -69,10 +70,31 @@ const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
 const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
 
 /** One screened name: rank, logo + symbol/name, sector, price, change, % change. */
-function StockRow({ rank, stock }: { rank: number; stock: ScreenedStock }) {
+function StockRow({
+  rank,
+  stock,
+  onSelect,
+}: {
+  rank: number
+  stock: ScreenedStock
+  onSelect: (symbol: string) => void
+}) {
   const up = (stock.change_percent ?? 0) >= 0
   return (
-    <TableRow hover>
+    <TableRow
+      hover
+      onClick={() => onSelect(stock.symbol)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(stock.symbol)
+        }
+      }}
+      tabIndex={0}
+      role="link"
+      aria-label={`View ${stock.symbol} details`}
+      sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}
+    >
       <TableCell
         sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
       >
@@ -81,7 +103,7 @@ function StockRow({ rank, stock }: { rank: number; stock: ScreenedStock }) {
       <TableCell>
         <Stack
           direction="row"
-          spacing={1.5}
+          spacing={{ xs: 0, sm: 1.5 }}
           sx={{ alignItems: 'center', minWidth: 0 }}
         >
           <Avatar
@@ -92,6 +114,8 @@ function StockRow({ rank, stock }: { rank: number; stock: ScreenedStock }) {
               img: { loading: 'lazy', style: { objectFit: 'contain' } },
             }}
             sx={{
+              // Hidden on phones to keep #/symbol/price/%-change on one screen.
+              display: { xs: 'none', sm: 'flex' },
               width: 32,
               height: 32,
               bgcolor: '#fff',
@@ -111,7 +135,7 @@ function StockRow({ rank, stock }: { rank: number; stock: ScreenedStock }) {
                 color="text.secondary"
                 sx={{
                   display: 'block',
-                  maxWidth: 220,
+                  maxWidth: { xs: 120, sm: 220 },
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
                   whiteSpace: 'nowrap',
@@ -215,6 +239,7 @@ export default function Screener() {
   const [status, setStatus] = useState<Status>({ state: 'loading' })
   // Bumping this re-runs the fetch effect — drives the refresh button.
   const [nonce, setNonce] = useState(0)
+  const navigate = useNavigate()
 
   useEffect(() => {
     let active = true
@@ -333,7 +358,7 @@ export default function Screener() {
             ))}
           </TextField>
 
-          <Box sx={{ flexGrow: 1 }} />
+          <Box sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }} />
 
           <ToggleButtonGroup
             size="small"
@@ -341,6 +366,10 @@ export default function Screener() {
             value={side}
             onChange={(_, value: Side | null) => value && setSide(value)}
             aria-label="Gainers or losers"
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              '& .MuiToggleButton-root': { flex: { xs: 1, sm: 'none' } },
+            }}
           >
             <ToggleButton value="gainers" sx={{ px: 2, py: 0.5 }}>
               Gainers
@@ -386,7 +415,16 @@ export default function Screener() {
               bgcolor: 'action.hover',
             }}
           >
-            <Table size="small" sx={{ '& td, & th': { borderColor: 'divider' } }}>
+            <Table
+              size="small"
+              sx={{
+                '& td, & th': {
+                  borderColor: 'divider',
+                  px: { xs: 1, sm: 2 },
+                  whiteSpace: 'nowrap',
+                },
+              }}
+            >
               <TableHead>
                 <TableRow
                   sx={{
@@ -399,7 +437,7 @@ export default function Screener() {
                     },
                   }}
                 >
-                  <TableCell sx={{ width: 48 }}>#</TableCell>
+                  <TableCell sx={{ width: { xs: 32, sm: 48 } }}>#</TableCell>
                   <TableCell>Symbol</TableCell>
                   <TableCell sx={HIDE_MD}>Sector</TableCell>
                   <TableCell align="right">Price</TableCell>
@@ -426,7 +464,14 @@ export default function Screener() {
                 )}
                 {status.state === 'success' &&
                   rows.map((stock, i) => (
-                    <StockRow key={stock.symbol} rank={i + 1} stock={stock} />
+                    <StockRow
+                      key={stock.symbol}
+                      rank={i + 1}
+                      stock={stock}
+                      onSelect={(symbol) =>
+                        navigate(`/stocks?symbol=${encodeURIComponent(symbol)}`)
+                      }
+                    />
                   ))}
               </TableBody>
             </Table>

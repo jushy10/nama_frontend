@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -58,29 +59,48 @@ const RANGE_OPTIONS: ChartRange[] = [
 ]
 
 export default function Stocks() {
-  const [symbol, setSymbol] = useState('')
+  // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
+  // links from elsewhere (e.g. the home-page screener) deep-link straight in.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlSymbol = (searchParams.get('symbol') ?? '').trim().toUpperCase()
+  const [symbol, setSymbol] = useState(urlSymbol)
   const [status, setStatus] = useState<Status>({ state: 'idle' })
   const [range, setRange] = useState<ChartRange>('6M')
   const [candle, setCandle] = useState<CandleStatus>({ state: 'idle' })
   const [rsi, setRsi] = useState<RsiStatus>({ state: 'idle' })
 
-  async function onSubmit(e: FormEvent) {
+  // Submitting just writes the ticker to the URL; the fetch below keys off that,
+  // so manual searches, deep links, and back/forward all run one code path.
+  function onSubmit(e: FormEvent) {
     e.preventDefault()
     const query = symbol.trim().toUpperCase()
     if (!query) return
-
-    setStatus({ state: 'loading' })
-    try {
-      const stock = await getStock(query)
-      setStatus({ state: 'success', stock })
-    } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : 'Could not reach the server. Please try again.'
-      setStatus({ state: 'error', message })
-    }
+    setSearchParams(query ? { symbol: query } : {})
   }
+
+  // Fetch the snapshot whenever the URL ticker changes.
+  useEffect(() => {
+    if (!urlSymbol) {
+      setStatus({ state: 'idle' })
+      return
+    }
+    setSymbol(urlSymbol)
+    const ac = new AbortController()
+    setStatus({ state: 'loading' })
+    getStock(urlSymbol, { signal: ac.signal })
+      .then((stock) => {
+        if (!ac.signal.aborted) setStatus({ state: 'success', stock })
+      })
+      .catch((err) => {
+        if (ac.signal.aborted) return
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : 'Could not reach the server. Please try again.'
+        setStatus({ state: 'error', message })
+      })
+    return () => ac.abort()
+  }, [urlSymbol])
 
   // Load candles whenever a stock is showing or the range changes. Kept
   // separate from the snapshot fetch so a chart hiccup never blanks the card,

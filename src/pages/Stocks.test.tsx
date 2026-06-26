@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { renderWithProviders, screen } from '@/test/test-utils'
 import Stocks from '@/pages/Stocks'
 
 const sample = {
@@ -101,8 +100,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('Stocks search', () => {
   it('shows a stock snapshot after a successful search', async () => {
     stubFetch(sample, candlesSample)
-    const user = userEvent.setup()
-    render(<Stocks />)
+    const { user } = renderWithProviders(<Stocks />)
 
     await user.type(screen.getByLabelText(/ticker symbol/i), 'nvda')
     await user.click(screen.getByRole('button', { name: /search/i }))
@@ -150,6 +148,20 @@ describe('Stocks search', () => {
     )
   })
 
+  it('deep-links to a snapshot from the ?symbol= query param', async () => {
+    stubFetch(sample, candlesSample)
+    renderWithProviders(<Stocks />, { initialEntries: ['/stocks?symbol=nvda'] })
+
+    // No typing/submitting — the URL ticker alone drives the fetch.
+    expect(
+      await screen.findByRole('heading', { name: 'NVDA' }),
+    ).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/NVDA'),
+      expect.anything(),
+    )
+  })
+
   it('shows an error message when the symbol is not found', async () => {
     vi.stubGlobal(
       'fetch',
@@ -160,8 +172,7 @@ describe('Stocks search', () => {
           Promise.resolve({ detail: "No stock data found for symbol 'ZZZZ'." }),
       }),
     )
-    const user = userEvent.setup()
-    render(<Stocks />)
+    const { user } = renderWithProviders(<Stocks />)
 
     await user.type(screen.getByLabelText(/ticker symbol/i), 'ZZZZ')
     await user.click(screen.getByRole('button', { name: /search/i }))

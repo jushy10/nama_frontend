@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Route, Routes, useSearchParams } from 'react-router-dom'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import Screener from '@/components/Screener'
+
+/** Minimal stand-in for the stocks page that echoes the ?symbol= it received. */
+function StockStub() {
+  const [params] = useSearchParams()
+  return <div>stock page: {params.get('symbol')}</div>
+}
 
 const RESULT = {
   index: null,
@@ -74,6 +81,20 @@ describe('Screener', () => {
     expect(await screen.findByText('INTC')).toBeInTheDocument()
     expect(screen.getByText('-5.63%')).toBeInTheDocument()
     expect(screen.queryByText('NVDA')).not.toBeInTheDocument()
+  })
+
+  it('navigates to the stock page when a row is clicked', async () => {
+    stubFetch()
+    const { user } = renderWithProviders(
+      <Routes>
+        <Route path="/" element={<Screener />} />
+        <Route path="/stocks" element={<StockStub />} />
+      </Routes>,
+    )
+
+    await user.click(await screen.findByText('NVDA'))
+
+    expect(await screen.findByText(/stock page: NVDA/i)).toBeInTheDocument()
   })
 
   it('surfaces an error when the first load fails', async () => {
