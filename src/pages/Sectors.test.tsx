@@ -116,12 +116,13 @@ describe('Sectors page', () => {
       expect.anything(),
     )
 
-    // The day's move is always shown (Technology is down -0.64% today).
+    // The day's move is always shown (Technology is down -0.64% today). With the
+    // 1D default the hero return mirrors that move, so the value can appear twice.
     expect(screen.getAllByText('today').length).toBe(3)
-    expect(screen.getByText('-0.64%')).toBeInTheDocument()
+    expect(screen.getAllByText('-0.64%').length).toBeGreaterThanOrEqual(1)
 
-    // Default timeframe is YTD; the hero label reflects it.
-    expect(screen.getAllByText(/ytd return/i).length).toBe(3)
+    // Default timeframe is 1D; the hero label reflects it.
+    expect(screen.getAllByText(/1d return/i).length).toBe(3)
   })
 
   it('re-sorts by the chosen timeframe, best first', async () => {
@@ -131,7 +132,8 @@ describe('Sectors page', () => {
 
     await screen.findByText('Technology')
 
-    // Default YTD order: Technology (27.19) > Energy (19.41) > Industrials (16.37).
+    // Switch to YTD: Technology (27.19) > Energy (19.41) > Industrials (16.37).
+    await user.click(screen.getByRole('button', { name: 'YTD' }))
     const ytdOrder = screen
       .getAllByRole('heading', { level: 3 })
       .map((h) => h.textContent)
