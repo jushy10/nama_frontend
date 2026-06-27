@@ -303,12 +303,18 @@ function EarningsChart({
         useFlexGap
         sx={{
           flexWrap: 'wrap',
+          alignItems: 'baseline',
           columnGap: 1.5,
           rowGap: 0.5,
           fontSize: '0.8rem',
           fontWeight: 500,
-          mb: 1,
-          minHeight: 20,
+          mb: 1.5,
+          px: 1.5,
+          py: 1,
+          borderRadius: 1.5,
+          bgcolor: 'action.hover',
+          border: '1px solid',
+          borderColor: 'divider',
         }}
       >
         {detail}
@@ -398,7 +404,9 @@ function EarningsChart({
             if (v == null) return null
             const top = Math.min(y(v), zeroY)
             const h = Math.max(1, Math.abs(y(v) - zeroY))
-            return <rect x={x} y={top} width={barW} height={h} fill={fill} />
+            return (
+              <rect x={x} y={top} width={barW} height={h} rx={2} fill={fill} />
+            )
           }
 
           // Surprise % rides in the top margin, aligned across all groups.
@@ -473,6 +481,7 @@ function EarningsChart({
                 y={top}
                 width={barW}
                 height={h}
+                rx={2}
                 fill={forecast}
                 fillOpacity={0.18}
                 stroke={forecast}
@@ -592,7 +601,17 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
             } else text = fmtPlainPct(v)
           }
           return (
-            <Box key={key}>
+            <Box
+              key={key}
+              sx={{
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 1.5,
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -600,17 +619,19 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
                   display: 'block',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                 }}
               >
                 {label}
               </Typography>
               <Typography
                 sx={{
+                  mt: 0.25,
                   fontWeight: 700,
+                  fontSize: '1.05rem',
                   fontVariantNumeric: 'tabular-nums',
                   color,
-                  lineHeight: 1.3,
+                  lineHeight: 1.25,
                 }}
               >
                 {text}
@@ -628,15 +649,8 @@ export default function EarningsCard({
 }: {
   earnings: EarningsHistory
 }) {
-  const { beat_rate, beats, scored, quarters } = earnings
-  // Beats more often than not reads green; a coin-flip-or-worse record reads
-  // red. No scored quarters → nothing to colour.
-  const rateColor =
-    beat_rate == null
-      ? 'text.primary'
-      : beat_rate >= 50
-        ? 'success.main'
-        : 'error.main'
+  const { quarters } = earnings
+  const nextRpt = earnings.next_report
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -655,8 +669,17 @@ export default function EarningsCard({
             </Typography>
           </Box>
 
-          {beat_rate != null && (
-            <Box sx={{ textAlign: 'right' }}>
+          {nextRpt?.report_date && (
+            <Box
+              sx={{
+                flexShrink: 0,
+                textAlign: 'right',
+                borderRadius: 1.5,
+                px: 1.5,
+                py: 0.75,
+                bgcolor: 'action.hover',
+              }}
+            >
               <Typography
                 variant="caption"
                 sx={{
@@ -664,24 +687,22 @@ export default function EarningsCard({
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   display: 'block',
+                  fontSize: '0.6rem',
                 }}
               >
-                Beat rate
+                Next report
               </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  color: rateColor,
-                  fontVariantNumeric: 'tabular-nums',
-                  lineHeight: 1.2,
-                }}
-              >
-                {Math.round(beat_rate)}%
+              <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                {fmtReportDate(nextRpt.report_date)}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {beats} of {scored} quarters
-              </Typography>
+              {nextRpt.eps_estimate != null && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'primary.main', fontWeight: 500 }}
+                >
+                  {`est ${fmtEps(nextRpt.eps_estimate)}`}
+                </Typography>
+              )}
             </Box>
           )}
         </Stack>

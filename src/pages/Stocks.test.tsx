@@ -203,11 +203,11 @@ describe('Stocks search', () => {
       expect.anything(),
     )
 
-    // The earnings card loads with its beat-rate summary and per-quarter EPS.
+    // The earnings card loads with its header, next-report chip and per-quarter EPS.
     expect(
       await screen.findByRole('heading', { name: 'Earnings' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('Next report')).toBeInTheDocument()
     // $0.96 is the newest quarter's actual — shown both on the bar and in the
     // hover detail line, so match all occurrences.
     expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)

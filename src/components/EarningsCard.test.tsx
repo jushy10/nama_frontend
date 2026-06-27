@@ -44,14 +44,12 @@ const base: EarningsHistory = {
 }
 
 describe('EarningsCard', () => {
-  it('shows the beat-rate summary and per-quarter EPS', () => {
+  it('shows the header and per-quarter EPS', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
 
     expect(
       screen.getByRole('heading', { name: 'Earnings' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('67%')).toBeInTheDocument()
-    expect(screen.getByText(/2 of 3 quarters/)).toBeInTheDocument()
 
     // Quarter labels and reported EPS render inside the SVG. The newest
     // quarter's actual ($0.96) also appears in the detail line, hence getAll.
@@ -245,7 +243,28 @@ describe('EarningsCard', () => {
     expect(
       screen.getByText(/no earnings history available/i),
     ).toBeInTheDocument()
-    // No beat-rate headline when nothing could be scored.
-    expect(screen.queryByText('Beat rate')).not.toBeInTheDocument()
+    // No "next report" chip when none is scheduled.
+    expect(screen.queryByText('Next report')).not.toBeInTheDocument()
+  })
+
+  it('shows a "next report" chip from the scheduled report', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          next_report: {
+            report_date: '2026-07-30',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: 1.93,
+            revenue_estimate: null,
+            session: 'amc',
+          },
+        }}
+      />,
+    )
+    expect(screen.getByText('Next report')).toBeInTheDocument()
+    expect(screen.getByText('Jul 30')).toBeInTheDocument()
+    expect(screen.getByText('est $1.93')).toBeInTheDocument()
   })
 })
