@@ -406,3 +406,59 @@ export async function getRsi(
   }
   return data
 }
+
+/**
+ * One quarter's reported EPS versus the consensus estimate going in. `beat` is
+ * the met-or-beat flag (`actual >= estimate`), null when either side is
+ * missing; `surprise` is the EPS gap and `surprise_percent` that gap as a
+ * percent of the estimate. `fiscal_year`/`fiscal_quarter` name the period.
+ */
+export interface EarningsSurprise {
+  period: string | null
+  fiscal_year: number | null
+  fiscal_quarter: number | null
+  actual: number | null
+  estimate: number | null
+  surprise: number | null
+  surprise_percent: number | null
+  beat: boolean | null
+}
+
+/**
+ * Recent quarterly earnings surprises (newest first) plus a beat summary.
+ * `beat_rate` is the percent of *scored* quarters (those with both an actual
+ * and an estimate) that met or beat — the "beats consistently?" read; `scored`
+ * is how many of `count` quarters could be scored, `beats` how many of those
+ * cleared the bar.
+ */
+export interface EarningsHistory {
+  symbol: string
+  count: number
+  beats: number
+  scored: number
+  beat_rate: number | null
+  quarters: EarningsSurprise[]
+}
+
+/**
+ * Fetch recent quarterly earnings (actual EPS vs. consensus estimate) for a
+ * ticker, newest first. `limit` is how many quarters to pull back, clamped by
+ * the API to 1–40 (default 4).
+ */
+export async function getEarnings(
+  symbol: string,
+  opts: { limit?: number; signal?: AbortSignal } = {},
+): Promise<EarningsHistory> {
+  const qs = new URLSearchParams()
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings?${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EarningsHistory
+  if (!Array.isArray(data?.quarters)) {
+    throw new ApiError(res.status, 'Malformed earnings response')
+  }
+  return data
+}
