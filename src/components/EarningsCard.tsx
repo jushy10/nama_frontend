@@ -106,6 +106,18 @@ const SESSION_LABEL: Record<string, string> = {
   dmh: 'during hours',
 }
 
+/** The nearest upcoming report — the same one the chart draws its first forecast
+ *  bar for. Prefers the multi-quarter `upcoming` list, falls back to
+ *  `next_report`, so the header chip and that bar always agree. */
+function nearestForecast(e: EarningsHistory): NextEarnings | null {
+  const list = e.upcoming?.length
+    ? e.upcoming
+    : e.next_report
+      ? [e.next_report]
+      : []
+  return list.find((f) => f.eps_estimate != null) ?? null
+}
+
 /**
  * Grouped EPS columns — a muted "estimate" bar beside the reported "actual"
  * (green when it met/beat, red when it missed) for each quarter, oldest to
@@ -650,7 +662,7 @@ export default function EarningsCard({
   earnings: EarningsHistory
 }) {
   const { quarters } = earnings
-  const nextRpt = earnings.next_report
+  const nextRpt = nearestForecast(earnings)
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>

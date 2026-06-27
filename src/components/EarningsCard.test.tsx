@@ -267,4 +267,37 @@ describe('EarningsCard', () => {
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
     expect(screen.getByText('est $1.93')).toBeInTheDocument()
   })
+
+  it('chip prefers the upcoming list, so it matches the forecast bar', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          // Different vendor for the scheduled date/estimate...
+          next_report: {
+            report_date: '2026-07-29',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: 1.93,
+            revenue_estimate: null,
+            session: 'amc',
+          },
+          // ...but `upcoming` (the chart's source) wins, so they agree.
+          upcoming: [
+            {
+              report_date: '2026-07-30',
+              fiscal_year: null,
+              fiscal_quarter: null,
+              eps_estimate: 1.88,
+              revenue_estimate: 110_000_000_000,
+              session: null,
+            },
+          ],
+        }}
+      />,
+    )
+    expect(screen.getByText('Jul 30')).toBeInTheDocument() // upcoming date
+    expect(screen.getByText('est $1.88')).toBeInTheDocument() // upcoming estimate
+    expect(screen.queryByText('est $1.93')).not.toBeInTheDocument() // not next_report
+  })
 })
