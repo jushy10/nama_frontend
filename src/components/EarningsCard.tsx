@@ -1,5 +1,12 @@
 import { useMemo } from 'react'
-import { Box, Card, CardContent, Stack, Typography, useTheme } from '@mui/material'
+import {
+  Box,
+  Card,
+  CardContent,
+  Stack,
+  Typography,
+  useTheme,
+} from '@mui/material'
 import type { Theme } from '@mui/material/styles'
 import type { EarningsHistory, EarningsSurprise } from '@/lib/api'
 
