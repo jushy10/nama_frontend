@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, type PointerEvent } from 'react'
 import {
   Box,
   Card,
@@ -73,6 +73,32 @@ const fmtReportDate = (iso: string) =>
     day: 'numeric',
   })
 
+/** "Nov 20 '25" — a quarter's period date, for the hover detail line. */
+const fmtFullDate = (iso: string) =>
+  parseDateOnly(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: '2-digit',
+  })
+
+/** Compact revenue, e.g. "$89.0B" / "$1.2T". */
+const fmtRev = (n: number) =>
+  n.toLocaleString('en-US', {
+    notation: 'compact',
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 1,
+  })
+
+/** EPS or an em dash when the value is missing. */
+const eps = (v: number | null | undefined) => (v == null ? '—' : fmtEps(v))
+
+const SESSION_LABEL: Record<string, string> = {
+  bmo: 'before open',
+  amc: 'after close',
+  dmh: 'during hours',
+}
+
 /**
  * Grouped EPS columns — a muted "estimate" bar beside the reported "actual"
  * (green when it met/beat, red when it missed) for each quarter, oldest to
@@ -95,6 +121,7 @@ function EarningsChart({
   const axis = theme.palette.text.secondary
   const est = estimateColor(theme)
   const forecast = theme.palette.primary.main // indigo accent for the forecast
+  const [hover, setHover] = useState<number | null>(null)
 
   // Only plot a forward column when there's a consensus EPS to place.
   const fcEps = next?.eps_estimate ?? null
@@ -145,7 +172,7 @@ function EarningsChart({
       (_, i) => min + ((max - min) * i) / tickN,
     )
 
-    return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot }
+    return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot, n }
   }, [data, hasForecast, fcEps])
 
   if (data.length === 0 && !hasForecast) {
@@ -156,185 +183,302 @@ function EarningsChart({
     )
   }
 
-  const { cx, y, groupW, gap, barW, ticks, zeroY, slot } = geo
+  const { cx, y, groupW, gap, barW, ticks, zeroY, slot, n } = geo
   const fcIndex = data.length // the forecast column's slot, at the right edge
 
-  return (
-    <Box
-      component="svg"
-      viewBox={`0 0 ${W} ${H}`}
-      preserveAspectRatio="none"
-      role="img"
-      aria-label="Quarterly actual versus estimated earnings per share"
-      sx={{ width: '100%', height: 'auto', display: 'block' }}
-    >
-      {/* gridlines + EPS axis labels (right) */}
-      {ticks.map((t, i) => (
-        <g key={`t${i}`}>
-          <line
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={y(t)}
-            y2={y(t)}
-            stroke={grid}
-            strokeWidth={1}
-          />
-          <text x={W - PAD.right + 6} y={y(t) + 3.5} fontSize={11} fill={axis}>
-            {fmtEps(t)}
-          </text>
-        </g>
-      ))}
-      {/* zero baseline, drawn a touch stronger than the gridlines */}
-      <line
-        x1={PAD.left}
-        x2={W - PAD.right}
-        y1={zeroY}
-        y2={zeroY}
-        stroke={axis}
-        strokeWidth={1}
-        opacity={0.5}
-      />
+  // The hovered column drives the detail line; default to the latest reported
+  // quarter (or the forecast when there's no history) so the line is never blank.
+  const active = hover ?? (data.length > 0 ? data.length - 1 : fcIndex)
 
-      {/* dashed divider between reported history and the forward estimate */}
-      {hasForecast && data.length > 0 && (
-        <line
-          x1={PAD.left + slot * fcIndex}
-          x2={PAD.left + slot * fcIndex}
-          y1={PAD.top}
-          y2={H - PAD.bottom}
-          stroke={axis}
-          strokeWidth={1}
-          strokeDasharray="2 3"
-          opacity={0.4}
-        />
-      )}
+  function onMove(e: PointerEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    if (!rect.width) return // jsdom / unmeasured: leave hover untouched
+    const vbX = ((e.clientX - rect.left) / rect.width) * W
+    const i = Math.floor((vbX - PAD.left) / slot)
+    setHover(Math.max(0, Math.min(n - 1, i)))
+  }
 
-      {data.map((q, i) => {
-        const center = cx(i)
-        const estX = center - groupW / 2
-        const actX = estX + barW + gap
-        const actColor = q.beat == null ? axis : q.beat ? up : down
+  // One inline label/value cell for the detail line above the plot.
+  const cell = (label: string, value: string, color?: string) => (
+    <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
+      <Box component="span" sx={{ color: axis }}>
+        {label}
+      </Box>{' '}
+      <Box
+        component="span"
+        sx={{
+          color: color ?? 'text.primary',
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value}
+      </Box>
+    </Box>
+  )
 
-        const bar = (x: number, v: number | null, fill: string) => {
-          if (v == null) return null
-          const top = Math.min(y(v), zeroY)
-          const h = Math.max(1, Math.abs(y(v) - zeroY))
-          return <rect x={x} y={top} width={barW} height={h} fill={fill} />
-        }
-
-        // Surprise % rides in the top margin, aligned across all groups.
-        const surprise =
-          q.surprise_percent == null ? null : (
-            <text
-              x={center}
-              y={18}
-              fontSize={11}
-              fontWeight={600}
-              fill={actColor}
-              textAnchor="middle"
-            >
-              {fmtPct(q.surprise_percent)}
-            </text>
+  // The detail line for the active column — EPS estimate vs. actual (+ surprise),
+  // revenue when present; the forecast column shows the consensus going in.
+  const detail =
+    active < data.length
+      ? (() => {
+          const q = data[active]
+          const c = q.beat == null ? axis : q.beat ? up : down
+          return (
+            <>
+              <Box component="span" sx={{ color: axis, mr: 0.5 }}>
+                {quarterLabel(q)}
+                {q.period ? ` · ${fmtFullDate(q.period)}` : ''}
+              </Box>
+              {cell('Est', eps(q.estimate))}
+              {cell('Act', eps(q.actual), c)}
+              {q.surprise_percent != null &&
+                cell('', fmtPct(q.surprise_percent), c)}
+              {q.revenue_estimate != null &&
+                cell('Rev est', fmtRev(q.revenue_estimate))}
+              {q.revenue_actual != null &&
+                cell('act', fmtRev(q.revenue_actual), c)}
+            </>
           )
+        })()
+      : next && (
+          <>
+            <Box component="span" sx={{ color: forecast, mr: 0.5 }}>
+              {nextLabel(next)}
+              {next.report_date
+                ? ` · Est. ${fmtReportDate(next.report_date)}`
+                : ''}
+              {next.session && SESSION_LABEL[next.session]
+                ? ` (${SESSION_LABEL[next.session]})`
+                : ''}
+            </Box>
+            {cell('EPS est', eps(next.eps_estimate), forecast)}
+            {next.revenue_estimate != null &&
+              cell('Rev est', fmtRev(next.revenue_estimate), forecast)}
+            <Box component="span" sx={{ color: forecast, fontWeight: 600 }}>
+              Upcoming
+            </Box>
+          </>
+        )
 
-        return (
-          <g key={q.period ?? i}>
-            {surprise}
-            {bar(estX, q.estimate, est)}
-            {bar(actX, q.actual, actColor)}
-            {/* quarter label + the reported EPS beneath it */}
+  return (
+    <Box>
+      <Stack
+        direction="row"
+        useFlexGap
+        sx={{
+          flexWrap: 'wrap',
+          columnGap: 1.5,
+          rowGap: 0.5,
+          fontSize: '0.8rem',
+          fontWeight: 500,
+          mb: 1,
+          minHeight: 20,
+        }}
+      >
+        {detail}
+      </Stack>
+
+      <Box
+        component="svg"
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Quarterly actual versus estimated earnings per share"
+        onPointerMove={onMove}
+        onPointerLeave={() => setHover(null)}
+        sx={{
+          width: '100%',
+          height: 'auto',
+          display: 'block',
+          touchAction: 'none',
+          cursor: 'crosshair',
+        }}
+      >
+        {/* hovered-column highlight band */}
+        {hover != null && (
+          <rect
+            x={PAD.left + slot * hover}
+            y={PAD.top}
+            width={slot}
+            height={H - PAD.top - PAD.bottom}
+            fill={axis}
+            opacity={0.08}
+            pointerEvents="none"
+          />
+        )}
+        {/* gridlines + EPS axis labels (right) */}
+        {ticks.map((t, i) => (
+          <g key={`t${i}`}>
+            <line
+              x1={PAD.left}
+              x2={W - PAD.right}
+              y1={y(t)}
+              y2={y(t)}
+              stroke={grid}
+              strokeWidth={1}
+            />
             <text
-              x={center}
-              y={H - 26}
+              x={W - PAD.right + 6}
+              y={y(t) + 3.5}
               fontSize={11}
               fill={axis}
-              textAnchor="middle"
             >
-              {quarterLabel(q)}
+              {fmtEps(t)}
             </text>
-            {q.actual != null && (
-              <text
-                x={center}
-                y={H - 12}
-                fontSize={11}
-                fontWeight={600}
-                fill={actColor}
-                textAnchor="middle"
-              >
-                {fmtEps(q.actual)}
-              </text>
-            )}
           </g>
-        )
-      })}
+        ))}
+        {/* zero baseline, drawn a touch stronger than the gridlines */}
+        <line
+          x1={PAD.left}
+          x2={W - PAD.right}
+          y1={zeroY}
+          y2={zeroY}
+          stroke={axis}
+          strokeWidth={1}
+          opacity={0.5}
+        />
 
-      {/* forward "expected" column: where analysts see the next report landing */}
-      {hasForecast &&
-        next &&
-        fcEps != null &&
-        (() => {
-          const center = cx(fcIndex)
-          const top = Math.min(y(fcEps), zeroY)
-          const h = Math.max(1, Math.abs(y(fcEps) - zeroY))
-          return (
-            <g key="forecast">
-              {/* consensus estimate, accent-coloured, in the top margin */}
+        {/* dashed divider between reported history and the forward estimate */}
+        {hasForecast && data.length > 0 && (
+          <line
+            x1={PAD.left + slot * fcIndex}
+            x2={PAD.left + slot * fcIndex}
+            y1={PAD.top}
+            y2={H - PAD.bottom}
+            stroke={axis}
+            strokeWidth={1}
+            strokeDasharray="2 3"
+            opacity={0.4}
+          />
+        )}
+
+        {data.map((q, i) => {
+          const center = cx(i)
+          const estX = center - groupW / 2
+          const actX = estX + barW + gap
+          const actColor = q.beat == null ? axis : q.beat ? up : down
+
+          const bar = (x: number, v: number | null, fill: string) => {
+            if (v == null) return null
+            const top = Math.min(y(v), zeroY)
+            const h = Math.max(1, Math.abs(y(v) - zeroY))
+            return <rect x={x} y={top} width={barW} height={h} fill={fill} />
+          }
+
+          // Surprise % rides in the top margin, aligned across all groups.
+          const surprise =
+            q.surprise_percent == null ? null : (
               <text
                 x={center}
                 y={18}
                 fontSize={11}
                 fontWeight={600}
-                fill={forecast}
+                fill={actColor}
                 textAnchor="middle"
               >
-                {fmtEps(fcEps)}
+                {fmtPct(q.surprise_percent)}
               </text>
-              {/* a single forecast bar: faint accent fill + dashed outline */}
-              <rect
-                x={center - barW / 2}
-                y={top}
-                width={barW}
-                height={h}
-                fill={forecast}
-                fillOpacity={0.18}
-                stroke={forecast}
-                strokeWidth={1.25}
-                strokeDasharray="3 2"
-              />
-              {/* level marker — "where analysts expect it", a touch wider */}
-              <line
-                x1={center - groupW / 2}
-                x2={center + groupW / 2}
-                y1={y(fcEps)}
-                y2={y(fcEps)}
-                stroke={forecast}
-                strokeWidth={1.5}
-              />
-              {/* fiscal label + the expected report date beneath it */}
+            )
+
+          return (
+            <g key={q.period ?? i}>
+              {surprise}
+              {bar(estX, q.estimate, est)}
+              {bar(actX, q.actual, actColor)}
+              {/* quarter label + the reported EPS beneath it */}
               <text
                 x={center}
                 y={H - 26}
                 fontSize={11}
-                fill={forecast}
+                fill={axis}
                 textAnchor="middle"
               >
-                {nextLabel(next)}
+                {quarterLabel(q)}
               </text>
-              {next.report_date && (
+              {q.actual != null && (
                 <text
                   x={center}
                   y={H - 12}
                   fontSize={11}
                   fontWeight={600}
-                  fill={forecast}
+                  fill={actColor}
                   textAnchor="middle"
                 >
-                  {`Est. ${fmtReportDate(next.report_date)}`}
+                  {fmtEps(q.actual)}
                 </text>
               )}
             </g>
           )
-        })()}
+        })}
+
+        {/* forward "expected" column: where analysts see the next report landing */}
+        {hasForecast &&
+          next &&
+          fcEps != null &&
+          (() => {
+            const center = cx(fcIndex)
+            const top = Math.min(y(fcEps), zeroY)
+            const h = Math.max(1, Math.abs(y(fcEps) - zeroY))
+            return (
+              <g key="forecast">
+                {/* consensus estimate, accent-coloured, in the top margin */}
+                <text
+                  x={center}
+                  y={18}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill={forecast}
+                  textAnchor="middle"
+                >
+                  {fmtEps(fcEps)}
+                </text>
+                {/* a single forecast bar: faint accent fill + dashed outline */}
+                <rect
+                  x={center - barW / 2}
+                  y={top}
+                  width={barW}
+                  height={h}
+                  fill={forecast}
+                  fillOpacity={0.18}
+                  stroke={forecast}
+                  strokeWidth={1.25}
+                  strokeDasharray="3 2"
+                />
+                {/* level marker — "where analysts expect it", a touch wider */}
+                <line
+                  x1={center - groupW / 2}
+                  x2={center + groupW / 2}
+                  y1={y(fcEps)}
+                  y2={y(fcEps)}
+                  stroke={forecast}
+                  strokeWidth={1.5}
+                />
+                {/* fiscal label + the expected report date beneath it */}
+                <text
+                  x={center}
+                  y={H - 26}
+                  fontSize={11}
+                  fill={forecast}
+                  textAnchor="middle"
+                >
+                  {nextLabel(next)}
+                </text>
+                {next.report_date && (
+                  <text
+                    x={center}
+                    y={H - 12}
+                    fontSize={11}
+                    fontWeight={600}
+                    fill={forecast}
+                    textAnchor="middle"
+                  >
+                    {`Est. ${fmtReportDate(next.report_date)}`}
+                  </text>
+                )}
+              </g>
+            )
+          })()}
+      </Box>
     </Box>
   )
 }
