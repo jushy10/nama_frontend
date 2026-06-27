@@ -1,4 +1,10 @@
-import { useMemo, useState, type PointerEvent } from 'react'
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react'
 import {
   Box,
   Card,
@@ -15,10 +21,11 @@ import type {
   NextEarnings,
 } from '@/lib/api'
 
-// Like CandleChart, the plot draws into a fixed viewBox and scales to its
-// container via `width: 100%`, so all geometry is in these abstract units — no
-// DOM measurement needed (which also keeps it happy in jsdom).
-const W = 820
+// The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
+// and text stays legible at any size — crucial on mobile), while the height is
+// fixed at H. `W_FALLBACK` is used until the container is measured and in jsdom
+// (where there's no layout), keeping tests on stable desktop geometry.
+const W_FALLBACK = 820
 const H = 300
 const PAD = { top: 30, right: 48, bottom: 46, left: 12 }
 
@@ -125,6 +132,25 @@ function EarningsChart({
   const forecast = theme.palette.primary.main // indigo accent for the forecast
   const [hover, setHover] = useState<number | null>(null)
 
+  // Track the rendered width so the viewBox matches it 1:1 — keeps labels at
+  // their native pixel size instead of shrinking on narrow (mobile) screens.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [cw, setCw] = useState(W_FALLBACK)
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => {
+      const w = el.getBoundingClientRect().width
+      if (w > 0) setCw(Math.round(w))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const W = cw
+
   // Forward "expected" columns: the multi-quarter analyst consensus when we have
   // it, else just the next scheduled report — only those with a consensus EPS.
   const forecasts = useMemo(() => {
@@ -181,7 +207,7 @@ function EarningsChart({
     )
 
     return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot, n }
-  }, [data, forecasts])
+  }, [data, forecasts, W])
 
   if (data.length === 0 && !hasForecast) {
     return (
@@ -271,7 +297,7 @@ function EarningsChart({
         })()
 
   return (
-    <Box>
+    <Box ref={wrapRef}>
       <Stack
         direction="row"
         useFlexGap
