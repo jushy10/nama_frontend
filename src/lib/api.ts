@@ -425,11 +425,31 @@ export interface EarningsSurprise {
 }
 
 /**
+ * Trailing earnings/profitability snapshot served alongside the beat history:
+ * trailing EPS, year-over-year EPS/revenue growth, the margin stack, the
+ * returns (ROE/ROIC) and the dividend payout ratio. All percentages except
+ * `eps`; any field a vendor doesn't cover is null. (Valuation/market metrics —
+ * P/E, beta, 52-week range — live on the stock snapshot's `metrics` instead.)
+ */
+export interface EarningsMetrics {
+  eps: number | null
+  eps_growth_yoy: number | null
+  revenue_growth_yoy: number | null
+  gross_margin: number | null
+  operating_margin: number | null
+  net_margin: number | null
+  roe: number | null
+  roic: number | null
+  payout_ratio: number | null
+}
+
+/**
  * Recent quarterly earnings surprises (newest first) plus a beat summary.
  * `beat_rate` is the percent of *scored* quarters (those with both an actual
  * and an estimate) that met or beat — the "beats consistently?" read; `scored`
  * is how many of `count` quarters could be scored, `beats` how many of those
- * cleared the bar.
+ * cleared the bar. `metrics` is an optional trailing earnings snapshot
+ * (best-effort; absent on older API builds, null when the vendor has no data).
  */
 export interface EarningsHistory {
   symbol: string
@@ -438,6 +458,7 @@ export interface EarningsHistory {
   scored: number
   beat_rate: number | null
   quarters: EarningsSurprise[]
+  metrics?: EarningsMetrics | null
 }
 
 /**
