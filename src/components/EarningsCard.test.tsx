@@ -88,6 +88,40 @@ describe('EarningsCard', () => {
     expect(screen.getByText('-$0.15')).toBeInTheDocument()
   })
 
+  it('renders the trailing metric tiles when metrics are present', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          metrics: {
+            eps: 8.27,
+            eps_growth_yoy: 29.0,
+            revenue_growth_yoy: 12.8,
+            gross_margin: 47.9,
+            operating_margin: 32.6,
+            net_margin: 27.2,
+            roe: 146.7,
+            roic: null, // vendor-uncovered -> em dash
+            payout_ratio: 12.7,
+          },
+        }}
+      />,
+    )
+    expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
+    expect(screen.getByText('EPS (TTM)')).toBeInTheDocument()
+    expect(screen.getByText('$8.27')).toBeInTheDocument()
+    expect(screen.getByText('+29.0%')).toBeInTheDocument() // growth: signed
+    expect(screen.getByText('27.2%')).toBeInTheDocument() // margin: plain
+    // A null metric renders an em dash rather than vanishing.
+    expect(screen.getByText('ROIC')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
+  it('omits the trailing metrics block when metrics are absent', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
+  })
+
   it('falls back when there is no earnings history', () => {
     renderWithProviders(
       <EarningsCard

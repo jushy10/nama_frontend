@@ -8,7 +8,11 @@ import {
   useTheme,
 } from '@mui/material'
 import type { Theme } from '@mui/material/styles'
-import type { EarningsHistory, EarningsSurprise } from '@/lib/api'
+import type {
+  EarningsHistory,
+  EarningsMetrics,
+  EarningsSurprise,
+} from '@/lib/api'
 
 // Like CandleChart, the plot draws into a fixed viewBox and scales to its
 // container via `width: 100%`, so all geometry is in these abstract units — no
@@ -19,6 +23,7 @@ const PAD = { top: 30, right: 48, bottom: 46, left: 12 }
 
 const fmtEps = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`
 const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
+const fmtPlainPct = (n: number) => `${n.toFixed(1)}%`
 
 /** Muted fill for the "estimate" bar — faint enough to sit behind the actual,
  *  and legible on both the dark and light canvas. Shared with the legend. */
@@ -222,6 +227,92 @@ function LegendItem({
   )
 }
 
+// The trailing earnings/profitability metrics, in display order. `kind` drives
+// formatting: `money` → "$8.27", `growth` → signed + coloured ("+29.0%"),
+// `pct` → plain percent ("27.2%").
+const METRIC_TILES: {
+  key: keyof EarningsMetrics
+  label: string
+  kind: 'money' | 'growth' | 'pct'
+}[] = [
+  { key: 'eps', label: 'EPS (TTM)', kind: 'money' },
+  { key: 'eps_growth_yoy', label: 'EPS Gr. (YoY)', kind: 'growth' },
+  { key: 'revenue_growth_yoy', label: 'Rev. Gr. (YoY)', kind: 'growth' },
+  { key: 'gross_margin', label: 'Gross Margin', kind: 'pct' },
+  { key: 'operating_margin', label: 'Op. Margin', kind: 'pct' },
+  { key: 'net_margin', label: 'Net Margin', kind: 'pct' },
+  { key: 'roe', label: 'ROE', kind: 'pct' },
+  { key: 'roic', label: 'ROIC', kind: 'pct' },
+  { key: 'payout_ratio', label: 'Payout', kind: 'pct' },
+]
+
+/** A grid of trailing earnings metrics (EPS, growth, margins, returns, payout)
+ *  served alongside the beat history. Growth tiles are signed and coloured; a
+ *  value the vendor doesn't cover shows an em dash. */
+function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
+  return (
+    <Box
+      sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
+    >
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
+      >
+        Trailing metrics
+      </Typography>
+      <Box
+        sx={{
+          mt: 1.5,
+          display: 'grid',
+          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
+          rowGap: 2,
+          columnGap: 2,
+        }}
+      >
+        {METRIC_TILES.map(({ key, label, kind }) => {
+          const v = metrics[key]
+          let text = '—'
+          let color = 'text.primary'
+          if (v != null) {
+            if (kind === 'money') text = fmtEps(v)
+            else if (kind === 'growth') {
+              text = fmtPct(v)
+              color = v >= 0 ? 'success.main' : 'error.main'
+            } else text = fmtPlainPct(v)
+          }
+          return (
+            <Box key={key}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{
+                  display: 'block',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                  fontSize: '0.68rem',
+                }}
+              >
+                {label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontVariantNumeric: 'tabular-nums',
+                  color,
+                  lineHeight: 1.3,
+                }}
+              >
+                {text}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Box>
+  )
+}
+
 export default function EarningsCard({
   earnings,
 }: {
@@ -306,6 +397,8 @@ export default function EarningsCard({
             </Stack>
           </>
         )}
+
+        {earnings.metrics && <MetricTiles metrics={earnings.metrics} />}
       </CardContent>
     </Card>
   )

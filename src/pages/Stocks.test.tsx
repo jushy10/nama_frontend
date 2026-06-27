@@ -81,6 +81,17 @@ const earningsSample = {
   beats: 3,
   scored: 4,
   beat_rate: 75.0,
+  metrics: {
+    eps: 8.27,
+    eps_growth_yoy: 29.0,
+    revenue_growth_yoy: 12.8,
+    gross_margin: 47.9,
+    operating_margin: 32.6,
+    net_margin: 27.2,
+    roe: 146.7,
+    roic: null,
+    payout_ratio: 12.7,
+  },
   quarters: [
     {
       period: '2026-05-28',
@@ -190,6 +201,10 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
     expect(screen.getByText('$0.96')).toBeInTheDocument()
+    // Trailing earnings metrics relocated from the stock endpoint render as tiles.
+    expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
+    expect(screen.getByText('Net Margin')).toBeInTheDocument()
+    expect(screen.getByText('27.2%')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),
