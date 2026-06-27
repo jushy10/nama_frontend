@@ -208,7 +208,9 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'Earnings' }),
     ).toBeInTheDocument()
     expect(screen.getByText('75%')).toBeInTheDocument()
-    expect(screen.getByText('$0.96')).toBeInTheDocument()
+    // $0.96 is the newest quarter's actual — shown both on the bar and in the
+    // hover detail line, so match all occurrences.
+    expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)
     // Trailing earnings metrics relocated from the stock endpoint render as tiles.
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
     expect(screen.getByText('Net Margin')).toBeInTheDocument()
@@ -216,6 +218,8 @@ describe('Stocks search', () => {
     // The next-earnings consensus plots a forward "expected" bar on the chart.
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
     expect(screen.getByText('Est. Jul 30')).toBeInTheDocument()
+    // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
+    expect(screen.getByText('$0.92')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),

@@ -53,9 +53,10 @@ describe('EarningsCard', () => {
     expect(screen.getByText('67%')).toBeInTheDocument()
     expect(screen.getByText(/2 of 3 quarters/)).toBeInTheDocument()
 
-    // Quarter labels and reported EPS render inside the SVG.
+    // Quarter labels and reported EPS render inside the SVG. The newest
+    // quarter's actual ($0.96) also appears in the detail line, hence getAll.
     expect(screen.getByText("Q1 '27")).toBeInTheDocument()
-    expect(screen.getByText('$0.96')).toBeInTheDocument()
+    expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)
     expect(screen.getByText('$0.68')).toBeInTheDocument()
   })
 
@@ -85,7 +86,7 @@ describe('EarningsCard', () => {
         }}
       />,
     )
-    expect(screen.getByText('-$0.15')).toBeInTheDocument()
+    expect(screen.getAllByText('-$0.15').length).toBeGreaterThan(0)
   })
 
   it('renders the trailing metric tiles when metrics are present', () => {
@@ -162,6 +163,36 @@ describe('EarningsCard', () => {
     )
     expect(screen.queryByText('Upcoming (est.)')).not.toBeInTheDocument()
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
+  })
+
+  it('shows a detail line with the latest quarter estimate vs. actual', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    // Default detail = newest reported quarter (Q1 '27): est 0.92 → act 0.96.
+    // Estimates aren't labelled on the bars, so $0.92 is unique to the line.
+    expect(screen.getByText('Est')).toBeInTheDocument()
+    expect(screen.getByText('Act')).toBeInTheDocument()
+    expect(screen.getByText('$0.92')).toBeInTheDocument()
+  })
+
+  it('shows expected vs. released revenue in the detail line when present', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          quarters: [
+            {
+              ...base.quarters[0],
+              revenue_estimate: 95_400_000_000,
+              revenue_actual: 97_100_000_000,
+            },
+            ...base.quarters.slice(1),
+          ],
+        }}
+      />,
+    )
+    expect(screen.getByText('Rev est')).toBeInTheDocument()
+    expect(screen.getByText('$95.4B')).toBeInTheDocument() // expected
+    expect(screen.getByText('$97.1B')).toBeInTheDocument() // released
   })
 
   it('falls back when there is no earnings history', () => {

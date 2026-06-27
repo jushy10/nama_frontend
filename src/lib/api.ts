@@ -422,6 +422,11 @@ export interface EarningsSurprise {
   surprise: number | null
   surprise_percent: number | null
   beat: boolean | null
+  // Revenue for the quarter (raw, e.g. USD), best-effort: `revenue_estimate` is
+  // the consensus going in, `revenue_actual` what was reported. Optional —
+  // absent on API builds that don't source revenue, null when uncovered.
+  revenue_estimate?: number | null
+  revenue_actual?: number | null
 }
 
 /**
