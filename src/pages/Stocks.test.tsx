@@ -75,17 +75,54 @@ const rsiSample = {
   ],
 }
 
-/** A fetch stub that answers the snapshot, candles, and RSI endpoints apart. */
-function stubFetch(stock: unknown, candles: unknown, rsi: unknown = rsiSample) {
+const earningsSample = {
+  symbol: 'NVDA',
+  count: 4,
+  beats: 3,
+  scored: 4,
+  beat_rate: 75.0,
+  quarters: [
+    {
+      period: '2026-05-28',
+      fiscal_year: 2027,
+      fiscal_quarter: 1,
+      actual: 0.96,
+      estimate: 0.92,
+      surprise: 0.04,
+      surprise_percent: 4.3,
+      beat: true,
+    },
+    {
+      period: '2025-11-20',
+      fiscal_year: 2026,
+      fiscal_quarter: 3,
+      actual: 0.81,
+      estimate: 0.75,
+      surprise: 0.06,
+      surprise_percent: 8.0,
+      beat: true,
+    },
+  ],
+}
+
+/** A fetch stub that answers the snapshot, candles, RSI, and earnings apart. */
+function stubFetch(
+  stock: unknown,
+  candles: unknown,
+  rsi: unknown = rsiSample,
+  earnings: unknown = earningsSample,
+) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL) => {
       const u = String(url)
-      const body = u.includes('/rsi')
-        ? rsi
-        : u.includes('/candles')
-          ? candles
-          : stock
+      const body = u.includes('/earnings')
+        ? earnings
+        : u.includes('/rsi')
+          ? rsi
+          : u.includes('/candles')
+            ? candles
+            : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -144,6 +181,17 @@ describe('Stocks search', () => {
     expect(screen.getByText('Buy')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/rsi'),
+      expect.anything(),
+    )
+
+    // The earnings card loads with its beat-rate summary and per-quarter EPS.
+    expect(
+      await screen.findByRole('heading', { name: 'Earnings' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('75%')).toBeInTheDocument()
+    expect(screen.getByText('$0.96')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),
     )
   })

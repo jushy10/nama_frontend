@@ -17,16 +17,19 @@ import {
 import {
   ApiError,
   getCandles,
+  getEarnings,
   getRsi,
   getStock,
   type CandleSeries,
   type ChartRange,
+  type EarningsHistory,
   type RsiSeries,
   type Stock,
 } from '@/lib/api'
 import StockCard from '@/components/StockCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
+import EarningsCard from '@/components/EarningsCard'
 
 type Status =
   | { state: 'idle' }
@@ -45,6 +48,12 @@ type RsiStatus =
   | { state: 'loading' }
   | { state: 'error'; message: string }
   | { state: 'success'; series: RsiSeries }
+
+type EarningsStatus =
+  | { state: 'idle' }
+  | { state: 'loading' }
+  | { state: 'error'; message: string }
+  | { state: 'success'; history: EarningsHistory }
 
 // Curated subset of the API's ranges — the ones worth a one-tap button.
 const RANGE_OPTIONS: ChartRange[] = [
@@ -68,6 +77,7 @@ export default function Stocks() {
   const [range, setRange] = useState<ChartRange>('6M')
   const [candle, setCandle] = useState<CandleStatus>({ state: 'idle' })
   const [rsi, setRsi] = useState<RsiStatus>({ state: 'idle' })
+  const [earnings, setEarnings] = useState<EarningsStatus>({ state: 'idle' })
   // 5Y trailing return — the snapshot's `performance` object stops at 1Y, so we
   // derive it from the first vs last close of the 5Y daily candle series.
   const [fiveYearReturn, setFiveYearReturn] = useState<number | null>(null)
@@ -168,6 +178,30 @@ export default function Stocks() {
         const message =
           err instanceof ApiError ? err.message : 'Could not load RSI data.'
         setRsi({ state: 'error', message })
+      })
+    return () => ac.abort()
+  }, [loadedSymbol])
+
+  // Earnings history also rides the symbol. We ask for up to 8 quarters; the
+  // backend's free Finnhub tier currently returns the last 4, and the chart
+  // renders whatever comes back — so it widens on its own if that source ever
+  // deepens, with no change needed here.
+  useEffect(() => {
+    if (!loadedSymbol) {
+      setEarnings({ state: 'idle' })
+      return
+    }
+    const ac = new AbortController()
+    setEarnings({ state: 'loading' })
+    getEarnings(loadedSymbol, { limit: 8, signal: ac.signal })
+      .then((history) => setEarnings({ state: 'success', history }))
+      .catch((err) => {
+        if (ac.signal.aborted) return
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : 'Could not load earnings data.'
+        setEarnings({ state: 'error', message })
       })
     return () => ac.abort()
   }, [loadedSymbol])
@@ -306,6 +340,20 @@ export default function Stocks() {
                 )}
               </CardContent>
             </Card>
+
+            {earnings.state === 'loading' && (
+              <Stack sx={{ alignItems: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            )}
+            {earnings.state === 'error' && (
+              <Alert severity="warning" variant="outlined">
+                {earnings.message}
+              </Alert>
+            )}
+            {earnings.state === 'success' && (
+              <EarningsCard earnings={earnings.history} />
+            )}
           </Stack>
         )}
       </Box>
