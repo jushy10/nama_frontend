@@ -12,6 +12,7 @@ import type {
   EarningsHistory,
   EarningsMetrics,
   EarningsSurprise,
+  NextEarnings,
 } from '@/lib/api'
 
 // Like CandleChart, the plot draws into a fixed viewBox and scales to its
@@ -44,21 +45,63 @@ function quarterLabel(q: EarningsSurprise): string {
   return '—'
 }
 
+/** Parse a date-only "YYYY-MM-DD" as a *local* date. Using `new Date(iso)`
+ *  treats it as UTC midnight, which formats a day early in negative offsets. */
+function parseDateOnly(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** "Q3 '26" for the upcoming report, falling back to its expected month. */
+function nextLabel(n: NextEarnings): string {
+  if (n.fiscal_quarter && n.fiscal_year) {
+    return `Q${n.fiscal_quarter} '${String(n.fiscal_year).slice(-2)}`
+  }
+  if (n.report_date) {
+    return parseDateOnly(n.report_date).toLocaleDateString('en-US', {
+      month: 'short',
+      year: '2-digit',
+    })
+  }
+  return 'Next'
+}
+
+/** "Jul 30" — the expected report day, for the forecast column's sub-label. */
+const fmtReportDate = (iso: string) =>
+  parseDateOnly(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+
 /**
  * Grouped EPS columns — a muted "estimate" bar beside the reported "actual"
  * (green when it met/beat, red when it missed) for each quarter, oldest to
  * newest. Surprise % rides above each pair; the actual EPS sits under the
  * quarter label. A zero baseline keeps loss quarters (negative EPS) readable.
+ * When `next` carries a consensus, a forward "expected" column is appended at
+ * the right edge, styled as a forecast (dashed accent outline + a level marker).
  */
-function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
+function EarningsChart({
+  quarters,
+  next,
+}: {
+  quarters: EarningsSurprise[]
+  next?: NextEarnings | null
+}) {
   const theme = useTheme()
   const up = theme.palette.success.main
   const down = theme.palette.error.main
   const grid = theme.palette.divider
   const axis = theme.palette.text.secondary
   const est = estimateColor(theme)
+  const forecast = theme.palette.primary.main // indigo accent for the forecast
 
-  // API is newest-first; a time axis reads oldest → newest, left → right.
+  // Only plot a forward column when there's a consensus EPS to place.
+  const fcEps = next?.eps_estimate ?? null
+  const hasForecast = fcEps != null
+
+  // API is newest-first; a time axis reads oldest → newest, left → right. The
+  // optional forecast sits at the far right, after the last reported quarter.
   const data = useMemo(() => [...quarters].reverse(), [quarters])
 
   const geo = useMemo(() => {
@@ -66,7 +109,8 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
     const plotH = H - PAD.top - PAD.bottom
 
     // Always anchor the scale at zero so bar heights are comparable and the
-    // baseline is meaningful; stretch to cover whatever actual/estimate reach.
+    // baseline is meaningful; stretch to cover whatever actual/estimate reach,
+    // plus the forward consensus if there is one.
     let max = 0
     let min = 0
     for (const q of data) {
@@ -76,12 +120,16 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
         if (v < min) min = v
       }
     }
+    if (fcEps != null) {
+      if (fcEps > max) max = fcEps
+      if (fcEps < min) min = fcEps
+    }
     if (max === min) max = 1 // all-zero / empty guard
     const padV = (max - min) * 0.15 || 1
     max += padV
     if (min < 0) min -= padV // only drop the floor when there are losses
 
-    const n = data.length
+    const n = data.length + (hasForecast ? 1 : 0)
     const slot = plotW / Math.max(n, 1)
     const groupW = Math.min(slot * 0.62, 72)
     const gap = Math.min(groupW * 0.12, 4)
@@ -97,10 +145,10 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
       (_, i) => min + ((max - min) * i) / tickN,
     )
 
-    return { cx, y, groupW, gap, barW, ticks, zeroY: y(0) }
-  }, [data])
+    return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot }
+  }, [data, hasForecast, fcEps])
 
-  if (data.length === 0) {
+  if (data.length === 0 && !hasForecast) {
     return (
       <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
         No earnings history available.
@@ -108,7 +156,8 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
     )
   }
 
-  const { cx, y, groupW, gap, barW, ticks, zeroY } = geo
+  const { cx, y, groupW, gap, barW, ticks, zeroY, slot } = geo
+  const fcIndex = data.length // the forecast column's slot, at the right edge
 
   return (
     <Box
@@ -145,6 +194,20 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
         strokeWidth={1}
         opacity={0.5}
       />
+
+      {/* dashed divider between reported history and the forward estimate */}
+      {hasForecast && data.length > 0 && (
+        <line
+          x1={PAD.left + slot * fcIndex}
+          x2={PAD.left + slot * fcIndex}
+          y1={PAD.top}
+          y2={H - PAD.bottom}
+          stroke={axis}
+          strokeWidth={1}
+          strokeDasharray="2 3"
+          opacity={0.4}
+        />
+      )}
 
       {data.map((q, i) => {
         const center = cx(i)
@@ -204,6 +267,74 @@ function EarningsChart({ quarters }: { quarters: EarningsSurprise[] }) {
           </g>
         )
       })}
+
+      {/* forward "expected" column: where analysts see the next report landing */}
+      {hasForecast &&
+        next &&
+        fcEps != null &&
+        (() => {
+          const center = cx(fcIndex)
+          const top = Math.min(y(fcEps), zeroY)
+          const h = Math.max(1, Math.abs(y(fcEps) - zeroY))
+          return (
+            <g key="forecast">
+              {/* consensus estimate, accent-coloured, in the top margin */}
+              <text
+                x={center}
+                y={18}
+                fontSize={11}
+                fontWeight={600}
+                fill={forecast}
+                textAnchor="middle"
+              >
+                {fmtEps(fcEps)}
+              </text>
+              {/* a single forecast bar: faint accent fill + dashed outline */}
+              <rect
+                x={center - barW / 2}
+                y={top}
+                width={barW}
+                height={h}
+                fill={forecast}
+                fillOpacity={0.18}
+                stroke={forecast}
+                strokeWidth={1.25}
+                strokeDasharray="3 2"
+              />
+              {/* level marker — "where analysts expect it", a touch wider */}
+              <line
+                x1={center - groupW / 2}
+                x2={center + groupW / 2}
+                y1={y(fcEps)}
+                y2={y(fcEps)}
+                stroke={forecast}
+                strokeWidth={1.5}
+              />
+              {/* fiscal label + the expected report date beneath it */}
+              <text
+                x={center}
+                y={H - 26}
+                fontSize={11}
+                fill={forecast}
+                textAnchor="middle"
+              >
+                {nextLabel(next)}
+              </text>
+              {next.report_date && (
+                <text
+                  x={center}
+                  y={H - 12}
+                  fontSize={11}
+                  fontWeight={600}
+                  fill={forecast}
+                  textAnchor="middle"
+                >
+                  {`Est. ${fmtReportDate(next.report_date)}`}
+                </text>
+              )}
+            </g>
+          )
+        })()}
     </Box>
   )
 }
@@ -383,7 +514,7 @@ export default function EarningsCard({
         ) : (
           <>
             <Box sx={{ mt: 2.5 }}>
-              <EarningsChart quarters={quarters} />
+              <EarningsChart quarters={quarters} next={earnings.next_report} />
             </Box>
             <Stack
               direction="row"
@@ -394,6 +525,9 @@ export default function EarningsCard({
               <LegendItem color={estimateColor} label="Estimate" />
               <LegendItem color="success.main" label="Beat" />
               <LegendItem color="error.main" label="Missed" />
+              {earnings.next_report?.eps_estimate != null && (
+                <LegendItem color="primary.main" label="Upcoming (est.)" />
+              )}
             </Stack>
           </>
         )}

@@ -122,6 +122,48 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
   })
 
+  it('plots a forward expected bar when an upcoming consensus is present', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          next_report: {
+            report_date: '2026-07-30',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: 1.05,
+            revenue_estimate: 89_000_000_000,
+            session: 'amc',
+          },
+        }}
+      />,
+    )
+    expect(screen.getByText('$1.05')).toBeInTheDocument() // consensus estimate
+    expect(screen.getByText("Q2 '27")).toBeInTheDocument() // forecast column label
+    expect(screen.getByText('Est. Jul 30')).toBeInTheDocument() // expected date
+    expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
+  })
+
+  it('omits the forward bar when there is no upcoming consensus', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          next_report: {
+            report_date: '2026-07-30',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: null, // scheduled, but no consensus yet
+            revenue_estimate: null,
+            session: null,
+          },
+        }}
+      />,
+    )
+    expect(screen.queryByText('Upcoming (est.)')).not.toBeInTheDocument()
+    expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
+  })
+
   it('falls back when there is no earnings history', () => {
     renderWithProviders(
       <EarningsCard

@@ -92,6 +92,14 @@ const earningsSample = {
     roic: null,
     payout_ratio: 12.7,
   },
+  next_report: {
+    report_date: '2026-07-30',
+    fiscal_year: 2027,
+    fiscal_quarter: 2,
+    eps_estimate: 1.05,
+    revenue_estimate: 89_000_000_000,
+    session: 'amc',
+  },
   quarters: [
     {
       period: '2026-05-28',
@@ -205,6 +213,9 @@ describe('Stocks search', () => {
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
     expect(screen.getByText('Net Margin')).toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument()
+    // The next-earnings consensus plots a forward "expected" bar on the chart.
+    expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
+    expect(screen.getByText('Est. Jul 30')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),

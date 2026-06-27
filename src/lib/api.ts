@@ -444,12 +444,29 @@ export interface EarningsMetrics {
 }
 
 /**
+ * The next scheduled earnings report and the consensus going into it — the
+ * forward complement to the past-only beat history. `report_date` is the
+ * expected announcement date (ISO); `session` is when in the trading day it's
+ * expected (`bmo` before open, `amc` after close, `dmh` during hours, or null).
+ * Estimates are null when no consensus is published yet.
+ */
+export interface NextEarnings {
+  report_date: string | null
+  fiscal_year: number | null
+  fiscal_quarter: number | null
+  eps_estimate: number | null
+  revenue_estimate: number | null
+  session: string | null
+}
+
+/**
  * Recent quarterly earnings surprises (newest first) plus a beat summary.
  * `beat_rate` is the percent of *scored* quarters (those with both an actual
  * and an estimate) that met or beat — the "beats consistently?" read; `scored`
  * is how many of `count` quarters could be scored, `beats` how many of those
- * cleared the bar. `metrics` is an optional trailing earnings snapshot
- * (best-effort; absent on older API builds, null when the vendor has no data).
+ * cleared the bar. `metrics` is an optional trailing earnings snapshot and
+ * `next_report` the next scheduled report's consensus (both best-effort;
+ * absent on older API builds, null when the vendor has no data).
  */
 export interface EarningsHistory {
   symbol: string
@@ -459,6 +476,7 @@ export interface EarningsHistory {
   beat_rate: number | null
   quarters: EarningsSurprise[]
   metrics?: EarningsMetrics | null
+  next_report?: NextEarnings | null
 }
 
 /**
