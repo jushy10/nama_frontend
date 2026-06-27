@@ -145,6 +145,40 @@ describe('EarningsCard', () => {
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
   })
 
+  it('plots multiple upcoming quarters from the analyst estimates list', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          upcoming: [
+            {
+              report_date: '2026-09-30',
+              fiscal_year: null,
+              fiscal_quarter: null,
+              eps_estimate: 2.1,
+              revenue_estimate: 120_000_000_000,
+              session: null,
+            },
+            {
+              report_date: '2026-12-31',
+              fiscal_year: null,
+              fiscal_quarter: null,
+              eps_estimate: 2.45,
+              revenue_estimate: 130_000_000_000,
+              session: null,
+            },
+          ],
+        }}
+      />,
+    )
+    // Two forecast columns, each with its consensus EPS and expected date.
+    expect(screen.getByText('$2.10')).toBeInTheDocument()
+    expect(screen.getByText('$2.45')).toBeInTheDocument()
+    expect(screen.getByText('Est. Sep 30')).toBeInTheDocument()
+    expect(screen.getByText('Est. Dec 31')).toBeInTheDocument()
+    expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
+  })
+
   it('omits the forward bar when there is no upcoming consensus', () => {
     renderWithProviders(
       <EarningsCard

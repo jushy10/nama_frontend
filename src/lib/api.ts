@@ -482,6 +482,8 @@ export interface EarningsHistory {
   quarters: EarningsSurprise[]
   metrics?: EarningsMetrics | null
   next_report?: NextEarnings | null
+  // Analyst consensus for the next several quarters (nearest first), best-effort.
+  upcoming?: NextEarnings[]
 }
 
 /**
