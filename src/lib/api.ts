@@ -422,10 +422,9 @@ export interface EarningsSurprise {
   surprise: number | null
   surprise_percent: number | null
   beat: boolean | null
-  // Revenue for the quarter (raw, e.g. USD), best-effort: `revenue_estimate` is
-  // the consensus going in, `revenue_actual` what was reported. Optional —
-  // absent on API builds that don't source revenue, null when uncovered.
-  revenue_estimate?: number | null
+  // Revenue actually reported for the quarter (raw, e.g. USD), from SEC EDGAR;
+  // best-effort, so null when the filing isn't covered. There's no consensus
+  // revenue *estimate* — that's licensed analyst data the API doesn't source.
   revenue_actual?: number | null
 }
 
@@ -482,8 +481,6 @@ export interface EarningsHistory {
   quarters: EarningsSurprise[]
   metrics?: EarningsMetrics | null
   next_report?: NextEarnings | null
-  // Analyst consensus for the next several quarters (nearest first), best-effort.
-  upcoming?: NextEarnings[]
 }
 
 /**
