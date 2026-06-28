@@ -148,7 +148,7 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
   })
 
-  it('shows the valuation ratios (and an em dash for an uncovered one)', () => {
+  it('shows the valuation ratios with a plain explainer (and an em dash for an uncovered one)', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
@@ -156,13 +156,13 @@ describe('EarningsCard', () => {
           valuation: {
             pe: 45.6,
             peg: 1.85,
-            pb: 38.2,
+            pb: 38.2, // still in the payload, but no longer surfaced
             ps: 22.4,
-            current_ratio: 3.6,
+            current_ratio: null, // vendor-uncovered -> em dash
             debt_to_equity: 0.42,
             beta: 1.75,
-            week_52_high: 320.5,
-            week_52_low: null, // vendor-uncovered -> em dash
+            week_52_high: 320.5, // still in the payload, but no longer surfaced
+            week_52_low: 210.0,
           },
         }}
       />,
@@ -174,11 +174,19 @@ describe('EarningsCard', () => {
     expect(screen.getByText('1.85')).toBeInTheDocument()
     expect(screen.getByText('Beta')).toBeInTheDocument()
     expect(screen.getByText('1.75')).toBeInTheDocument()
-    expect(screen.getByText('$320.50')).toBeInTheDocument() // 52-week high
+    // Each ratio now carries a short plain-language explainer.
+    expect(
+      screen.getByText('What you pay per $1 of yearly profit'),
+    ).toBeInTheDocument()
     // A null ratio renders an em dash rather than vanishing.
-    expect(screen.getByText('52W Low')).toBeInTheDocument()
+    expect(screen.getByText('Current Ratio')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
-    // The PEG basis is spelled out, like the trailing-metrics footnote.
+    // P/B and the 52-week range were dropped from the valuation grid.
+    expect(screen.queryByText('P/B')).not.toBeInTheDocument()
+    expect(screen.queryByText('52W High')).not.toBeInTheDocument()
+    expect(screen.queryByText('52W Low')).not.toBeInTheDocument()
+    expect(screen.queryByText('$320.50')).not.toBeInTheDocument()
+    // The PEG basis is still spelled out, like the trailing-metrics footnote.
     expect(
       screen.getByText(/PEG is P\/E over trailing EPS growth/i),
     ).toBeInTheDocument()

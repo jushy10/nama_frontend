@@ -35,15 +35,9 @@ const PAD = { top: 30, right: 56, bottom: 46, left: 12 }
 const fmtEps = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`
 const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
 const fmtPlainPct = (n: number) => `${n.toFixed(1)}%`
-/** A valuation multiple or ratio (P/E, PEG, P/B, P/S, current ratio, D/E, beta)
- *  — two decimals, no unit. */
+/** A valuation multiple or ratio (P/E, PEG, P/S, current ratio, D/E, beta) —
+ *  two decimals, no unit. */
 const fmtMultiple = (n: number) => n.toFixed(2)
-/** A share price, for the 52-week range bounds (grouped, two decimals). */
-const fmtPrice = (n: number) =>
-  `$${n.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
 
 /** Muted fill for the "estimate" bar — faint enough to sit behind the actual,
  *  and legible on both the dark and light canvas. Shared with the legend. */
@@ -659,16 +653,20 @@ function adjustedTtmEps(quarters: EarningsSurprise[]): number | null {
 }
 
 /** One label/value tile in a metrics grid: a soft card with an uppercase label
- *  above a bold, tabular-aligned value. Shared by the trailing-metrics and
- *  valuation grids so the two read identically. */
+ *  above a bold, tabular-aligned value. An optional `hint` adds a one-line
+ *  plain-language explainer beneath the value (used by the valuation grid).
+ *  Shared by the trailing-metrics and valuation grids so the two read
+ *  identically. */
 function StatTile({
   label,
   value,
   color = 'text.primary',
+  hint,
 }: {
   label: string
   value: string
   color?: string
+  hint?: string
 }) {
   return (
     <Box
@@ -705,6 +703,20 @@ function StatTile({
       >
         {value}
       </Typography>
+      {hint && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            mt: 0.5,
+            fontSize: '0.68rem',
+            lineHeight: 1.35,
+          }}
+        >
+          {hint}
+        </Typography>
+      )}
     </Box>
   )
 }
@@ -801,29 +813,46 @@ function MetricTiles({
   )
 }
 
-/** A grid of point-in-time valuation, health and market ratios — the same
- *  KeyMetrics the stock snapshot carries (P/E, PEG, P/B, P/S, current ratio,
- *  debt/equity, beta, and the 52-week range), surfaced beside the trailing
- *  earnings so the "is it priced well?" read sits next to "how's it growing?".
- *  All trailing; uncovered values show an em dash, and an all-empty block is
- *  dropped rather than rendered as a wall of dashes. */
+/** A grid of point-in-time valuation and health ratios (P/E, PEG, P/S, current
+ *  ratio, debt/equity, beta) — a subset of the KeyMetrics the stock snapshot
+ *  carries, surfaced beside the trailing earnings so the "is it priced well?"
+ *  read sits next to "how's it growing?". Each tile carries a one-line
+ *  plain-language explainer of what it shows. All trailing; uncovered values
+ *  show an em dash, and an all-empty block is dropped rather than rendered as a
+ *  wall of dashes. (P/B and the 52-week range are part of KeyMetrics but aren't
+ *  surfaced here.) */
 function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
-  const tiles: { label: string; text: string }[] = [
-    { label: 'P/E', text: orDash(valuation.pe, fmtMultiple) },
-    { label: 'PEG', text: orDash(valuation.peg, fmtMultiple) },
-    { label: 'P/B', text: orDash(valuation.pb, fmtMultiple) },
-    { label: 'P/S', text: orDash(valuation.ps, fmtMultiple) },
+  const tiles: { label: string; text: string; hint: string }[] = [
+    {
+      label: 'P/E',
+      text: orDash(valuation.pe, fmtMultiple),
+      hint: 'What you pay per $1 of yearly profit',
+    },
+    {
+      label: 'PEG',
+      text: orDash(valuation.peg, fmtMultiple),
+      hint: 'P/E adjusted for growth; under 1 looks cheap',
+    },
+    {
+      label: 'P/S',
+      text: orDash(valuation.ps, fmtMultiple),
+      hint: 'What you pay per $1 of yearly sales',
+    },
     {
       label: 'Current Ratio',
       text: orDash(valuation.current_ratio, fmtMultiple),
+      hint: 'Short-term assets vs. bills due; above 1 is healthy',
     },
     {
       label: 'Debt / Equity',
       text: orDash(valuation.debt_to_equity, fmtMultiple),
+      hint: 'Debt vs. shareholder money; lower is safer',
     },
-    { label: 'Beta', text: orDash(valuation.beta, fmtMultiple) },
-    { label: '52W High', text: orDash(valuation.week_52_high, fmtPrice) },
-    { label: '52W Low', text: orDash(valuation.week_52_low, fmtPrice) },
+    {
+      label: 'Beta',
+      text: orDash(valuation.beta, fmtMultiple),
+      hint: 'How much it swings vs. the market; 1.0 = in step',
+    },
   ]
   // Nothing covered → drop the section rather than show a grid of em dashes.
   if (tiles.every((t) => t.text === '—')) return null
@@ -848,7 +877,12 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
         }}
       >
         {tiles.map((t) => (
-          <StatTile key={t.label} label={t.label} value={t.text} />
+          <StatTile
+            key={t.label}
+            label={t.label}
+            value={t.text}
+            hint={t.hint}
+          />
         ))}
       </Box>
       <Typography
