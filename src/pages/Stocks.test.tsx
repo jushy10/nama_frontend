@@ -216,11 +216,13 @@ describe('Stocks search', () => {
     expect(screen.getByText('Net Margin')).toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument()
     // The next-earnings consensus plots forward "expected" bars on the EPS and
-    // revenue charts, so the expected date appears on both.
+    // revenue charts, labelled with the forecast quarter (Q2 '27) and the
+    // consensus value beneath — the report date is no longer drawn on the bars.
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
     // Round billions render "$89B" or "$89.0B" depending on the ICU version.
     expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
+    expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(

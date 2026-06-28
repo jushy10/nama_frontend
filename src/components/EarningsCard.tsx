@@ -118,8 +118,6 @@ interface ChartBar {
 interface ChartForecast {
   key: string
   label: string
-  reportDate: string | null
-  session: string | null
   estimate: number | null
 }
 
@@ -162,8 +160,6 @@ function forecastSeries(
     .map((f, i) => ({
       key: f.report_date ?? String(i),
       label: nextLabel(f),
-      reportDate: f.report_date,
-      session: f.session,
       estimate: value(f),
     }))
     .filter((f) => f.estimate != null)
@@ -386,15 +382,8 @@ function SurpriseChart({
             <>
               <Box component="span" sx={{ color: forecast, mr: 0.5 }}>
                 {f.label}
-                {f.reportDate ? ` · Est. ${fmtReportDate(f.reportDate)}` : ''}
-                {f.session && SESSION_LABEL[f.session]
-                  ? ` (${SESSION_LABEL[f.session]})`
-                  : ''}
               </Box>
               {cell('Est', orDash(f.estimate, fmt), forecast)}
-              <Box component="span" sx={{ color: forecast, fontWeight: 600 }}>
-                Upcoming
-              </Box>
             </>
           )
         })()
@@ -586,17 +575,6 @@ function SurpriseChart({
           const h = Math.max(1, Math.abs(y(e) - zeroY))
           return (
             <g key={f.key}>
-              {/* consensus estimate, accent-coloured, in the top margin */}
-              <text
-                x={center}
-                y={18}
-                fontSize={11}
-                fontWeight={600}
-                fill={forecast}
-                textAnchor="middle"
-              >
-                {fmt(e)}
-              </text>
               {/* forecast bar: faint accent fill + dashed outline */}
               <rect
                 x={center - barW / 2}
@@ -610,7 +588,8 @@ function SurpriseChart({
                 strokeWidth={1.25}
                 strokeDasharray="3 2"
               />
-              {/* fiscal label + the expected report date beneath it */}
+              {/* fiscal label + the consensus target beneath it, mirroring the
+                  reported columns (value under the quarter) */}
               <text
                 x={center}
                 y={H - 26}
@@ -620,18 +599,16 @@ function SurpriseChart({
               >
                 {f.label}
               </text>
-              {f.reportDate && (
-                <text
-                  x={center}
-                  y={H - 12}
-                  fontSize={11}
-                  fontWeight={600}
-                  fill={forecast}
-                  textAnchor="middle"
-                >
-                  {`Est. ${fmtReportDate(f.reportDate)}`}
-                </text>
-              )}
+              <text
+                x={center}
+                y={H - 12}
+                fontSize={11}
+                fontWeight={600}
+                fill={forecast}
+                textAnchor="middle"
+              >
+                {fmt(e)}
+              </text>
             </g>
           )
         })}
@@ -857,8 +834,8 @@ export default function EarningsCard({
                 flexShrink: 0,
                 textAlign: 'right',
                 borderRadius: 1.5,
-                px: 1.5,
-                py: 0.75,
+                px: 2,
+                py: 1.25,
                 bgcolor: 'action.hover',
               }}
             >
@@ -869,14 +846,28 @@ export default function EarningsCard({
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   display: 'block',
-                  fontSize: '0.6rem',
+                  fontSize: '0.7rem',
                 }}
               >
                 Next report
               </Typography>
-              <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+              <Typography
+                sx={{ fontWeight: 700, fontSize: '1.35rem', lineHeight: 1.3 }}
+              >
                 {fmtReportDate(nextRpt.report_date)}
               </Typography>
+              {nextRpt.session && SESSION_LABEL[nextRpt.session] && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'text.secondary',
+                    display: 'block',
+                    textTransform: 'capitalize',
+                  }}
+                >
+                  {SESSION_LABEL[nextRpt.session]}
+                </Typography>
+              )}
             </Box>
           )}
         </Stack>

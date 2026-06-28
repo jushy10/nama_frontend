@@ -164,13 +164,17 @@ describe('EarningsCard', () => {
         }}
       />,
     )
+    // The consensus target sits beneath the forecast column's quarter label:
+    // EPS on the EPS chart, revenue on the revenue chart.
     expect(screen.getByText('$1.05')).toBeInTheDocument() // EPS consensus
     // Compact format: round billions render "$89B" or "$89.0B" depending on the
     // ICU/Intl data version (CI vs. local differ), so match both.
     expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
-    // The forecast label and date appear on both the EPS and revenue charts.
+    // The forecast quarter label appears on both the EPS and revenue charts; the
+    // expected report date is no longer drawn on the bars (only in the detail
+    // line on hover/tap).
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
   })
 
@@ -191,7 +195,8 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.queryByText('Upcoming (est.)')).not.toBeInTheDocument()
-    expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
+    // No forward column at all, so its quarter label never renders.
+    expect(screen.queryByText("Q2 '27")).not.toBeInTheDocument()
     // The header chip still shows the scheduled date, even with no consensus.
     expect(screen.getByText('Next report')).toBeInTheDocument()
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
@@ -314,7 +319,7 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Next report')).not.toBeInTheDocument()
   })
 
-  it('shows a "next report" chip with the date only', () => {
+  it('shows a "next report" chip with the date and session', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
@@ -332,8 +337,10 @@ describe('EarningsCard', () => {
     )
     expect(screen.getByText('Next report')).toBeInTheDocument()
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
-    // The chip is date-only now; the EPS consensus rides on the chart's forecast
-    // column, not in this header chip.
+    // The session (amc → "after close", shown title-cased via CSS) sits beneath
+    // the date in the chip.
+    expect(screen.getByText('after close')).toBeInTheDocument()
+    // The EPS consensus rides on the chart's forecast column, not in this chip.
     expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument()
   })
 })
