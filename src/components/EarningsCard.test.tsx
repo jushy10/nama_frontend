@@ -148,6 +148,47 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
   })
 
+  it('shows the valuation ratios (and an em dash for an uncovered one)', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          valuation: {
+            pe: 45.6,
+            peg: 1.85,
+            pb: 38.2,
+            ps: 22.4,
+            current_ratio: 3.6,
+            debt_to_equity: 0.42,
+            beta: 1.75,
+            week_52_high: 320.5,
+            week_52_low: null, // vendor-uncovered -> em dash
+          },
+        }}
+      />,
+    )
+    expect(screen.getByText('Valuation')).toBeInTheDocument()
+    expect(screen.getByText('P/E')).toBeInTheDocument()
+    expect(screen.getByText('45.60')).toBeInTheDocument()
+    expect(screen.getByText('PEG')).toBeInTheDocument()
+    expect(screen.getByText('1.85')).toBeInTheDocument()
+    expect(screen.getByText('Beta')).toBeInTheDocument()
+    expect(screen.getByText('1.75')).toBeInTheDocument()
+    expect(screen.getByText('$320.50')).toBeInTheDocument() // 52-week high
+    // A null ratio renders an em dash rather than vanishing.
+    expect(screen.getByText('52W Low')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    // The PEG basis is spelled out, like the trailing-metrics footnote.
+    expect(
+      screen.getByText(/PEG is P\/E over trailing EPS growth/i),
+    ).toBeInTheDocument()
+  })
+
+  it('omits the valuation block when valuation is absent', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    expect(screen.queryByText('Valuation')).not.toBeInTheDocument()
+  })
+
   it('plots a forward expected bar from the next scheduled report', () => {
     renderWithProviders(
       <EarningsCard
