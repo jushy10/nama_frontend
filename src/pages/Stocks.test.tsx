@@ -218,7 +218,8 @@ describe('Stocks search', () => {
     // The next-earnings consensus plots forward "expected" bars on the EPS and
     // revenue charts, so the expected date appears on both.
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
-    expect(screen.getAllByText('$89B').length).toBeGreaterThan(0) // revenue
+    // Round billions render "$89B" or "$89.0B" depending on the ICU version.
+    expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
     expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
