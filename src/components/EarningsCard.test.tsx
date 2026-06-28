@@ -135,7 +135,9 @@ describe('EarningsCard', () => {
     expect(screen.getByText('Gross Margin')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     // The basis is spelled out so the card doesn't read as contradictory.
-    expect(screen.getByText(/EPS growth, revenue growth and margins are GAAP/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/EPS growth, revenue growth and margins are GAAP/i),
+    ).toBeInTheDocument()
     // The old GAAP-EPS *level* and ROE/ROIC/Payout tiles are still gone.
     expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
     expect(screen.queryByText('ROE')).not.toBeInTheDocument()
