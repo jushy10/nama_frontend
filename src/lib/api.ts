@@ -126,18 +126,31 @@ export interface RsiSeries {
   points: RsiPoint[]
 }
 
-/** A trading suggestion derived from RSI: one of three plain calls. */
-export type RsiAction = 'Buy' | 'Sell' | 'Hold'
+/** A trading suggestion derived from RSI, from Strong Buy down to Strong Sell. */
+export type RsiAction = 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell'
 
 /**
- * Map an RSI series to a Buy/Sell/Hold call: oversold (cheap, may rebound) →
- * Buy, overbought (hot, may cool) → Sell, anything between → Hold. Returns null
- * when there's no reading to judge.
+ * Width of the softer Buy/Sell bands that sit just inside the oversold and
+ * overbought thresholds. With the conventional 30/70 lines this puts a plain
+ * Buy at 30–40 and a plain Sell at 60–70, leaving the Strong calls for the
+ * extremes beyond 30/70.
+ */
+export const RSI_ACTION_MARGIN = 10
+
+/**
+ * Map an RSI series to a five-step call. Below `oversold` is a Strong Buy; the
+ * band just above it (within RSI_ACTION_MARGIN) softens to Buy. The overbought
+ * side mirrors that — above `overbought` is a Strong Sell, the band just below
+ * is Sell — and everything in the middle is Hold. The threshold values
+ * themselves count as the softer Buy/Sell. Returns null when there's no
+ * reading to judge.
  */
 export function rsiVerdict(rsi: RsiSeries): RsiAction | null {
   if (rsi.latest == null) return null
-  if (rsi.latest <= rsi.oversold) return 'Buy'
-  if (rsi.latest >= rsi.overbought) return 'Sell'
+  if (rsi.latest < rsi.oversold) return 'Strong Buy'
+  if (rsi.latest <= rsi.oversold + RSI_ACTION_MARGIN) return 'Buy'
+  if (rsi.latest > rsi.overbought) return 'Strong Sell'
+  if (rsi.latest >= rsi.overbought - RSI_ACTION_MARGIN) return 'Sell'
   return 'Hold'
 }
 
