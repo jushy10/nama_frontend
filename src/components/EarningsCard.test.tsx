@@ -52,8 +52,9 @@ describe('EarningsCard', () => {
     ).toBeInTheDocument()
 
     // Quarter labels and reported EPS render inside the SVG. The newest
-    // quarter's actual ($0.96) also appears in the detail line, hence getAll.
-    expect(screen.getByText("Q1 '27")).toBeInTheDocument()
+    // quarter's label (Q1 '27) and actual ($0.96) also appear in the detail
+    // line, hence getAll.
+    expect(screen.getAllByText("Q1 '27").length).toBeGreaterThan(0)
     expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)
     expect(screen.getByText('$0.68')).toBeInTheDocument()
   })
@@ -141,9 +142,11 @@ describe('EarningsCard', () => {
         }}
       />,
     )
-    expect(screen.getByText('$1.05')).toBeInTheDocument() // consensus estimate
-    expect(screen.getByText("Q2 '27")).toBeInTheDocument() // forecast column label
-    expect(screen.getByText('Est. Jul 30')).toBeInTheDocument() // expected date
+    expect(screen.getByText('$1.05')).toBeInTheDocument() // EPS consensus
+    expect(screen.getAllByText('$89B').length).toBeGreaterThan(0) // revenue
+    // The forecast label and date appear on both the EPS and revenue charts.
+    expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
   })
 
@@ -173,11 +176,14 @@ describe('EarningsCard', () => {
         }}
       />,
     )
-    // Two forecast columns, each with its consensus EPS and expected date.
-    expect(screen.getByText('$2.10')).toBeInTheDocument()
+    // Two forecast columns on each chart, with their consensus EPS/revenue and
+    // expected date. The dates appear on both the EPS and revenue charts.
+    expect(screen.getByText('$2.10')).toBeInTheDocument() // EPS consensus
     expect(screen.getByText('$2.45')).toBeInTheDocument()
-    expect(screen.getByText('Est. Sep 30')).toBeInTheDocument()
-    expect(screen.getByText('Est. Dec 31')).toBeInTheDocument()
+    expect(screen.getAllByText('$120B').length).toBeGreaterThan(0) // revenue
+    expect(screen.getByText('$130B')).toBeInTheDocument()
+    expect(screen.getAllByText('Est. Sep 30').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Est. Dec 31').length).toBeGreaterThan(0)
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
   })
 
@@ -210,7 +216,7 @@ describe('EarningsCard', () => {
     expect(screen.getByText('$0.92')).toBeInTheDocument()
   })
 
-  it('shows expected vs. released revenue in the detail line when present', () => {
+  it('renders a revenue chart with expected vs. released figures', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
@@ -226,9 +232,11 @@ describe('EarningsCard', () => {
         }}
       />,
     )
-    expect(screen.getByText('Rev est')).toBeInTheDocument()
-    expect(screen.getByText('$95.4B')).toBeInTheDocument() // expected
-    expect(screen.getByText('$97.1B')).toBeInTheDocument() // released
+    // Revenue gets its own chart; the newest quarter is the default detail line.
+    expect(screen.getByText('Revenue')).toBeInTheDocument()
+    expect(screen.getByText('$95.4B')).toBeInTheDocument() // estimate (detail only)
+    // Actual shows both in the detail line and beneath the bar.
+    expect(screen.getAllByText('$97.1B').length).toBeGreaterThan(0)
   })
 
   it('falls back when there is no earnings history', () => {
@@ -269,7 +277,7 @@ describe('EarningsCard', () => {
     )
     expect(screen.getByText('Next report')).toBeInTheDocument()
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
-    expect(screen.getByText('est $1.93')).toBeInTheDocument()
+    expect(screen.getByText('Est $1.93')).toBeInTheDocument()
   })
 
   it('chip prefers the upcoming list, so it matches the forecast bar', () => {
@@ -301,7 +309,7 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.getByText('Jul 30')).toBeInTheDocument() // upcoming date
-    expect(screen.getByText('est $1.88')).toBeInTheDocument() // upcoming estimate
-    expect(screen.queryByText('est $1.93')).not.toBeInTheDocument() // not next_report
+    expect(screen.getByText('Est $1.88')).toBeInTheDocument() // upcoming estimate
+    expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument() // not next_report
   })
 })
