@@ -96,11 +96,11 @@ describe('EarningsCard', () => {
             eps: 8.27,
             eps_growth_yoy: 29.0,
             revenue_growth_yoy: 12.8,
-            gross_margin: 47.9,
+            gross_margin: null, // vendor-uncovered -> em dash
             operating_margin: 32.6,
             net_margin: 27.2,
             roe: 146.7,
-            roic: null, // vendor-uncovered -> em dash
+            roic: null,
             payout_ratio: 12.7,
           },
         }}
@@ -112,8 +112,12 @@ describe('EarningsCard', () => {
     expect(screen.getByText('+29.0%')).toBeInTheDocument() // growth: signed
     expect(screen.getByText('27.2%')).toBeInTheDocument() // margin: plain
     // A null metric renders an em dash rather than vanishing.
-    expect(screen.getByText('ROIC')).toBeInTheDocument()
+    expect(screen.getByText('Gross Margin')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
+    // ROE / ROIC / Payout were removed from the card.
+    expect(screen.queryByText('ROE')).not.toBeInTheDocument()
+    expect(screen.queryByText('ROIC')).not.toBeInTheDocument()
+    expect(screen.queryByText('Payout')).not.toBeInTheDocument()
   })
 
   it('omits the trailing metrics block when metrics are absent', () => {
