@@ -247,7 +247,11 @@ describe('EarningsCard', () => {
     } as DOMRect)
 
     // Tap the leftmost (oldest) column → its estimate ($0.70) fills the detail.
-    fireEvent.pointerDown(svg, { clientX: 60, clientY: 150, pointerType: 'touch' })
+    fireEvent.pointerDown(svg, {
+      clientX: 60,
+      clientY: 150,
+      pointerType: 'touch',
+    })
     expect(screen.getByText('$0.70')).toBeInTheDocument()
 
     // Touch has no hover: lifting the finger (pointerleave) keeps the selection.
