@@ -103,12 +103,6 @@ const SESSION_LABEL: Record<string, string> = {
   dmh: 'during hours',
 }
 
-/** The next scheduled report when it carries an EPS consensus — the same one the
- *  chart draws its forecast bar for, so the header chip and that bar agree. */
-function nearestForecast(e: EarningsHistory): NextEarnings | null {
-  return e.next_report?.eps_estimate != null ? e.next_report : null
-}
-
 /** One reported column for the grouped-bar chart: a muted "estimate" bar beside
  *  the reported "actual", coloured by whether it met or beat. */
 interface ChartBar {
@@ -817,7 +811,8 @@ export default function EarningsCard({
   const theme = useTheme()
   const { quarters } = earnings
   const epsTtm = adjustedTtmEps(quarters)
-  const nextRpt = nearestForecast(earnings)
+  // The scheduled next report, if any — the header chip shows its date alone.
+  const nextRpt = earnings.next_report
 
   // The forward consensus the charts draw from: the single scheduled next report.
   const forecastList = earnings.next_report ? [earnings.next_report] : []
@@ -882,14 +877,6 @@ export default function EarningsCard({
               <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>
                 {fmtReportDate(nextRpt.report_date)}
               </Typography>
-              {nextRpt.eps_estimate != null && (
-                <Typography
-                  variant="caption"
-                  sx={{ color: 'primary.main', fontWeight: 500 }}
-                >
-                  {`Est ${fmtEps(nextRpt.eps_estimate)}`}
-                </Typography>
-              )}
             </Box>
           )}
         </Stack>

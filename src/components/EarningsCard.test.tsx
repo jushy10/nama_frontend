@@ -192,6 +192,9 @@ describe('EarningsCard', () => {
     )
     expect(screen.queryByText('Upcoming (est.)')).not.toBeInTheDocument()
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
+    // The header chip still shows the scheduled date, even with no consensus.
+    expect(screen.getByText('Next report')).toBeInTheDocument()
+    expect(screen.getByText('Jul 30')).toBeInTheDocument()
   })
 
   it('shows a detail line with the latest quarter estimate vs. actual', () => {
@@ -311,7 +314,7 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Next report')).not.toBeInTheDocument()
   })
 
-  it('shows a "next report" chip from the scheduled report', () => {
+  it('shows a "next report" chip with the date only', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
@@ -329,6 +332,8 @@ describe('EarningsCard', () => {
     )
     expect(screen.getByText('Next report')).toBeInTheDocument()
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
-    expect(screen.getByText('Est $1.93')).toBeInTheDocument()
+    // The chip is date-only now; the EPS consensus rides on the chart's forecast
+    // column, not in this header chip.
+    expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument()
   })
 })
