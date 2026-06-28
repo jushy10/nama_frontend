@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react'
 import {
   Alert,
   Avatar,
@@ -15,7 +14,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { getStocks, stockLogoUrl, type Sector, type Stock } from '@/lib/api'
+import { stockLogoUrl, type Sector, type Stock } from '@/lib/api'
+import { useStocks } from '@/lib/queries'
 
 /**
  * Top constituents per S&P sector, by index weight (heaviest first). The backend
@@ -49,11 +49,6 @@ const fmtPct = (n: number | null) =>
 
 const moveColor = (n: number | null | undefined) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
-
-type State =
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; stocks: Stock[] }
 
 /** One holding row: logo + symbol/name on the left, price + day move on the right. */
 function HoldingRow({ stock }: { stock: Stock }) {
@@ -149,34 +144,14 @@ export default function SectorStocksDialog({
   sector: Sector | null
   onClose: () => void
 }) {
-  const [state, setState] = useState<State>({ state: 'loading' })
-
-  useEffect(() => {
-    if (!sector) return
-    const tickers = SECTOR_CONSTITUENTS[sector.sector] ?? []
-    if (tickers.length === 0) {
-      setState({ state: 'success', stocks: [] })
-      return
-    }
-    const ac = new AbortController()
-    setState({ state: 'loading' })
-    getStocks(tickers, { signal: ac.signal })
-      .then((rows) => {
-        if (ac.signal.aborted) return
-        setState({
-          state: 'success',
-          stocks: rows.filter((s): s is Stock => s != null),
-        })
-      })
-      .catch(() => {
-        if (ac.signal.aborted) return
-        setState({
-          state: 'error',
-          message: 'Could not load holdings. Please try again.',
-        })
-      })
-    return () => ac.abort()
-  }, [sector])
+  // Curated constituents for the open sector; the query stays idle until the
+  // dialog opens on a sector that has any. A failed ticker comes back null and
+  // is filtered out — getStocks never rejects the whole batch.
+  const tickers = sector ? (SECTOR_CONSTITUENTS[sector.sector] ?? []) : []
+  const { data, isLoading, isError } = useStocks(tickers, {
+    enabled: !!sector && tickers.length > 0,
+  })
+  const stocks = (data ?? []).filter((s): s is Stock => s != null)
 
   return (
     <Dialog open={sector != null} onClose={onClose} fullWidth maxWidth="sm">
@@ -210,24 +185,25 @@ export default function SectorStocksDialog({
         </IconButton>
       </DialogTitle>
       <DialogContent dividers>
-        {state.state === 'loading' && (
+        {isLoading && (
           <Stack sx={{ alignItems: 'center', py: 4 }}>
             <CircularProgress />
           </Stack>
         )}
-        {state.state === 'error' && (
+        {isError && (
           <Alert severity="error" variant="outlined">
-            {state.message}
+            Could not load holdings. Please try again.
           </Alert>
         )}
-        {state.state === 'success' &&
-          (state.stocks.length === 0 ? (
+        {!isLoading &&
+          !isError &&
+          (stocks.length === 0 ? (
             <Typography color="text.secondary" sx={{ py: 2 }}>
               No holdings available for this sector.
             </Typography>
           ) : (
             <Stack spacing={1}>
-              {state.stocks.map((s) => (
+              {stocks.map((s) => (
                 <HoldingRow key={s.symbol} stock={s} />
               ))}
             </Stack>

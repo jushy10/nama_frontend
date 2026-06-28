@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 import { render, type RenderOptions } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ColorModeProvider } from '@/ColorModeProvider'
 
 interface RenderWithProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
@@ -24,11 +25,22 @@ export function renderWithProviders(
   ui: ReactElement,
   { initialEntries = ['/'], ...renderOptions }: RenderWithProvidersOptions = {},
 ) {
+  // A fresh client per render keeps tests isolated (no cache bleed between
+  // them), and retry-off means a failed query surfaces its error immediately
+  // instead of backing off — so error-state assertions resolve right away.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ColorModeProvider>
-        <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
-      </ColorModeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ColorModeProvider>
+          <MemoryRouter initialEntries={initialEntries}>
+            {children}
+          </MemoryRouter>
+        </ColorModeProvider>
+      </QueryClientProvider>
     )
   }
 
