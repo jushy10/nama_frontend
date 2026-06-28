@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { renderWithProviders, screen } from '@/test/test-utils'
+import { describe, expect, it, vi } from 'vitest'
+import { fireEvent, renderWithProviders, screen } from '@/test/test-utils'
 import EarningsCard from '@/components/EarningsCard'
 import type { EarningsHistory } from '@/lib/api'
 
@@ -216,6 +216,47 @@ describe('EarningsCard', () => {
     // Estimates aren't labelled on the bars, so $0.92 is unique to the line.
     expect(screen.getByText('Est')).toBeInTheDocument()
     expect(screen.getByText('Act')).toBeInTheDocument()
+    expect(screen.getByText('$0.92')).toBeInTheDocument()
+  })
+
+  it('selects a tapped column on touch and keeps it selected', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+
+    // Default detail = newest quarter (Q1 '27), whose estimate ($0.92) is unique
+    // to the detail line. The oldest quarter's estimate ($0.70) isn't shown yet.
+    expect(screen.getByText('$0.92')).toBeInTheDocument()
+    expect(screen.queryByText('$0.70')).not.toBeInTheDocument()
+
+    const svg = screen.getByRole('img', {
+      name: /earnings per share/i,
+    })
+    // jsdom has no layout, so the chart reads its width from getBoundingClientRect.
+    // Map clientX 1:1 onto the 820-unit viewBox (W_FALLBACK) so a tap lands in a
+    // known column.
+    const WIDTH = 820
+    vi.spyOn(svg, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      top: 0,
+      right: WIDTH,
+      bottom: 300,
+      width: WIDTH,
+      height: 300,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    } as DOMRect)
+
+    // Tap the leftmost (oldest) column → its estimate ($0.70) fills the detail.
+    fireEvent.pointerDown(svg, { clientX: 60, clientY: 150, pointerType: 'touch' })
+    expect(screen.getByText('$0.70')).toBeInTheDocument()
+
+    // Touch has no hover: lifting the finger (pointerleave) keeps the selection.
+    fireEvent.pointerLeave(svg, { pointerType: 'touch' })
+    expect(screen.getByText('$0.70')).toBeInTheDocument()
+
+    // A mouse leaving, by contrast, clears it back to the default newest quarter.
+    fireEvent.pointerLeave(svg, { pointerType: 'mouse' })
+    expect(screen.queryByText('$0.70')).not.toBeInTheDocument()
     expect(screen.getByText('$0.92')).toBeInTheDocument()
   })
 
