@@ -1,4 +1,10 @@
-import { useMemo, useState, type PointerEvent } from 'react'
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react'
 import {
   Box,
   Card,
@@ -15,10 +21,11 @@ import type {
   NextEarnings,
 } from '@/lib/api'
 
-// Like CandleChart, the plot draws into a fixed viewBox and scales to its
-// container via `width: 100%`, so all geometry is in these abstract units — no
-// DOM measurement needed (which also keeps it happy in jsdom).
-const W = 820
+// The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
+// and text stays legible at any size — crucial on mobile), while the height is
+// fixed at H. `W_FALLBACK` is used until the container is measured and in jsdom
+// (where there's no layout), keeping tests on stable desktop geometry.
+const W_FALLBACK = 820
 const H = 300
 const PAD = { top: 30, right: 48, bottom: 46, left: 12 }
 
@@ -99,6 +106,18 @@ const SESSION_LABEL: Record<string, string> = {
   dmh: 'during hours',
 }
 
+/** The nearest upcoming report — the same one the chart draws its first forecast
+ *  bar for. Prefers the multi-quarter `upcoming` list, falls back to
+ *  `next_report`, so the header chip and that bar always agree. */
+function nearestForecast(e: EarningsHistory): NextEarnings | null {
+  const list = e.upcoming?.length
+    ? e.upcoming
+    : e.next_report
+      ? [e.next_report]
+      : []
+  return list.find((f) => f.eps_estimate != null) ?? null
+}
+
 /**
  * Grouped EPS columns — a muted "estimate" bar beside the reported "actual"
  * (green when it met/beat, red when it missed) for each quarter, oldest to
@@ -124,6 +143,25 @@ function EarningsChart({
   const est = estimateColor(theme)
   const forecast = theme.palette.primary.main // indigo accent for the forecast
   const [hover, setHover] = useState<number | null>(null)
+
+  // Track the rendered width so the viewBox matches it 1:1 — keeps labels at
+  // their native pixel size instead of shrinking on narrow (mobile) screens.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [cw, setCw] = useState(W_FALLBACK)
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => {
+      const w = el.getBoundingClientRect().width
+      if (w > 0) setCw(Math.round(w))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const W = cw
 
   // Forward "expected" columns: the multi-quarter analyst consensus when we have
   // it, else just the next scheduled report — only those with a consensus EPS.
@@ -181,7 +219,7 @@ function EarningsChart({
     )
 
     return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot, n }
-  }, [data, forecasts])
+  }, [data, forecasts, W])
 
   if (data.length === 0 && !hasForecast) {
     return (
@@ -271,18 +309,24 @@ function EarningsChart({
         })()
 
   return (
-    <Box>
+    <Box ref={wrapRef}>
       <Stack
         direction="row"
         useFlexGap
         sx={{
           flexWrap: 'wrap',
+          alignItems: 'baseline',
           columnGap: 1.5,
           rowGap: 0.5,
           fontSize: '0.8rem',
           fontWeight: 500,
-          mb: 1,
-          minHeight: 20,
+          mb: 1.5,
+          px: 1.5,
+          py: 1,
+          borderRadius: 1.5,
+          bgcolor: 'action.hover',
+          border: '1px solid',
+          borderColor: 'divider',
         }}
       >
         {detail}
@@ -372,7 +416,9 @@ function EarningsChart({
             if (v == null) return null
             const top = Math.min(y(v), zeroY)
             const h = Math.max(1, Math.abs(y(v) - zeroY))
-            return <rect x={x} y={top} width={barW} height={h} fill={fill} />
+            return (
+              <rect x={x} y={top} width={barW} height={h} rx={2} fill={fill} />
+            )
           }
 
           // Surprise % rides in the top margin, aligned across all groups.
@@ -447,6 +493,7 @@ function EarningsChart({
                 y={top}
                 width={barW}
                 height={h}
+                rx={2}
                 fill={forecast}
                 fillOpacity={0.18}
                 stroke={forecast}
@@ -566,7 +613,17 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
             } else text = fmtPlainPct(v)
           }
           return (
-            <Box key={key}>
+            <Box
+              key={key}
+              sx={{
+                px: 1.5,
+                py: 1.25,
+                borderRadius: 1.5,
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
               <Typography
                 variant="caption"
                 color="text.secondary"
@@ -574,17 +631,19 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
                   display: 'block',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
-                  fontSize: '0.68rem',
+                  fontSize: '0.65rem',
                 }}
               >
                 {label}
               </Typography>
               <Typography
                 sx={{
+                  mt: 0.25,
                   fontWeight: 700,
+                  fontSize: '1.05rem',
                   fontVariantNumeric: 'tabular-nums',
                   color,
-                  lineHeight: 1.3,
+                  lineHeight: 1.25,
                 }}
               >
                 {text}
@@ -602,15 +661,8 @@ export default function EarningsCard({
 }: {
   earnings: EarningsHistory
 }) {
-  const { beat_rate, beats, scored, quarters } = earnings
-  // Beats more often than not reads green; a coin-flip-or-worse record reads
-  // red. No scored quarters → nothing to colour.
-  const rateColor =
-    beat_rate == null
-      ? 'text.primary'
-      : beat_rate >= 50
-        ? 'success.main'
-        : 'error.main'
+  const { quarters } = earnings
+  const nextRpt = nearestForecast(earnings)
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -629,8 +681,17 @@ export default function EarningsCard({
             </Typography>
           </Box>
 
-          {beat_rate != null && (
-            <Box sx={{ textAlign: 'right' }}>
+          {nextRpt?.report_date && (
+            <Box
+              sx={{
+                flexShrink: 0,
+                textAlign: 'right',
+                borderRadius: 1.5,
+                px: 1.5,
+                py: 0.75,
+                bgcolor: 'action.hover',
+              }}
+            >
               <Typography
                 variant="caption"
                 sx={{
@@ -638,24 +699,22 @@ export default function EarningsCard({
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   display: 'block',
+                  fontSize: '0.6rem',
                 }}
               >
-                Beat rate
+                Next report
               </Typography>
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 700,
-                  color: rateColor,
-                  fontVariantNumeric: 'tabular-nums',
-                  lineHeight: 1.2,
-                }}
-              >
-                {Math.round(beat_rate)}%
+              <Typography sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                {fmtReportDate(nextRpt.report_date)}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {beats} of {scored} quarters
-              </Typography>
+              {nextRpt.eps_estimate != null && (
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'primary.main', fontWeight: 500 }}
+                >
+                  {`est ${fmtEps(nextRpt.eps_estimate)}`}
+                </Typography>
+              )}
             </Box>
           )}
         </Stack>
