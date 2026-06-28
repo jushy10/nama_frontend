@@ -266,6 +266,29 @@ describe('EarningsCard', () => {
     // Reported revenue shows in the detail line and beneath the bar; there's no
     // consensus revenue estimate, so the chart is actuals-only.
     expect(screen.getAllByText('$97.1B').length).toBeGreaterThan(0)
+    // The two quarters with no reported revenue render as labelled "no data"
+    // gaps rather than being dropped, so the missing quarters stay visible.
+    expect(screen.getAllByText('no data').length).toBe(2)
+  })
+
+  it('shows a "no data" gap when only the latest quarter is missing revenue', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          quarters: [
+            { ...base.quarters[0], revenue_actual: null }, // EPS in, revenue not yet
+            { ...base.quarters[1], revenue_actual: 68_100_000_000 },
+            { ...base.quarters[2], revenue_actual: 57_300_000_000 },
+          ],
+        }}
+      />,
+    )
+    // The latest quarter reported EPS but not revenue (the common EDGAR lag): it
+    // stays as a single labelled gap instead of being dropped before the others.
+    expect(screen.getByText('no data')).toBeInTheDocument()
+    expect(screen.getAllByText('$68.1B').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$57.3B').length).toBeGreaterThan(0)
   })
 
   it('falls back when there is no earnings history', () => {
