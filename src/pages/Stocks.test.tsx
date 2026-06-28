@@ -215,9 +215,11 @@ describe('Stocks search', () => {
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
     expect(screen.getByText('Net Margin')).toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument()
-    // The next-earnings consensus plots a forward "expected" bar on the chart.
+    // The next-earnings consensus plots forward "expected" bars on the EPS and
+    // revenue charts, so the expected date appears on both.
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
-    expect(screen.getByText('Est. Jul 30')).toBeInTheDocument()
+    expect(screen.getAllByText('$89B').length).toBeGreaterThan(0) // revenue
+    expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
