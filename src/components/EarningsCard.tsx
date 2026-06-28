@@ -143,16 +143,23 @@ function epsSeries(quarters: EarningsSurprise[]): ChartBar[] {
 
 /** The revenue series (newest-first): reported actuals only. The API carries no
  *  consensus revenue estimate, so there's no beat/surprise to derive — the
- *  forward consensus (next report) rides in as a forecast column instead. */
+ *  forward consensus (next report) rides in as a forecast column instead.
+ *  Quarters with no reported revenue are dropped rather than drawn as an empty
+ *  slot: revenue has no estimate bar to stand in their place, so a missing
+ *  quarter (e.g. the latest, reported for EPS but not yet revenue) would just be
+ *  a blank gap. Each bar stays labelled with its own quarter, so omitting one
+ *  doesn't misrepresent the rest. */
 function revenueSeries(quarters: EarningsSurprise[]): ChartBar[] {
-  return quarters.map((q, i) => ({
-    key: q.period ?? String(i),
-    label: quarterLabel(q),
-    estimate: null,
-    actual: q.revenue_actual ?? null,
-    beat: null,
-    surprise: null,
-  }))
+  return quarters
+    .filter((q) => q.revenue_actual != null)
+    .map((q, i) => ({
+      key: q.period ?? String(i),
+      label: quarterLabel(q),
+      estimate: null,
+      actual: q.revenue_actual ?? null,
+      beat: null,
+      surprise: null,
+    }))
 }
 
 /** Forward columns from a consensus list, keeping only those with a value. */
@@ -185,11 +192,17 @@ function SurpriseChart({
   forecasts,
   fmt,
   ariaLabel,
+  neutralColor,
 }: {
   bars: ChartBar[]
   forecasts: ChartForecast[]
   fmt: (n: number) => string
   ariaLabel: string
+  /** Bar/value colour for a series with no beat-or-miss meaning (revenue, which
+   *  has no consensus estimate). Defaults to the muted axis grey EPS uses for the
+   *  rare estimate-less quarter; revenue passes its own accent so its bars read
+   *  as a deliberate series, not a greyed-out one. */
+  neutralColor?: string
 }) {
   const theme = useTheme()
   const up = theme.palette.success.main
@@ -198,6 +211,7 @@ function SurpriseChart({
   const axis = theme.palette.text.secondary
   const est = estimateColor(theme)
   const forecast = theme.palette.primary.main // indigo accent for the forecast
+  const neutral = neutralColor ?? axis
   // The pointer-selected column — a mouse hover or, on touch, a tap. null falls
   // back to the latest column carrying a value (see `active` below).
   const [hover, setHover] = useState<number | null>(null)
@@ -257,7 +271,11 @@ function SurpriseChart({
     const slot = plotW / Math.max(n, 1)
     const groupW = Math.min(slot * 0.62, 72)
     const gap = Math.min(groupW * 0.12, 4)
-    const barW = (groupW - gap) / 2
+    // EPS pairs an estimate + actual bar in each group; a single-series metric
+    // (revenue: actual only) gives its lone bar the whole group width so the
+    // slot isn't left half-empty with a thin, lost-looking bar.
+    const grouped = data.some((b) => b.estimate != null)
+    const barW = grouped ? (groupW - gap) / 2 : groupW
 
     const cx = (i: number) => PAD.left + slot * (i + 0.5)
     const y = (v: number) =>
@@ -349,7 +367,7 @@ function SurpriseChart({
     active < data.length
       ? (() => {
           const b = data[active]
-          const c = b.beat == null ? axis : b.beat ? up : down
+          const c = b.beat == null ? neutral : b.beat ? up : down
           return (
             <>
               <Box component="span" sx={{ color: axis, mr: 0.5 }}>
@@ -488,7 +506,7 @@ function SurpriseChart({
           // With no estimate bar (revenue), centre the lone actual in the slot.
           const actX =
             b.estimate == null ? center - barW / 2 : estX + barW + gap
-          const actColor = b.beat == null ? axis : b.beat ? up : down
+          const actColor = b.beat == null ? neutral : b.beat ? up : down
 
           const bar = (x: number, v: number | null, fill: string) => {
             if (v == null) return null
@@ -639,11 +657,12 @@ function adjustedTtmEps(quarters: EarningsSurprise[]): number | null {
   return actuals.slice(0, 4).reduce((sum, v) => sum + v, 0)
 }
 
-/** A grid of trailing metrics beside the beat history. EPS is the *adjusted*
- *  (non-GAAP) trailing figure, summed from the quarters so it shares their basis;
- *  the margins and revenue growth are GAAP. The differing bases are spelled out
- *  below the grid so the card doesn't read as self-contradictory (e.g. a positive
- *  adjusted EPS beside a negative GAAP margin). Uncovered values show an em dash. */
+/** A grid of trailing metrics beside the beat history. The EPS *level* is the
+ *  *adjusted* (non-GAAP) trailing figure, summed from the quarters so it shares
+ *  their basis; the growth figures (EPS & revenue YoY) and margins are GAAP, from
+ *  the vendor. The differing bases are spelled out below the grid so the card
+ *  doesn't read as self-contradictory (e.g. an adjusted EPS level beside a GAAP
+ *  EPS-growth figure). Uncovered values show an em dash. */
 function MetricTiles({
   metrics,
   epsTtm,
@@ -651,23 +670,24 @@ function MetricTiles({
   metrics: EarningsMetrics
   epsTtm: number | null
 }) {
-  const revGr = metrics.revenue_growth_yoy
+  // A year-over-year growth tile: signed and coloured green/red, em dash when
+  // the vendor doesn't cover it. Both growth figures are GAAP (see footnote).
+  const growthTile = (label: string, v: number | null) => ({
+    label,
+    text: v == null ? '—' : fmtPct(v),
+    color: v == null ? 'text.primary' : v >= 0 ? 'success.main' : 'error.main',
+  })
   const tiles: { label: string; text: string; color: string }[] = [
     {
       label: 'Adj. EPS (TTM)',
       text: epsTtm == null ? '—' : fmtEps(epsTtm),
       color: 'text.primary',
     },
-    {
-      label: 'Rev. Gr. (YoY)',
-      text: revGr == null ? '—' : fmtPct(revGr),
-      color:
-        revGr == null
-          ? 'text.primary'
-          : revGr >= 0
-            ? 'success.main'
-            : 'error.main',
-    },
+    // GAAP, from the vendor — an *adjusted* growth would need the prior-year
+    // TTM, but the API only serves four quarters, so it's the one growth basis
+    // available. The footnote spells out that it isn't on the adjusted-EPS basis.
+    growthTile('EPS Gr. (YoY)', metrics.eps_growth_yoy),
+    growthTile('Rev. Gr. (YoY)', metrics.revenue_growth_yoy),
     {
       label: 'Gross Margin',
       text:
@@ -752,8 +772,8 @@ function MetricTiles({
         color="text.secondary"
         sx={{ display: 'block', mt: 1.5 }}
       >
-        EPS is adjusted (non-GAAP), summed from the quarters above; margins are
-        GAAP.
+        Adj. EPS (TTM) is non-GAAP, summed from the quarters above; EPS growth,
+        revenue growth and margins are GAAP.
       </Typography>
     </Box>
   )
@@ -774,6 +794,7 @@ export default function EarningsCard({
 }: {
   earnings: EarningsHistory
 }) {
+  const theme = useTheme()
   const { quarters } = earnings
   const epsTtm = adjustedTtmEps(quarters)
   const nextRpt = nearestForecast(earnings)
@@ -876,7 +897,8 @@ export default function EarningsCard({
                   bars={revBars}
                   forecasts={revForecasts}
                   fmt={fmtRev}
-                  ariaLabel="Quarterly actual versus estimated revenue"
+                  neutralColor={theme.palette.secondary.main}
+                  ariaLabel="Quarterly reported revenue"
                 />
               </Box>
             )}
@@ -886,9 +908,12 @@ export default function EarningsCard({
               useFlexGap
               sx={{ flexWrap: 'wrap', mt: 1.5 }}
             >
-              <LegendItem color={estimateColor} label="Estimate" />
+              <LegendItem color={estimateColor} label="EPS estimate" />
               <LegendItem color="success.main" label="Beat" />
               <LegendItem color="error.main" label="Missed" />
+              {hasRevenue && (
+                <LegendItem color="secondary.main" label="Revenue" />
+              )}
               {hasUpcoming && (
                 <LegendItem color="primary.main" label="Upcoming (est.)" />
               )}
