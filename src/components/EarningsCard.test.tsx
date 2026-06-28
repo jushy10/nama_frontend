@@ -109,7 +109,7 @@ describe('EarningsCard', () => {
           ],
           metrics: {
             eps: -0.63, // vendor's GAAP TTM EPS — deliberately NOT surfaced
-            eps_growth_yoy: 29.0, // GAAP growth — tile dropped
+            eps_growth_yoy: 29.0, // GAAP growth — shown, labelled GAAP via footnote
             revenue_growth_yoy: 12.8,
             gross_margin: null, // vendor-uncovered -> em dash
             operating_margin: 32.6,
@@ -128,14 +128,16 @@ describe('EarningsCard', () => {
     expect(screen.getByText('$3.00')).toBeInTheDocument()
     expect(screen.queryByText('-$0.63')).not.toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument() // GAAP margin
+    // EPS growth is back as a GAAP tile (signed), alongside revenue growth.
+    expect(screen.getByText('EPS Gr. (YoY)')).toBeInTheDocument()
+    expect(screen.getByText('+29.0%')).toBeInTheDocument()
     // A null metric renders an em dash rather than vanishing.
     expect(screen.getByText('Gross Margin')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     // The basis is spelled out so the card doesn't read as contradictory.
-    expect(screen.getByText(/margins are GAAP/i)).toBeInTheDocument()
-    // The old GAAP-EPS, EPS-growth, and ROE/ROIC/Payout tiles are gone.
+    expect(screen.getByText(/EPS growth, revenue growth and margins are GAAP/i)).toBeInTheDocument()
+    // The old GAAP-EPS *level* and ROE/ROIC/Payout tiles are still gone.
     expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
-    expect(screen.queryByText('EPS Gr. (YoY)')).not.toBeInTheDocument()
     expect(screen.queryByText('ROE')).not.toBeInTheDocument()
   })
 
@@ -256,8 +258,9 @@ describe('EarningsCard', () => {
         }}
       />,
     )
-    // Revenue gets its own chart; the newest quarter is the default detail line.
-    expect(screen.getByText('Revenue')).toBeInTheDocument()
+    // Revenue gets its own chart (title) plus a matching legend swatch, so the
+    // label appears more than once.
+    expect(screen.getAllByText('Revenue').length).toBeGreaterThan(0)
     // Reported revenue shows in the detail line and beneath the bar; there's no
     // consensus revenue estimate, so the chart is actuals-only.
     expect(screen.getAllByText('$97.1B').length).toBeGreaterThan(0)
