@@ -143,7 +143,9 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.getByText('$1.05')).toBeInTheDocument() // EPS consensus
-    expect(screen.getAllByText('$89B').length).toBeGreaterThan(0) // revenue
+    // Compact format: round billions render "$89B" or "$89.0B" depending on the
+    // ICU/Intl data version (CI vs. local differ), so match both.
+    expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
     // The forecast label and date appear on both the EPS and revenue charts.
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
     expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
@@ -180,8 +182,9 @@ describe('EarningsCard', () => {
     // expected date. The dates appear on both the EPS and revenue charts.
     expect(screen.getByText('$2.10')).toBeInTheDocument() // EPS consensus
     expect(screen.getByText('$2.45')).toBeInTheDocument()
-    expect(screen.getAllByText('$120B').length).toBeGreaterThan(0) // revenue
-    expect(screen.getByText('$130B')).toBeInTheDocument()
+    // Round billions render with or without a trailing ".0" across ICU versions.
+    expect(screen.getAllByText(/\$120(\.0)?B/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/\$130(\.0)?B/)).toBeInTheDocument()
     expect(screen.getAllByText('Est. Sep 30').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Est. Dec 31').length).toBeGreaterThan(0)
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
