@@ -144,22 +144,19 @@ function epsSeries(quarters: EarningsSurprise[]): ChartBar[] {
 /** The revenue series (newest-first): reported actuals only. The API carries no
  *  consensus revenue estimate, so there's no beat/surprise to derive — the
  *  forward consensus (next report) rides in as a forecast column instead.
- *  Quarters with no reported revenue are dropped rather than drawn as an empty
- *  slot: revenue has no estimate bar to stand in their place, so a missing
- *  quarter (e.g. the latest, reported for EPS but not yet revenue) would just be
- *  a blank gap. Each bar stays labelled with its own quarter, so omitting one
- *  doesn't misrepresent the rest. */
+ *  Quarters with no reported revenue are KEPT (actual stays null), so the chart
+ *  draws a labelled "no data" slot for them rather than silently closing the
+ *  gap. That makes a missing quarter visible — e.g. the latest one, which prints
+ *  EPS before its EDGAR revenue lands, or a quarter EDGAR doesn't cover. */
 function revenueSeries(quarters: EarningsSurprise[]): ChartBar[] {
-  return quarters
-    .filter((q) => q.revenue_actual != null)
-    .map((q, i) => ({
-      key: q.period ?? String(i),
-      label: quarterLabel(q),
-      estimate: null,
-      actual: q.revenue_actual ?? null,
-      beat: null,
-      surprise: null,
-    }))
+  return quarters.map((q, i) => ({
+    key: q.period ?? String(i),
+    label: quarterLabel(q),
+    estimate: null,
+    actual: q.revenue_actual ?? null,
+    beat: null,
+    surprise: null,
+  }))
 }
 
 /** Forward columns from a consensus list, keeping only those with a value. */
@@ -368,14 +365,23 @@ function SurpriseChart({
       ? (() => {
           const b = data[active]
           const c = b.beat == null ? neutral : b.beat ? up : down
+          const isGap = b.estimate == null && b.actual == null
           return (
             <>
               <Box component="span" sx={{ color: axis, mr: 0.5 }}>
                 {b.label}
               </Box>
-              {b.estimate != null && cell('Est', fmt(b.estimate))}
-              {cell('Act', orDash(b.actual, fmt), c)}
-              {b.surprise != null && cell('', fmtPct(b.surprise), c)}
+              {isGap ? (
+                <Box component="span" sx={{ color: axis }}>
+                  No data reported
+                </Box>
+              ) : (
+                <>
+                  {b.estimate != null && cell('Est', fmt(b.estimate))}
+                  {cell('Act', orDash(b.actual, fmt), c)}
+                  {b.surprise != null && cell('', fmtPct(b.surprise), c)}
+                </>
+              )}
             </>
           )
         })()
@@ -507,6 +513,9 @@ function SurpriseChart({
           const actX =
             b.estimate == null ? center - barW / 2 : estX + barW + gap
           const actColor = b.beat == null ? neutral : b.beat ? up : down
+          // Nothing reported this quarter (no estimate and no actual) — draw a
+          // labelled "no data" slot so the gap reads as missing, not as zero.
+          const isGap = b.estimate == null && b.actual == null
 
           const bar = (x: number, v: number | null, fill: string) => {
             if (v == null) return null
@@ -537,7 +546,20 @@ function SurpriseChart({
               {surprise}
               {bar(estX, b.estimate, est)}
               {bar(actX, b.actual, actColor)}
-              {/* quarter label + the reported value beneath it */}
+              {/* "no data" mark, centred in the plot for a gap column */}
+              {isGap && (
+                <text
+                  x={center}
+                  y={PAD.top + (H - PAD.top - PAD.bottom) / 2}
+                  fontSize={15}
+                  fill={axis}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                >
+                  —
+                </text>
+              )}
+              {/* quarter label + the reported value (or "no data") beneath it */}
               <text
                 x={center}
                 y={H - 26}
@@ -547,18 +569,16 @@ function SurpriseChart({
               >
                 {b.label}
               </text>
-              {b.actual != null && (
-                <text
-                  x={center}
-                  y={H - 12}
-                  fontSize={11}
-                  fontWeight={600}
-                  fill={actColor}
-                  textAnchor="middle"
-                >
-                  {fmt(b.actual)}
-                </text>
-              )}
+              <text
+                x={center}
+                y={H - 12}
+                fontSize={isGap ? 9 : 11}
+                fontWeight={isGap ? 400 : 600}
+                fill={isGap ? axis : actColor}
+                textAnchor="middle"
+              >
+                {isGap ? 'no data' : b.actual != null ? fmt(b.actual) : ''}
+              </text>
             </g>
           )
         })}
@@ -805,11 +825,16 @@ export default function EarningsCard({
   const revForecasts = forecastSeries(forecastList, (f) => f.revenue_estimate)
   const revBars = revenueSeries(quarters)
 
-  // Only draw the revenue chart when there's something to show — a reported
-  // figure or a forward consensus. Many tickers don't carry revenue at all.
-  const hasRevenue =
-    revBars.some((b) => b.estimate != null || b.actual != null) ||
-    revForecasts.length > 0
+  // Show the reported-revenue columns (gaps included — see revenueSeries) only
+  // when at least one quarter actually reported revenue. With no history at all
+  // there are no gaps worth surfacing, just the forward estimate, so don't draw
+  // a chart that's all "no data" slots.
+  const hasRevenueHistory = revBars.some((b) => b.actual != null)
+  const revChartBars = hasRevenueHistory ? revBars : []
+
+  // Only draw the revenue chart when there's something to show — reported
+  // figures or a forward consensus. Many tickers don't carry revenue at all.
+  const hasRevenue = hasRevenueHistory || revForecasts.length > 0
   const hasUpcoming = epsForecasts.length > 0 || revForecasts.length > 0
 
   return (
@@ -894,7 +919,7 @@ export default function EarningsCard({
                   Revenue
                 </Typography>
                 <SurpriseChart
-                  bars={revBars}
+                  bars={revChartBars}
                   forecasts={revForecasts}
                   fmt={fmtRev}
                   neutralColor={theme.palette.secondary.main}
