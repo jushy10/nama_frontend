@@ -103,16 +103,10 @@ const SESSION_LABEL: Record<string, string> = {
   dmh: 'during hours',
 }
 
-/** The nearest upcoming report — the same one the chart draws its first forecast
- *  bar for. Prefers the multi-quarter `upcoming` list, falls back to
- *  `next_report`, so the header chip and that bar always agree. */
+/** The next scheduled report when it carries an EPS consensus — the same one the
+ *  chart draws its forecast bar for, so the header chip and that bar agree. */
 function nearestForecast(e: EarningsHistory): NextEarnings | null {
-  const list = e.upcoming?.length
-    ? e.upcoming
-    : e.next_report
-      ? [e.next_report]
-      : []
-  return list.find((f) => f.eps_estimate != null) ?? null
+  return e.next_report?.eps_estimate != null ? e.next_report : null
 }
 
 /** One reported column for the grouped-bar chart: a muted "estimate" bar beside
@@ -147,29 +141,18 @@ function epsSeries(quarters: EarningsSurprise[]): ChartBar[] {
   }))
 }
 
-/** The revenue series (newest-first). `beat`/`surprise` are derived here, since
- *  the API's `beat`/`surprise_percent` describe EPS only. */
+/** The revenue series (newest-first): reported actuals only. The API carries no
+ *  consensus revenue estimate, so there's no beat/surprise to derive — the
+ *  forward consensus (next report) rides in as a forecast column instead. */
 function revenueSeries(quarters: EarningsSurprise[]): ChartBar[] {
-  return quarters.map((q, i) => {
-    const estimate = q.revenue_estimate ?? null
-    const actual = q.revenue_actual ?? null
-    let beat: boolean | null = null
-    let surprise: number | null = null
-    if (estimate != null && actual != null) {
-      beat = actual >= estimate
-      if (estimate !== 0) {
-        surprise = ((actual - estimate) / Math.abs(estimate)) * 100
-      }
-    }
-    return {
-      key: q.period ?? String(i),
-      label: quarterLabel(q),
-      estimate,
-      actual,
-      beat,
-      surprise,
-    }
-  })
+  return quarters.map((q, i) => ({
+    key: q.period ?? String(i),
+    label: quarterLabel(q),
+    estimate: null,
+    actual: q.revenue_actual ?? null,
+    beat: null,
+    surprise: null,
+  }))
 }
 
 /** Forward columns from a consensus list, keeping only those with a value. */
@@ -372,7 +355,7 @@ function SurpriseChart({
               <Box component="span" sx={{ color: axis, mr: 0.5 }}>
                 {b.label}
               </Box>
-              {cell('Est', orDash(b.estimate, fmt))}
+              {b.estimate != null && cell('Est', fmt(b.estimate))}
               {cell('Act', orDash(b.actual, fmt), c)}
               {b.surprise != null && cell('', fmtPct(b.surprise), c)}
             </>
@@ -502,7 +485,9 @@ function SurpriseChart({
         {data.map((b, i) => {
           const center = cx(i)
           const estX = center - groupW / 2
-          const actX = estX + barW + gap
+          // With no estimate bar (revenue), centre the lone actual in the slot.
+          const actX =
+            b.estimate == null ? center - barW / 2 : estX + barW + gap
           const actColor = b.beat == null ? axis : b.beat ? up : down
 
           const bar = (x: number, v: number | null, fill: string) => {
@@ -755,13 +740,8 @@ export default function EarningsCard({
   const { quarters } = earnings
   const nextRpt = nearestForecast(earnings)
 
-  // The forward consensus the charts draw from: the multi-quarter `upcoming`
-  // list when present, else the single `next_report`.
-  const forecastList = earnings.upcoming?.length
-    ? earnings.upcoming
-    : earnings.next_report
-      ? [earnings.next_report]
-      : []
+  // The forward consensus the charts draw from: the single scheduled next report.
+  const forecastList = earnings.next_report ? [earnings.next_report] : []
   const epsForecasts = forecastSeries(forecastList, (f) => f.eps_estimate)
   const revForecasts = forecastSeries(forecastList, (f) => f.revenue_estimate)
   const revBars = revenueSeries(quarters)
@@ -787,7 +767,7 @@ export default function EarningsCard({
             </Typography>
             <Typography variant="caption" color="text.secondary">
               {hasRevenue
-                ? 'Quarterly actual vs. estimate'
+                ? 'Quarterly EPS & revenue'
                 : 'Quarterly EPS — actual vs. estimate'}
             </Typography>
           </Box>

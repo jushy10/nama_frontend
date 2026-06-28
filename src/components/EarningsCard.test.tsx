@@ -126,7 +126,7 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
   })
 
-  it('plots a forward expected bar when an upcoming consensus is present', () => {
+  it('plots a forward expected bar from the next scheduled report', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
@@ -150,44 +150,6 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
     expect(screen.getAllByText('Est. Jul 30').length).toBeGreaterThan(0)
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
-  })
-
-  it('plots multiple upcoming quarters from the analyst estimates list', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={{
-          ...base,
-          upcoming: [
-            {
-              report_date: '2026-09-30',
-              fiscal_year: null,
-              fiscal_quarter: null,
-              eps_estimate: 2.1,
-              revenue_estimate: 120_000_000_000,
-              session: null,
-            },
-            {
-              report_date: '2026-12-31',
-              fiscal_year: null,
-              fiscal_quarter: null,
-              eps_estimate: 2.45,
-              revenue_estimate: 130_000_000_000,
-              session: null,
-            },
-          ],
-        }}
-      />,
-    )
-    // Two forecast columns on each chart, with their consensus EPS/revenue and
-    // expected date. The dates appear on both the EPS and revenue charts.
-    expect(screen.getByText('$2.10')).toBeInTheDocument() // EPS consensus
-    expect(screen.getByText('$2.45')).toBeInTheDocument()
-    // Round billions render with or without a trailing ".0" across ICU versions.
-    expect(screen.getAllByText(/\$120(\.0)?B/).length).toBeGreaterThan(0)
-    expect(screen.getByText(/\$130(\.0)?B/)).toBeInTheDocument()
-    expect(screen.getAllByText('Est. Sep 30').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Est. Dec 31').length).toBeGreaterThan(0)
-    expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
   })
 
   it('omits the forward bar when there is no upcoming consensus', () => {
@@ -264,17 +226,13 @@ describe('EarningsCard', () => {
     expect(screen.getByText('$0.92')).toBeInTheDocument()
   })
 
-  it('renders a revenue chart with expected vs. released figures', () => {
+  it('renders a revenue chart from the reported actuals', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
           ...base,
           quarters: [
-            {
-              ...base.quarters[0],
-              revenue_estimate: 95_400_000_000,
-              revenue_actual: 97_100_000_000,
-            },
+            { ...base.quarters[0], revenue_actual: 97_100_000_000 },
             ...base.quarters.slice(1),
           ],
         }}
@@ -282,8 +240,8 @@ describe('EarningsCard', () => {
     )
     // Revenue gets its own chart; the newest quarter is the default detail line.
     expect(screen.getByText('Revenue')).toBeInTheDocument()
-    expect(screen.getByText('$95.4B')).toBeInTheDocument() // estimate (detail only)
-    // Actual shows both in the detail line and beneath the bar.
+    // Reported revenue shows in the detail line and beneath the bar; there's no
+    // consensus revenue estimate, so the chart is actuals-only.
     expect(screen.getAllByText('$97.1B').length).toBeGreaterThan(0)
   })
 
@@ -326,38 +284,5 @@ describe('EarningsCard', () => {
     expect(screen.getByText('Next report')).toBeInTheDocument()
     expect(screen.getByText('Jul 30')).toBeInTheDocument()
     expect(screen.getByText('Est $1.93')).toBeInTheDocument()
-  })
-
-  it('chip prefers the upcoming list, so it matches the forecast bar', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={{
-          ...base,
-          // Different vendor for the scheduled date/estimate...
-          next_report: {
-            report_date: '2026-07-29',
-            fiscal_year: 2027,
-            fiscal_quarter: 2,
-            eps_estimate: 1.93,
-            revenue_estimate: null,
-            session: 'amc',
-          },
-          // ...but `upcoming` (the chart's source) wins, so they agree.
-          upcoming: [
-            {
-              report_date: '2026-07-30',
-              fiscal_year: null,
-              fiscal_quarter: null,
-              eps_estimate: 1.88,
-              revenue_estimate: 110_000_000_000,
-              session: null,
-            },
-          ],
-        }}
-      />,
-    )
-    expect(screen.getByText('Jul 30')).toBeInTheDocument() // upcoming date
-    expect(screen.getByText('Est $1.88')).toBeInTheDocument() // upcoming estimate
-    expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument() // not next_report
   })
 })
