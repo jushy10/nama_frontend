@@ -572,9 +572,6 @@ const METRIC_TILES: {
   { key: 'gross_margin', label: 'Gross Margin', kind: 'pct' },
   { key: 'operating_margin', label: 'Op. Margin', kind: 'pct' },
   { key: 'net_margin', label: 'Net Margin', kind: 'pct' },
-  { key: 'roe', label: 'ROE', kind: 'pct' },
-  { key: 'roic', label: 'ROIC', kind: 'pct' },
-  { key: 'payout_ratio', label: 'Payout', kind: 'pct' },
 ]
 
 /** A grid of trailing earnings metrics (EPS, growth, margins, returns, payout)
