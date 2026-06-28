@@ -16,22 +16,37 @@ const base: RsiSeries = {
 }
 
 describe('RsiCard', () => {
-  it('calls Buy when the latest reading is oversold', () => {
+  it('calls Strong Buy when the reading is below oversold', () => {
     renderWithProviders(
       <RsiCard rsi={{ ...base, latest: 22.81, signal: 'oversold' }} />,
     )
     expect(screen.getByText('22.8')).toBeInTheDocument()
     expect(screen.getByText('Oversold')).toBeInTheDocument()
-    expect(screen.getByText('Buy')).toBeInTheDocument()
-    expect(screen.getByText(/selling may be overdone/i)).toBeInTheDocument()
+    expect(screen.getByText('Strong Buy')).toBeInTheDocument()
+    expect(screen.getByText(/deeply oversold/i)).toBeInTheDocument()
   })
 
-  it('calls Sell when the latest reading is overbought', () => {
+  it('calls Buy in the softer band just above oversold', () => {
+    renderWithProviders(<RsiCard rsi={{ ...base, latest: 35 }} />)
+    expect(screen.getByText('35.0')).toBeInTheDocument()
+    expect(screen.getByText('Buy')).toBeInTheDocument()
+    expect(screen.getByText(/leaning oversold/i)).toBeInTheDocument()
+  })
+
+  it('calls Sell in the softer band just below overbought', () => {
+    renderWithProviders(<RsiCard rsi={{ ...base, latest: 65 }} />)
+    expect(screen.getByText('65.0')).toBeInTheDocument()
+    expect(screen.getByText('Sell')).toBeInTheDocument()
+    expect(screen.getByText(/leaning overbought/i)).toBeInTheDocument()
+  })
+
+  it('calls Strong Sell when the reading is above overbought', () => {
     renderWithProviders(
       <RsiCard rsi={{ ...base, latest: 81.2, signal: 'overbought' }} />,
     )
     expect(screen.getByText('81.2')).toBeInTheDocument()
-    expect(screen.getByText('Sell')).toBeInTheDocument()
+    expect(screen.getByText('Strong Sell')).toBeInTheDocument()
+    expect(screen.getByText(/deeply overbought/i)).toBeInTheDocument()
   })
 
   it('calls Hold when the latest reading sits in the neutral band', () => {
@@ -41,11 +56,15 @@ describe('RsiCard', () => {
     expect(screen.getByText('Hold')).toBeInTheDocument()
   })
 
-  it('treats the thresholds themselves as Buy/Sell (inclusive)', () => {
+  it('treats the band edges (30/40/60/70) as the softer Buy/Sell calls', () => {
     const { rerender } = renderWithProviders(
       <RsiCard rsi={{ ...base, latest: 30, signal: 'oversold' }} />,
     )
     expect(screen.getByText('Buy')).toBeInTheDocument()
+    rerender(<RsiCard rsi={{ ...base, latest: 40 }} />)
+    expect(screen.getByText('Buy')).toBeInTheDocument()
+    rerender(<RsiCard rsi={{ ...base, latest: 60 }} />)
+    expect(screen.getByText('Sell')).toBeInTheDocument()
     rerender(<RsiCard rsi={{ ...base, latest: 70, signal: 'overbought' }} />)
     expect(screen.getByText('Sell')).toBeInTheDocument()
   })

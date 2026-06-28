@@ -192,12 +192,12 @@ describe('Stocks search', () => {
       expect.anything(),
     )
 
-    // The RSI card loads and turns the oversold reading into a Buy call.
+    // The RSI card loads and turns the deeply oversold reading into a Strong Buy.
     expect(
       await screen.findByRole('heading', { name: 'RSI' }),
     ).toBeInTheDocument()
     expect(screen.getByText('22.8')).toBeInTheDocument()
-    expect(screen.getByText('Buy')).toBeInTheDocument()
+    expect(screen.getByText('Strong Buy')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/rsi'),
       expect.anything(),

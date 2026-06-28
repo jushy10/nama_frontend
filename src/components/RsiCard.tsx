@@ -1,31 +1,59 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
-import { rsiVerdict, type RsiAction, type RsiSeries } from '@/lib/api'
+import {
+  rsiVerdict,
+  RSI_ACTION_MARGIN,
+  type RsiAction,
+  type RsiSeries,
+} from '@/lib/api'
 
 // Amber for the neutral "Hold" call — the theme only defines green (up) and
 // red (down), so this fills the cautionary middle ground between them.
 const HOLD_COLOR = '#fbbf24' // amber-400
 
+// `color` drives the reading, gauge marker, and outlined chip; `filled` (on the
+// Strong calls only) renders the chip as a solid pill so the strongest
+// conviction reads at a glance. contrastText keeps the label legible in both modes.
 const ACTION: Record<
   RsiAction,
-  { color: string; blurb: (r: RsiSeries) => string }
+  {
+    color: string
+    filled?: { bg: string; fg: string }
+    blurb: (r: RsiSeries) => string
+  }
 > = {
+  'Strong Buy': {
+    color: 'success.main',
+    filled: { bg: 'success.main', fg: 'success.contrastText' },
+    blurb: (r) =>
+      `Below ${fmtLevel(r.oversold)}, RSI is deeply oversold — the selloff looks ` +
+      `overstretched and primed to rebound.`,
+  },
   Buy: {
     color: 'success.main',
     blurb: (r) =>
-      `At or below ${fmtLevel(r.oversold)}, RSI reads oversold — selling may be ` +
-      `overdone and momentum could rebound.`,
-  },
-  Sell: {
-    color: 'error.main',
-    blurb: (r) =>
-      `At or above ${fmtLevel(r.overbought)}, RSI reads overbought — the run may ` +
-      `be stretched and momentum could cool.`,
+      `Between ${fmtLevel(r.oversold)} and ${fmtLevel(r.oversold + RSI_ACTION_MARGIN)}, ` +
+      `RSI is leaning oversold — selling may be starting to overshoot.`,
   },
   Hold: {
     color: HOLD_COLOR,
     blurb: (r) =>
-      `Between ${fmtLevel(r.oversold)} and ${fmtLevel(r.overbought)}, RSI shows ` +
-      `no strong momentum signal either way.`,
+      `Between ${fmtLevel(r.oversold + RSI_ACTION_MARGIN)} and ` +
+      `${fmtLevel(r.overbought - RSI_ACTION_MARGIN)}, RSI shows no strong ` +
+      `momentum signal either way.`,
+  },
+  Sell: {
+    color: 'error.main',
+    blurb: (r) =>
+      `Between ${fmtLevel(r.overbought - RSI_ACTION_MARGIN)} and ` +
+      `${fmtLevel(r.overbought)}, RSI is leaning overbought — the run may be ` +
+      `getting stretched.`,
+  },
+  'Strong Sell': {
+    color: 'error.main',
+    filled: { bg: 'error.main', fg: 'error.contrastText' },
+    blurb: (r) =>
+      `Above ${fmtLevel(r.overbought)}, RSI is deeply overbought — the rally ` +
+      `looks overextended and primed to cool.`,
   },
 }
 
@@ -158,11 +186,13 @@ export default function RsiCard({ rsi }: { rsi: RsiSeries }) {
                   borderRadius: 2,
                   border: '1px solid',
                   borderColor: meta.color,
-                  color: meta.color,
-                  bgcolor: 'action.hover',
                   fontWeight: 700,
                   fontSize: '1rem',
                   letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap',
+                  ...(meta.filled
+                    ? { bgcolor: meta.filled.bg, color: meta.filled.fg }
+                    : { bgcolor: 'action.hover', color: meta.color }),
                 }}
               >
                 {action}
