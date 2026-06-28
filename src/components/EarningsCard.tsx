@@ -215,6 +215,8 @@ function SurpriseChart({
   const axis = theme.palette.text.secondary
   const est = estimateColor(theme)
   const forecast = theme.palette.primary.main // indigo accent for the forecast
+  // The pointer-selected column — a mouse hover or, on touch, a tap. null falls
+  // back to the latest column carrying a value (see `active` below).
   const [hover, setHover] = useState<number | null>(null)
 
   // Track the rendered width so the viewBox matches it 1:1 — keeps labels at
@@ -316,12 +318,28 @@ function SurpriseChart({
         ? fcIndex
         : Math.max(0, data.length - 1))
 
-  function onMove(e: PointerEvent<SVGSVGElement>) {
+  // Which column sits under the pointer, in viewBox space — or null before the
+  // SVG is laid out (jsdom / pre-measure), where we leave the selection alone.
+  function columnAt(e: PointerEvent<SVGSVGElement>): number | null {
     const rect = e.currentTarget.getBoundingClientRect()
-    if (!rect.width) return // jsdom / unmeasured: leave hover untouched
+    if (!rect.width) return null
     const vbX = ((e.clientX - rect.left) / rect.width) * W
     const i = Math.floor((vbX - PAD.left) / slot)
-    setHover(Math.max(0, Math.min(n - 1, i)))
+    return Math.max(0, Math.min(n - 1, i))
+  }
+
+  // Select the column under the pointer. Bound to pointerdown as well as
+  // pointermove so a touch tap selects (touch has no hover), while a mouse
+  // hover or drag scrubs across columns.
+  function onPoint(e: PointerEvent<SVGSVGElement>) {
+    const i = columnAt(e)
+    if (i != null) setHover(i)
+  }
+
+  // Only a mouse leaving clears the highlight; on touch there's no pointer to
+  // "leave", so a tapped column stays selected after the finger lifts.
+  function onLeave(e: PointerEvent<SVGSVGElement>) {
+    if (e.pointerType === 'mouse') setHover(null)
   }
 
   // One inline label/value cell for the detail line above the plot.
@@ -410,13 +428,16 @@ function SurpriseChart({
         preserveAspectRatio="none"
         role="img"
         aria-label={ariaLabel}
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        onPointerDown={onPoint}
+        onPointerMove={onPoint}
+        onPointerLeave={onLeave}
         sx={{
           width: '100%',
           height: 'auto',
           display: 'block',
-          touchAction: 'none',
+          // Let the page scroll vertically through the chart on touch, while
+          // horizontal drags scrub and a tap selects a column.
+          touchAction: 'pan-y',
           cursor: 'crosshair',
         }}
       >
