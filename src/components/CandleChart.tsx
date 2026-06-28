@@ -1,11 +1,20 @@
-import { useMemo, useState, type PointerEvent } from 'react'
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react'
 import { Box, Stack, Typography, useTheme } from '@mui/material'
 import type { Candle } from '@/lib/api'
 
-// The chart draws into a fixed viewBox and scales to its container via
-// `width: 100%`, so all geometry below is in these abstract units — no DOM
-// measurement or ResizeObserver needed (which also keeps it happy in jsdom).
-const W = 820
+// The chart's viewBox width tracks the container's pixel width (measured below),
+// so one viewBox unit ≈ one CSS pixel and the in-SVG axis text stays legible on
+// a phone instead of being shrunk to ~4px by an 820-unit box crammed into
+// ~300px. Until we've measured — and in jsdom, which has no ResizeObserver — we
+// fall back to a sensible desktop width. The height is fixed, so with
+// `preserveAspectRatio="none"` the chart always renders H px tall.
+const W_FALLBACK = 820
 const H = 360
 const PAD = { top: 14, right: 58, bottom: 26, left: 10 }
 const VOL_BAND = 54 // height reserved for the volume histogram at the bottom
@@ -52,11 +61,33 @@ interface Props {
 /**
  * A dependency-free candlestick chart: wicks + bodies, a volume histogram band,
  * price/date axes, and a hover crosshair that drives a TradingView-style OHLC
- * legend above the plot. Renders as a single responsive SVG.
+ * legend above the plot. Renders as a single responsive SVG whose viewBox width
+ * tracks the container, so it stays sharp and legible down to phone widths.
  */
 export default function CandleChart({ candles, timeframe }: Props) {
   const theme = useTheme()
   const [hover, setHover] = useState<number | null>(null)
+
+  // Measure the container so the viewBox width matches it 1:1 (see W_FALLBACK).
+  // useLayoutEffect runs before paint, so the chart never flashes at the
+  // fallback width; the ResizeObserver guard keeps jsdom (tests) on the
+  // fallback, where there's no layout to measure anyway.
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [cw, setCw] = useState(W_FALLBACK)
+  useLayoutEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const measure = () => {
+      const w = el.getBoundingClientRect().width
+      if (w > 0) setCw(Math.round(w))
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const W = cw
 
   const up = theme.palette.success.main
   const down = theme.palette.error.main
@@ -98,13 +129,17 @@ export default function CandleChart({ candles, timeframe }: Props) {
       { length: tickN + 1 },
       (_, i) => min + ((max - min) * i) / tickN,
     )
-    const dateN = Math.min(6, n)
+    // Fit the date labels to the available width: a phone can only show two or
+    // three before they collide, while a wide desktop plot comfortably takes
+    // six. Intraday labels carry a time, so they need more room than a bare date.
+    const labelW = intraday ? 96 : 64
+    const dateN = Math.min(n, 6, Math.max(2, Math.floor(plotW / labelW)))
     const dateIdx = Array.from({ length: dateN }, (_, i) =>
       Math.round((i * (n - 1)) / Math.max(dateN - 1, 1)),
     )
 
     return { x, y, volY, volTop, slot, bodyW, priceTicks, dateIdx, n }
-  }, [candles])
+  }, [candles, W, intraday])
 
   if (candles.length === 0) {
     return (
@@ -119,13 +154,25 @@ export default function CandleChart({ candles, timeframe }: Props) {
   const c = candles[active]
   const cUp = c.close >= c.open
   const chgPct = c.open ? ((c.close - c.open) / c.open) * 100 : 0
+  const ariaLabel = `Candlestick price chart with ${candles.length} ${
+    intraday ? 'intraday' : 'daily'
+  } candles and a volume histogram`
 
-  function onMove(e: PointerEvent<SVGSVGElement>) {
+  // Map a pointer onto the candle under it (viewBox space). Bound to pointerdown
+  // as well as pointermove, so a touch tap — which has no hover — still selects a
+  // candle, while a mouse hover or drag scrubs across them.
+  function onPoint(e: PointerEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
     if (!rect.width) return
     const vbX = ((e.clientX - rect.left) / rect.width) * W
     const i = Math.floor((vbX - PAD.left) / geo.slot)
     setHover(Math.max(0, Math.min(candles.length - 1, i)))
+  }
+
+  // Only a mouse leaving clears the readout; on touch there's no pointer to
+  // "leave", so a tapped candle stays selected after the finger lifts.
+  function onLeave(e: PointerEvent<SVGSVGElement>) {
+    if (e.pointerType === 'mouse') setHover(null)
   }
 
   const legendCell = (label: string, value: string, color?: string) => (
@@ -146,7 +193,7 @@ export default function CandleChart({ candles, timeframe }: Props) {
   )
 
   return (
-    <Box>
+    <Box ref={wrapRef}>
       <Stack
         direction="row"
         useFlexGap
@@ -178,13 +225,18 @@ export default function CandleChart({ candles, timeframe }: Props) {
         component="svg"
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
-        onPointerMove={onMove}
-        onPointerLeave={() => setHover(null)}
+        role="img"
+        aria-label={ariaLabel}
+        onPointerDown={onPoint}
+        onPointerMove={onPoint}
+        onPointerLeave={onLeave}
         sx={{
           width: '100%',
           height: 'auto',
           display: 'block',
-          touchAction: 'none',
+          // Let the page scroll vertically through the chart on touch, while a
+          // tap selects a candle and a horizontal drag scrubs across them.
+          touchAction: 'pan-y',
           cursor: 'crosshair',
         }}
       >
