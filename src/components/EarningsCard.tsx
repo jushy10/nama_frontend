@@ -627,26 +627,67 @@ function LegendItem({
   )
 }
 
-// The trailing earnings/profitability metrics, in display order. `kind` drives
-// formatting: `money` → "$8.27", `growth` → signed + coloured ("+29.0%"),
-// `pct` → plain percent ("27.2%").
-const METRIC_TILES: {
-  key: keyof EarningsMetrics
-  label: string
-  kind: 'money' | 'growth' | 'pct'
-}[] = [
-  { key: 'eps', label: 'EPS (TTM)', kind: 'money' },
-  { key: 'eps_growth_yoy', label: 'EPS Gr. (YoY)', kind: 'growth' },
-  { key: 'revenue_growth_yoy', label: 'Rev. Gr. (YoY)', kind: 'growth' },
-  { key: 'gross_margin', label: 'Gross Margin', kind: 'pct' },
-  { key: 'operating_margin', label: 'Op. Margin', kind: 'pct' },
-  { key: 'net_margin', label: 'Net Margin', kind: 'pct' },
-]
+/** Adjusted (non-GAAP) trailing-twelve-month EPS: the sum of the last four
+ *  quarters' reported EPS, on the same (consensus) basis as the beat history —
+ *  so it agrees with the per-quarter bars rather than the GAAP figure a vendor
+ *  reports. null until a full four quarters of actuals are available. */
+function adjustedTtmEps(quarters: EarningsSurprise[]): number | null {
+  const actuals = quarters
+    .map((q) => q.actual)
+    .filter((v): v is number => v != null)
+  if (actuals.length < 4) return null
+  return actuals.slice(0, 4).reduce((sum, v) => sum + v, 0)
+}
 
-/** A grid of trailing earnings metrics (EPS, growth, margins, returns, payout)
- *  served alongside the beat history. Growth tiles are signed and coloured; a
- *  value the vendor doesn't cover shows an em dash. */
-function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
+/** A grid of trailing metrics beside the beat history. EPS is the *adjusted*
+ *  (non-GAAP) trailing figure, summed from the quarters so it shares their basis;
+ *  the margins and revenue growth are GAAP. The differing bases are spelled out
+ *  below the grid so the card doesn't read as self-contradictory (e.g. a positive
+ *  adjusted EPS beside a negative GAAP margin). Uncovered values show an em dash. */
+function MetricTiles({
+  metrics,
+  epsTtm,
+}: {
+  metrics: EarningsMetrics
+  epsTtm: number | null
+}) {
+  const revGr = metrics.revenue_growth_yoy
+  const tiles: { label: string; text: string; color: string }[] = [
+    {
+      label: 'Adj. EPS (TTM)',
+      text: epsTtm == null ? '—' : fmtEps(epsTtm),
+      color: 'text.primary',
+    },
+    {
+      label: 'Rev. Gr. (YoY)',
+      text: revGr == null ? '—' : fmtPct(revGr),
+      color:
+        revGr == null
+          ? 'text.primary'
+          : revGr >= 0
+            ? 'success.main'
+            : 'error.main',
+    },
+    {
+      label: 'Gross Margin',
+      text:
+        metrics.gross_margin == null ? '—' : fmtPlainPct(metrics.gross_margin),
+      color: 'text.primary',
+    },
+    {
+      label: 'Op. Margin',
+      text:
+        metrics.operating_margin == null
+          ? '—'
+          : fmtPlainPct(metrics.operating_margin),
+      color: 'text.primary',
+    },
+    {
+      label: 'Net Margin',
+      text: metrics.net_margin == null ? '—' : fmtPlainPct(metrics.net_margin),
+      color: 'text.primary',
+    },
+  ]
   return (
     <Box
       sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
@@ -667,57 +708,53 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
           columnGap: 2,
         }}
       >
-        {METRIC_TILES.map(({ key, label, kind }) => {
-          const v = metrics[key]
-          let text = '—'
-          let color = 'text.primary'
-          if (v != null) {
-            if (kind === 'money') text = fmtEps(v)
-            else if (kind === 'growth') {
-              text = fmtPct(v)
-              color = v >= 0 ? 'success.main' : 'error.main'
-            } else text = fmtPlainPct(v)
-          }
-          return (
-            <Box
-              key={key}
+        {tiles.map((t) => (
+          <Box
+            key={t.label}
+            sx={{
+              px: 1.5,
+              py: 1.25,
+              borderRadius: 1.5,
+              bgcolor: 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
               sx={{
-                px: 1.5,
-                py: 1.25,
-                borderRadius: 1.5,
-                bgcolor: 'action.hover',
-                border: '1px solid',
-                borderColor: 'divider',
+                display: 'block',
+                textTransform: 'uppercase',
+                letterSpacing: '0.03em',
+                fontSize: '0.65rem',
               }}
             >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  display: 'block',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.03em',
-                  fontSize: '0.65rem',
-                }}
-              >
-                {label}
-              </Typography>
-              <Typography
-                sx={{
-                  mt: 0.25,
-                  fontWeight: 700,
-                  fontSize: '1.05rem',
-                  fontVariantNumeric: 'tabular-nums',
-                  color,
-                  lineHeight: 1.25,
-                }}
-              >
-                {text}
-              </Typography>
-            </Box>
-          )
-        })}
+              {t.label}
+            </Typography>
+            <Typography
+              sx={{
+                mt: 0.25,
+                fontWeight: 700,
+                fontSize: '1.05rem',
+                fontVariantNumeric: 'tabular-nums',
+                color: t.color,
+                lineHeight: 1.25,
+              }}
+            >
+              {t.text}
+            </Typography>
+          </Box>
+        ))}
       </Box>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: 'block', mt: 1.5 }}
+      >
+        EPS is adjusted (non-GAAP), summed from the quarters above; margins are
+        GAAP.
+      </Typography>
     </Box>
   )
 }
@@ -738,6 +775,7 @@ export default function EarningsCard({
   earnings: EarningsHistory
 }) {
   const { quarters } = earnings
+  const epsTtm = adjustedTtmEps(quarters)
   const nextRpt = nearestForecast(earnings)
 
   // The forward consensus the charts draw from: the single scheduled next report.
@@ -819,7 +857,7 @@ export default function EarningsCard({
             <Box sx={{ mt: 2.5 }}>
               {hasRevenue && (
                 <Typography variant="caption" sx={chartLabelSx}>
-                  EPS
+                  EPS (adjusted)
                 </Typography>
               )}
               <SurpriseChart
@@ -858,7 +896,9 @@ export default function EarningsCard({
           </>
         )}
 
-        {earnings.metrics && <MetricTiles metrics={earnings.metrics} />}
+        {earnings.metrics && (
+          <MetricTiles metrics={earnings.metrics} epsTtm={epsTtm} />
+        )}
       </CardContent>
     </Card>
   )

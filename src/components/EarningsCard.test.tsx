@@ -88,14 +88,28 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText('-$0.15').length).toBeGreaterThan(0)
   })
 
-  it('renders the trailing metric tiles when metrics are present', () => {
+  it('shows adjusted EPS (summed from the quarters) and GAAP-labelled margins', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
           ...base,
+          // Four quarters so the adjusted TTM EPS (their sum) can be computed.
+          quarters: [
+            ...base.quarters,
+            {
+              period: '2025-05-29',
+              fiscal_year: 2026,
+              fiscal_quarter: 1,
+              actual: 0.55,
+              estimate: 0.5,
+              surprise: 0.05,
+              surprise_percent: 10,
+              beat: true,
+            },
+          ],
           metrics: {
-            eps: 8.27,
-            eps_growth_yoy: 29.0,
+            eps: -0.63, // vendor's GAAP TTM EPS — deliberately NOT surfaced
+            eps_growth_yoy: 29.0, // GAAP growth — tile dropped
             revenue_growth_yoy: 12.8,
             gross_margin: null, // vendor-uncovered -> em dash
             operating_margin: 32.6,
@@ -108,17 +122,21 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
-    expect(screen.getByText('EPS (TTM)')).toBeInTheDocument()
-    expect(screen.getByText('$8.27')).toBeInTheDocument()
-    expect(screen.getByText('+29.0%')).toBeInTheDocument() // growth: signed
-    expect(screen.getByText('27.2%')).toBeInTheDocument() // margin: plain
+    // EPS (TTM) is the sum of the four ADJUSTED quarters (0.96+0.81+0.68+0.55),
+    // not the vendor's GAAP -0.63.
+    expect(screen.getByText('Adj. EPS (TTM)')).toBeInTheDocument()
+    expect(screen.getByText('$3.00')).toBeInTheDocument()
+    expect(screen.queryByText('-$0.63')).not.toBeInTheDocument()
+    expect(screen.getByText('27.2%')).toBeInTheDocument() // GAAP margin
     // A null metric renders an em dash rather than vanishing.
     expect(screen.getByText('Gross Margin')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
-    // ROE / ROIC / Payout were removed from the card.
+    // The basis is spelled out so the card doesn't read as contradictory.
+    expect(screen.getByText(/margins are GAAP/i)).toBeInTheDocument()
+    // The old GAAP-EPS, EPS-growth, and ROE/ROIC/Payout tiles are gone.
+    expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
+    expect(screen.queryByText('EPS Gr. (YoY)')).not.toBeInTheDocument()
     expect(screen.queryByText('ROE')).not.toBeInTheDocument()
-    expect(screen.queryByText('ROIC')).not.toBeInTheDocument()
-    expect(screen.queryByText('Payout')).not.toBeInTheDocument()
   })
 
   it('omits the trailing metrics block when metrics are absent', () => {
