@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
@@ -25,15 +25,13 @@ import RefreshIcon from '@mui/icons-material/Refresh'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import {
-  ApiError,
-  getScreener,
   stockLogoUrl,
   GICS_SECTORS,
   SCREENER_INDICES,
   type ScreenedStock,
-  type ScreenerResult,
   type StockIndex,
 } from '@/lib/api'
+import { errorMessage, useScreener } from '@/lib/queries'
 
 // Re-poll on the same cadence the rest of the app promises.
 const REFRESH_MS = 60_000
@@ -41,11 +39,6 @@ const REFRESH_MS = 60_000
 const LIMITS = [10, 25, 50]
 
 type Side = 'gainers' | 'losers'
-
-type Status =
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; data: ScreenerResult }
 
 const fmtPrice = (n: number | null) =>
   n == null
@@ -236,48 +229,24 @@ export default function Screener() {
   const [sector, setSector] = useState<string>('all')
   const [limit, setLimit] = useState<number>(10)
   const [side, setSide] = useState<Side>('gainers')
-  const [status, setStatus] = useState<Status>({ state: 'loading' })
-  // Bumping this re-runs the fetch effect — drives the refresh button.
-  const [nonce, setNonce] = useState(0)
   const navigate = useNavigate()
 
-  useEffect(() => {
-    let active = true
-    const ac = new AbortController()
-    setStatus({ state: 'loading' })
-
-    const load = (initial: boolean) =>
-      getScreener({
-        index: index === 'all' ? null : index,
-        sector: sector === 'all' ? null : sector,
-        limit,
-        signal: ac.signal,
-      })
-        .then((data) => {
-          if (active) setStatus({ state: 'success', data })
-        })
-        .catch((err) => {
-          // A failed background poll keeps whatever is on screen; only the first
-          // load surfaces an error.
-          if (!active || ac.signal.aborted || !initial) return
-          const message =
-            err instanceof ApiError
-              ? err.message
-              : 'Could not reach the server. Please try again.'
-          setStatus({ state: 'error', message })
-        })
-
-    load(true)
-    const id = setInterval(() => load(false), REFRESH_MS)
-    return () => {
-      active = false
-      ac.abort()
-      clearInterval(id)
-    }
-  }, [index, sector, limit, nonce])
-
-  const data = status.state === 'success' ? status.data : null
+  // Filters live in the query key, so changing one refetches (and aborts the
+  // in-flight request); `side` is local, so flipping gainers/losers just
+  // re-slices the cached result. Re-polls every minute in the background.
+  const screenerQuery = useScreener(
+    {
+      index: index === 'all' ? null : index,
+      sector: sector === 'all' ? null : sector,
+      limit,
+    },
+    { refetchInterval: REFRESH_MS },
+  )
+  const data = screenerQuery.data ?? null
   const rows = data?.[side] ?? []
+  // Only the first load (nothing on screen yet) surfaces an error; a failed
+  // background poll keeps the last good table, since React Query retains `data`.
+  const showError = screenerQuery.isError && !data
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
@@ -298,7 +267,7 @@ export default function Screener() {
           </Box>
           <Tooltip title="Refresh">
             <IconButton
-              onClick={() => setNonce((n) => n + 1)}
+              onClick={() => screenerQuery.refetch()}
               aria-label="Refresh screener"
               sx={{ color: 'text.secondary' }}
             >
@@ -399,13 +368,13 @@ export default function Screener() {
           </Stack>
         )}
 
-        {status.state === 'error' && (
+        {showError && (
           <Alert severity="error" variant="outlined" sx={{ mt: 3 }}>
-            {status.message}
+            {errorMessage(screenerQuery.error)}
           </Alert>
         )}
 
-        {status.state !== 'error' && (
+        {!showError && (
           <TableContainer
             sx={{
               mt: 3,
@@ -448,11 +417,11 @@ export default function Screener() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {status.state === 'loading' &&
+                {screenerQuery.isLoading &&
                   Array.from({ length: Math.min(limit, 10) }).map((_, i) => (
                     <SkeletonRow key={i} />
                   ))}
-                {status.state === 'success' && rows.length === 0 && (
+                {data && rows.length === 0 && (
                   <TableRow>
                     <TableCell
                       colSpan={6}
@@ -466,7 +435,7 @@ export default function Screener() {
                     </TableCell>
                   </TableRow>
                 )}
-                {status.state === 'success' &&
+                {data &&
                   rows.map((stock, i) => (
                     <StockRow
                       key={stock.symbol}

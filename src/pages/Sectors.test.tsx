@@ -1,6 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { renderWithProviders, screen } from '@/test/test-utils'
 import Sectors from '@/pages/Sectors'
 
 const sectorsSample = {
@@ -106,7 +105,7 @@ afterEach(() => vi.unstubAllGlobals())
 describe('Sectors page', () => {
   it('lists every sector with its day move and the selected timeframe', async () => {
     stubFetch(sectorsSample)
-    render(<Sectors />)
+    renderWithProviders(<Sectors />)
 
     expect(await screen.findByText('Technology')).toBeInTheDocument()
     expect(screen.getByText('Industrials')).toBeInTheDocument()
@@ -127,8 +126,7 @@ describe('Sectors page', () => {
 
   it('re-sorts by the chosen timeframe, best first', async () => {
     stubFetch(sectorsSample)
-    const user = userEvent.setup()
-    render(<Sectors />)
+    const { user } = renderWithProviders(<Sectors />)
 
     await screen.findByText('Technology')
 
@@ -150,8 +148,7 @@ describe('Sectors page', () => {
 
   it('sorts by the day move when 1D is selected', async () => {
     stubFetch(sectorsSample)
-    const user = userEvent.setup()
-    render(<Sectors />)
+    const { user } = renderWithProviders(<Sectors />)
 
     await screen.findByText('Technology')
 
@@ -174,8 +171,7 @@ describe('Sectors page', () => {
         change_percent: 1.06,
       },
     })
-    const user = userEvent.setup()
-    render(<Sectors />)
+    const { user } = renderWithProviders(<Sectors />)
 
     await screen.findByText('Technology')
     await user.click(
@@ -197,7 +193,7 @@ describe('Sectors page', () => {
           Promise.resolve({ detail: 'Upstream sector feed unavailable.' }),
       }),
     )
-    render(<Sectors />)
+    renderWithProviders(<Sectors />)
 
     expect(await screen.findByRole('alert')).toHaveTextContent(
       /upstream sector feed/i,

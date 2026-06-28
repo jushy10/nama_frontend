@@ -14,46 +14,19 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
+import { type ChartRange } from '@/lib/api'
 import {
-  ApiError,
-  getCandles,
-  getEarnings,
-  getRsi,
-  getStock,
-  type CandleSeries,
-  type ChartRange,
-  type EarningsHistory,
-  type RsiSeries,
-  type Stock,
-} from '@/lib/api'
+  errorMessage,
+  useCandles,
+  useEarnings,
+  useFiveYearReturn,
+  useRsi,
+  useStock,
+} from '@/lib/queries'
 import StockCard from '@/components/StockCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
 import EarningsCard from '@/components/EarningsCard'
-
-type Status =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; stock: Stock }
-
-type CandleStatus =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; series: CandleSeries }
-
-type RsiStatus =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; series: RsiSeries }
-
-type EarningsStatus =
-  | { state: 'idle' }
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; history: EarningsHistory }
 
 // Curated subset of the API's ranges — the ones worth a one-tap button.
 const RANGE_OPTIONS: ChartRange[] = [
@@ -73,17 +46,26 @@ export default function Stocks() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlSymbol = (searchParams.get('symbol') ?? '').trim().toUpperCase()
   const [symbol, setSymbol] = useState(urlSymbol)
-  const [status, setStatus] = useState<Status>({ state: 'idle' })
   const [range, setRange] = useState<ChartRange>('6M')
-  const [candle, setCandle] = useState<CandleStatus>({ state: 'idle' })
-  const [rsi, setRsi] = useState<RsiStatus>({ state: 'idle' })
-  const [earnings, setEarnings] = useState<EarningsStatus>({ state: 'idle' })
-  // 5Y trailing return — the snapshot's `performance` object stops at 1Y, so we
-  // derive it from the first vs last close of the 5Y daily candle series.
-  const [fiveYearReturn, setFiveYearReturn] = useState<number | null>(null)
 
-  // Submitting just writes the ticker to the URL; the fetch below keys off that,
-  // so manual searches, deep links, and back/forward all run one code path.
+  // The snapshot keys off the URL ticker; the chart, RSI, 5Y pill, and earnings
+  // ride the *loaded* symbol, so they only fire once a snapshot resolves and a
+  // bad ticker never kicks off four more doomed requests. Each hook aborts its
+  // in-flight request when the symbol/range moves on.
+  const stockQuery = useStock(urlSymbol || null)
+  const loadedSymbol = stockQuery.data?.symbol ?? null
+  const candleQuery = useCandles(loadedSymbol, range)
+  const fiveYearReturn = useFiveYearReturn(loadedSymbol)
+  const rsiQuery = useRsi(loadedSymbol)
+  const earningsQuery = useEarnings(loadedSymbol, 8)
+
+  // Keep the search box in sync with the URL ticker on deep links / back-forward.
+  useEffect(() => {
+    if (urlSymbol) setSymbol(urlSymbol)
+  }, [urlSymbol])
+
+  // Submitting just writes the ticker to the URL; the snapshot query keys off
+  // that, so manual searches, deep links, and back/forward all run one path.
   function onSubmit(e: FormEvent) {
     e.preventDefault()
     const query = symbol.trim().toUpperCase()
@@ -91,122 +73,8 @@ export default function Stocks() {
     setSearchParams(query ? { symbol: query } : {})
   }
 
-  // Fetch the snapshot whenever the URL ticker changes.
-  useEffect(() => {
-    if (!urlSymbol) {
-      setStatus({ state: 'idle' })
-      return
-    }
-    setSymbol(urlSymbol)
-    const ac = new AbortController()
-    setStatus({ state: 'loading' })
-    getStock(urlSymbol, { signal: ac.signal })
-      .then((stock) => {
-        if (!ac.signal.aborted) setStatus({ state: 'success', stock })
-      })
-      .catch((err) => {
-        if (ac.signal.aborted) return
-        const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Could not reach the server. Please try again.'
-        setStatus({ state: 'error', message })
-      })
-    return () => ac.abort()
-  }, [urlSymbol])
-
-  // Load candles whenever a stock is showing or the range changes. Kept
-  // separate from the snapshot fetch so a chart hiccup never blanks the card,
-  // and stale responses are aborted when the symbol/range moves on.
-  const loadedSymbol = status.state === 'success' ? status.stock.symbol : null
-  useEffect(() => {
-    if (!loadedSymbol) {
-      setCandle({ state: 'idle' })
-      return
-    }
-    const ac = new AbortController()
-    setCandle({ state: 'loading' })
-    getCandles(loadedSymbol, { range, signal: ac.signal })
-      .then((series) => setCandle({ state: 'success', series }))
-      .catch((err) => {
-        if (ac.signal.aborted) return
-        const message =
-          err instanceof ApiError ? err.message : 'Could not load chart data.'
-        setCandle({ state: 'error', message })
-      })
-    return () => ac.abort()
-  }, [loadedSymbol, range])
-
-  // 5Y return rides the symbol, independent of the chart's range selector. A
-  // failed/short series is non-fatal — the pill just falls back to "—".
-  useEffect(() => {
-    if (!loadedSymbol) {
-      setFiveYearReturn(null)
-      return
-    }
-    const ac = new AbortController()
-    setFiveYearReturn(null)
-    getCandles(loadedSymbol, { range: '5Y', signal: ac.signal })
-      .then((series) => {
-        if (ac.signal.aborted) return
-        const c = series.candles
-        const first = c[0]?.close
-        const last = c[c.length - 1]?.close
-        if (c.length >= 2 && first) {
-          setFiveYearReturn(((last - first) / first) * 100)
-        }
-      })
-      .catch(() => {
-        /* non-fatal: the 5Y pill stays at "—" */
-      })
-    return () => ac.abort()
-  }, [loadedSymbol])
-
-  // RSI rides the snapshot, not the chart range — it's a fixed 14-period daily
-  // read, so it only refetches when the symbol changes.
-  useEffect(() => {
-    if (!loadedSymbol) {
-      setRsi({ state: 'idle' })
-      return
-    }
-    const ac = new AbortController()
-    setRsi({ state: 'loading' })
-    getRsi(loadedSymbol, { signal: ac.signal })
-      .then((series) => setRsi({ state: 'success', series }))
-      .catch((err) => {
-        if (ac.signal.aborted) return
-        const message =
-          err instanceof ApiError ? err.message : 'Could not load RSI data.'
-        setRsi({ state: 'error', message })
-      })
-    return () => ac.abort()
-  }, [loadedSymbol])
-
-  // Earnings history also rides the symbol. We ask for up to 8 quarters; the
-  // backend's free Finnhub tier currently returns the last 4, and the chart
-  // renders whatever comes back — so it widens on its own if that source ever
-  // deepens, with no change needed here.
-  useEffect(() => {
-    if (!loadedSymbol) {
-      setEarnings({ state: 'idle' })
-      return
-    }
-    const ac = new AbortController()
-    setEarnings({ state: 'loading' })
-    getEarnings(loadedSymbol, { limit: 8, signal: ac.signal })
-      .then((history) => setEarnings({ state: 'success', history }))
-      .catch((err) => {
-        if (ac.signal.aborted) return
-        const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Could not load earnings data.'
-        setEarnings({ state: 'error', message })
-      })
-    return () => ac.abort()
-  }, [loadedSymbol])
-
-  const loading = status.state === 'loading'
+  const loading = stockQuery.isLoading
+  const stock = stockQuery.data
 
   return (
     <Container maxWidth="md" sx={{ py: 6 }}>
@@ -255,26 +123,26 @@ export default function Stocks() {
             <CircularProgress />
           </Stack>
         )}
-        {status.state === 'error' && (
+        {stockQuery.isError && (
           <Alert severity="error" variant="outlined">
-            {status.message}
+            {errorMessage(stockQuery.error)}
           </Alert>
         )}
-        {status.state === 'success' && (
+        {stock && (
           <Stack spacing={3}>
-            <StockCard stock={status.stock} fiveYearReturn={fiveYearReturn} />
+            <StockCard stock={stock} fiveYearReturn={fiveYearReturn} />
 
-            {rsi.state === 'loading' && (
+            {rsiQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
                 <CircularProgress size={28} />
               </Stack>
             )}
-            {rsi.state === 'error' && (
+            {rsiQuery.isError && (
               <Alert severity="warning" variant="outlined">
-                {rsi.message}
+                {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
               </Alert>
             )}
-            {rsi.state === 'success' && <RsiCard rsi={rsi.series} />}
+            {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
 
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
@@ -316,7 +184,7 @@ export default function Stocks() {
                   </ToggleButtonGroup>
                 </Stack>
 
-                {candle.state === 'loading' && (
+                {candleQuery.isLoading && (
                   <Stack
                     sx={{
                       alignItems: 'center',
@@ -327,32 +195,38 @@ export default function Stocks() {
                     <CircularProgress />
                   </Stack>
                 )}
-                {candle.state === 'error' && (
+                {candleQuery.isError && (
                   <Alert severity="warning" variant="outlined">
-                    {candle.message}
+                    {errorMessage(
+                      candleQuery.error,
+                      'Could not load chart data.',
+                    )}
                   </Alert>
                 )}
-                {candle.state === 'success' && (
+                {candleQuery.data && (
                   <CandleChart
-                    candles={candle.series.candles}
-                    timeframe={candle.series.timeframe}
+                    candles={candleQuery.data.candles}
+                    timeframe={candleQuery.data.timeframe}
                   />
                 )}
               </CardContent>
             </Card>
 
-            {earnings.state === 'loading' && (
+            {earningsQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
                 <CircularProgress size={28} />
               </Stack>
             )}
-            {earnings.state === 'error' && (
+            {earningsQuery.isError && (
               <Alert severity="warning" variant="outlined">
-                {earnings.message}
+                {errorMessage(
+                  earningsQuery.error,
+                  'Could not load earnings data.',
+                )}
               </Alert>
             )}
-            {earnings.state === 'success' && (
-              <EarningsCard earnings={earnings.history} />
+            {earningsQuery.data && (
+              <EarningsCard earnings={earningsQuery.data} />
             )}
           </Stack>
         )}

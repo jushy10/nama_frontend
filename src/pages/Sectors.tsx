@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Alert,
   Box,
@@ -13,59 +13,36 @@ import {
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import {
-  ApiError,
-  getSectors,
   sectorReturn,
   SECTOR_WINDOWS,
   type Sector,
   type SectorWindow,
 } from '@/lib/api'
+import { errorMessage, useSectors } from '@/lib/queries'
 import SectorCard from '@/components/SectorCard'
 import SectorStocksDialog from '@/components/SectorStocksDialog'
-
-type Status =
-  | { state: 'loading' }
-  | { state: 'error'; message: string }
-  | { state: 'success'; sectors: Sector[] }
 
 type Window = SectorWindow
 
 export default function Sectors() {
-  const [status, setStatus] = useState<Status>({ state: 'loading' })
+  const sectorsQuery = useSectors()
   const [timeframe, setTimeframe] = useState<Window>('1d')
   // The sector whose holdings drill-down is open (null = closed).
   const [selected, setSelected] = useState<Sector | null>(null)
-  // Bumping this re-runs the fetch effect — drives the refresh button.
-  const [nonce, setNonce] = useState(0)
-
-  useEffect(() => {
-    const ac = new AbortController()
-    setStatus({ state: 'loading' })
-    getSectors(ac.signal)
-      .then((sectors) => setStatus({ state: 'success', sectors }))
-      .catch((err) => {
-        if (ac.signal.aborted) return
-        const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Could not reach the server. Please try again.'
-        setStatus({ state: 'error', message })
-      })
-    return () => ac.abort()
-  }, [nonce])
 
   const tf =
     SECTOR_WINDOWS.find((w) => w.key === timeframe) ?? SECTOR_WINDOWS[0]
 
   // Sort by the selected window, best first; missing values sink to the bottom.
   const sectors = useMemo(() => {
-    if (status.state !== 'success') return []
-    return [...status.sectors].sort((a, b) => {
+    const data = sectorsQuery.data
+    if (!data) return []
+    return [...data].sort((a, b) => {
       const av = sectorReturn(a, timeframe) ?? -Infinity
       const bv = sectorReturn(b, timeframe) ?? -Infinity
       return bv - av
     })
-  }, [status, timeframe])
+  }, [sectorsQuery.data, timeframe])
 
   // Day-move tally and the freshest "as of" stamp, for the summary line.
   const { up, down, asOf } = useMemo(() => {
@@ -101,10 +78,10 @@ export default function Sectors() {
             open a sector to see its top holdings.
           </Typography>
         </Box>
-        {status.state === 'success' && (
+        {sectorsQuery.isSuccess && (
           <Tooltip title="Refresh">
             <IconButton
-              onClick={() => setNonce((n) => n + 1)}
+              onClick={() => sectorsQuery.refetch()}
               aria-label="Refresh sectors"
               sx={{ color: 'text.secondary' }}
             >
@@ -114,7 +91,7 @@ export default function Sectors() {
         )}
       </Stack>
 
-      {status.state === 'success' && (
+      {sectorsQuery.isSuccess && (
         <Stack
           direction="row"
           spacing={2}
@@ -172,17 +149,17 @@ export default function Sectors() {
       </Box>
 
       <Box sx={{ mt: 4 }}>
-        {status.state === 'loading' && (
+        {sectorsQuery.isLoading && (
           <Stack sx={{ alignItems: 'center', py: 6 }}>
             <CircularProgress />
           </Stack>
         )}
-        {status.state === 'error' && (
+        {sectorsQuery.isError && (
           <Alert severity="error" variant="outlined">
-            {status.message}
+            {errorMessage(sectorsQuery.error)}
           </Alert>
         )}
-        {status.state === 'success' && (
+        {sectorsQuery.isSuccess && (
           <Box
             sx={{
               display: 'grid',

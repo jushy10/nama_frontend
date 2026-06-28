@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
 import { Box, Container, Skeleton, Stack, Typography } from '@mui/material'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { getStocks, type Stock } from '@/lib/api'
+import { type Stock } from '@/lib/api'
+import { useStocks } from '@/lib/queries'
 
 type IndexDef = {
   /** Friendly index/market name shown to the user. */
@@ -28,6 +28,9 @@ const INDICES: IndexDef[] = [
 
 // Re-poll on the same cadence the marketing copy promises ("60s data refresh").
 const REFRESH_MS = 60_000
+
+// Hoisted so the array identity is stable across renders.
+const SYMBOLS = INDICES.map((i) => i.symbol)
 
 const fmtPrice = (n: number) =>
   n.toLocaleString('en-US', {
@@ -149,31 +152,10 @@ const GRID_SX = {
  * than blanking the row.
  */
 export default function MarketIndices() {
-  // null while the first fetch is in flight; after that, one entry per index.
-  const [quotes, setQuotes] = useState<(Stock | null)[] | null>(null)
-
-  useEffect(() => {
-    let active = true
-    const ac = new AbortController()
-    const symbols = INDICES.map((i) => i.symbol)
-
-    const load = () =>
-      getStocks(symbols, { signal: ac.signal })
-        .then((result) => {
-          if (active) setQuotes(result)
-        })
-        .catch(() => {
-          /* aborted or offline — keep whatever is on screen */
-        })
-
-    load()
-    const id = setInterval(load, REFRESH_MS)
-    return () => {
-      active = false
-      ac.abort()
-      clearInterval(id)
-    }
-  }, [])
+  // Self-refreshing every minute; null until the first fetch resolves, then one
+  // entry per index (a symbol that fails comes back null, not a thrown batch).
+  const { data } = useStocks(SYMBOLS, { refetchInterval: REFRESH_MS })
+  const quotes = data ?? null
 
   const allFailed = quotes != null && quotes.every((q) => q == null)
 

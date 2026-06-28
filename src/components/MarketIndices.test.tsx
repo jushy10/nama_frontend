@@ -46,7 +46,7 @@ describe('MarketIndices', () => {
     expect(
       await screen.findByRole('heading', { name: /markets today/i }),
     ).toBeInTheDocument()
-    expect(screen.getByText('S&P 500')).toBeInTheDocument()
+    expect(await screen.findByText('S&P 500')).toBeInTheDocument()
     expect(screen.getByText('Nasdaq 100')).toBeInTheDocument()
 
     // A resolved symbol shows price and signed day-change percent.
