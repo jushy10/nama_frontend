@@ -445,8 +445,9 @@ export interface EarningsSurprise {
  * Trailing earnings/profitability snapshot served alongside the beat history:
  * trailing EPS, year-over-year EPS/revenue growth, the margin stack, the
  * returns (ROE/ROIC) and the dividend payout ratio. All percentages except
- * `eps`; any field a vendor doesn't cover is null. (Valuation/market metrics —
- * P/E, beta, 52-week range — live on the stock snapshot's `metrics` instead.)
+ * `eps`; any field a vendor doesn't cover is null. (Valuation/market ratios —
+ * P/E, PEG, beta, the 52-week range — ride alongside as `valuation`, the same
+ * block the stock snapshot carries on its `metrics`.)
  */
 export interface EarningsMetrics {
   eps: number | null
@@ -458,6 +459,27 @@ export interface EarningsMetrics {
   roe: number | null
   roic: number | null
   payout_ratio: number | null
+}
+
+/**
+ * Point-in-time valuation, financial-health and market ratios — the "is it
+ * priced well?" read that complements the trailing earnings. `pe`/`pb`/`ps` are
+ * valuation multiples and `peg` the trailing P/E over EPS growth (null on losses
+ * or non-positive growth); `current_ratio` and `debt_to_equity` gauge
+ * balance-sheet health; `beta` is volatility vs. the market (1.0 = moves with
+ * it); `week_52_high`/`week_52_low` bound the trailing year's price range. All
+ * trailing (no forward estimates); any field a vendor doesn't cover is null.
+ */
+export interface KeyMetrics {
+  pe: number | null
+  peg: number | null
+  pb: number | null
+  ps: number | null
+  current_ratio: number | null
+  debt_to_equity: number | null
+  beta: number | null
+  week_52_high: number | null
+  week_52_low: number | null
 }
 
 /**
@@ -481,9 +503,10 @@ export interface NextEarnings {
  * `beat_rate` is the percent of *scored* quarters (those with both an actual
  * and an estimate) that met or beat — the "beats consistently?" read; `scored`
  * is how many of `count` quarters could be scored, `beats` how many of those
- * cleared the bar. `metrics` is an optional trailing earnings snapshot and
- * `next_report` the next scheduled report's consensus (both best-effort;
- * absent on older API builds, null when the vendor has no data).
+ * cleared the bar. `metrics` is an optional trailing earnings snapshot,
+ * `valuation` the point-in-time valuation/health/market ratios, and
+ * `next_report` the next scheduled report's consensus (all best-effort; absent
+ * on older API builds, null when the vendor has no data).
  */
 export interface EarningsHistory {
   symbol: string
@@ -493,6 +516,7 @@ export interface EarningsHistory {
   beat_rate: number | null
   quarters: EarningsSurprise[]
   metrics?: EarningsMetrics | null
+  valuation?: KeyMetrics | null
   next_report?: NextEarnings | null
 }
 
