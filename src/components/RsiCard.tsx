@@ -10,6 +10,18 @@ import {
 // red (down), so this fills the cautionary middle ground between them.
 const HOLD_COLOR = '#fbbf24' // amber-400
 
+// RSI gauge track tints (emerald / red), each at two intensities. The deep
+// shades mark the Strong Buy/Sell extremes beyond the oversold/overbought
+// lines; the lighter shades mark the softer Buy/Sell bands just inside them
+// (30–40 and 60–70 with the conventional 30/70 thresholds). Both read on the
+// dark and light canvases; the neutral middle is tinted per-mode below.
+const GAUGE_ZONE = {
+  strongBuy: 'rgba(52,211,153,0.35)',
+  buy: 'rgba(52,211,153,0.18)',
+  sell: 'rgba(248,113,113,0.18)',
+  strongSell: 'rgba(248,113,113,0.35)',
+}
+
 // `color` drives the reading, gauge marker, and outlined chip; `filled` (on the
 // Strong calls only) renders the chip as a solid pill so the strongest
 // conviction reads at a glance. contrastText keeps the label legible in both modes.
@@ -78,8 +90,9 @@ function Gauge({ rsi, color }: { rsi: RsiSeries; color: string }) {
           position: 'relative',
           height: 8,
           borderRadius: 4,
-          // Green oversold zone, neutral middle, red overbought zone, with the
-          // hand-offs pinned to the actual thresholds the API reports.
+          // Five RSI zones — deep-green Strong Buy, light-green Buy, neutral
+          // middle, light-red Sell, deep-red Strong Sell — with the hand-offs
+          // pinned to the API's thresholds plus the shared Buy/Sell margin.
           background: (theme) => {
             // Neutral middle band: light tint on the dark canvas, dark tint
             // on the light one. Green/red zones read fine in both modes.
@@ -87,13 +100,19 @@ function Gauge({ rsi, color }: { rsi: RsiSeries; color: string }) {
               theme.palette.mode === 'dark'
                 ? 'rgba(255,255,255,0.07)'
                 : 'rgba(0,0,0,0.06)'
+            const buyEdge = rsi.oversold + RSI_ACTION_MARGIN
+            const sellEdge = rsi.overbought - RSI_ACTION_MARGIN
             return `linear-gradient(to right,
-            rgba(52,211,153,0.35) 0%,
-            rgba(52,211,153,0.35) ${rsi.oversold}%,
-            ${mid} ${rsi.oversold}%,
-            ${mid} ${rsi.overbought}%,
-            rgba(248,113,113,0.35) ${rsi.overbought}%,
-            rgba(248,113,113,0.35) 100%)`
+            ${GAUGE_ZONE.strongBuy} 0%,
+            ${GAUGE_ZONE.strongBuy} ${rsi.oversold}%,
+            ${GAUGE_ZONE.buy} ${rsi.oversold}%,
+            ${GAUGE_ZONE.buy} ${buyEdge}%,
+            ${mid} ${buyEdge}%,
+            ${mid} ${sellEdge}%,
+            ${GAUGE_ZONE.sell} ${sellEdge}%,
+            ${GAUGE_ZONE.sell} ${rsi.overbought}%,
+            ${GAUGE_ZONE.strongSell} ${rsi.overbought}%,
+            ${GAUGE_ZONE.strongSell} 100%)`
           },
         }}
       >
