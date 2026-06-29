@@ -24,6 +24,7 @@ import {
   useStock,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
+import DcaCard from '@/components/DcaCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
 import EarningsCard from '@/components/EarningsCard'
@@ -156,6 +157,8 @@ export default function Stocks() {
                 {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
               </Box>
             </Box>
+
+            <DcaCard drawdown={stock.drawdown_from_high} />
 
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
