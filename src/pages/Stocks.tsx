@@ -20,6 +20,7 @@ import {
   useCandles,
   useEarnings,
   useFiveYearReturn,
+  useRecommendations,
   useRsi,
   useStock,
 } from '@/lib/queries'
@@ -28,6 +29,7 @@ import PerformanceCard from '@/components/PerformanceCard'
 import DcaCard from '@/components/DcaCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
+import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 
 // Curated subset of the API's ranges — the ones worth a one-tap button.
@@ -59,6 +61,7 @@ export default function Stocks() {
   const candleQuery = useCandles(loadedSymbol, range)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const rsiQuery = useRsi(loadedSymbol)
+  const recommendationsQuery = useRecommendations(loadedSymbol)
   const earningsQuery = useEarnings(loadedSymbol, 8)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
@@ -171,6 +174,23 @@ export default function Stocks() {
             </Box>
 
             <DcaCard drawdown={stock.drawdown_from_high} />
+
+            {recommendationsQuery.isLoading && (
+              <Stack sx={{ alignItems: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            )}
+            {recommendationsQuery.isError && (
+              <Alert severity="warning" variant="outlined">
+                {errorMessage(
+                  recommendationsQuery.error,
+                  'Could not load analyst ratings.',
+                )}
+              </Alert>
+            )}
+            {recommendationsQuery.data && (
+              <AnalystCard recommendations={recommendationsQuery.data} />
+            )}
 
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>
