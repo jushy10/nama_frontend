@@ -24,6 +24,7 @@ import {
   useStock,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
+import PerformanceCard from '@/components/PerformanceCard'
 import DcaCard from '@/components/DcaCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
@@ -131,8 +132,9 @@ export default function Stocks() {
         )}
         {stock && (
           <Stack spacing={3}>
-            {/* Snapshot + RSI ride side by side on desktop (md+) and stack on
-                mobile; the chart-heavy cards below keep the full page width. */}
+            {/* Snapshot rides beside the Performance + RSI stack on desktop
+                (md+) and stacks on mobile; the chart-heavy cards below keep the
+                full page width. */}
             <Box
               sx={{
                 display: 'grid',
@@ -141,21 +143,31 @@ export default function Stocks() {
                 alignItems: 'start',
               }}
             >
-              <StockCard stock={stock} fiveYearReturn={fiveYearReturn} />
+              <StockCard stock={stock} />
 
-              <Box>
-                {rsiQuery.isLoading && (
-                  <Stack sx={{ alignItems: 'center', py: 2 }}>
-                    <CircularProgress size={28} />
-                  </Stack>
+              {/* Performance sits directly above RSI in the right-hand column;
+                  both ride the loaded snapshot. */}
+              <Stack spacing={3}>
+                {stock.performance && (
+                  <PerformanceCard
+                    perf={stock.performance}
+                    fiveYearReturn={fiveYearReturn}
+                  />
                 )}
-                {rsiQuery.isError && (
-                  <Alert severity="warning" variant="outlined">
-                    {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
-                  </Alert>
-                )}
-                {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
-              </Box>
+                <Box>
+                  {rsiQuery.isLoading && (
+                    <Stack sx={{ alignItems: 'center', py: 2 }}>
+                      <CircularProgress size={28} />
+                    </Stack>
+                  )}
+                  {rsiQuery.isError && (
+                    <Alert severity="warning" variant="outlined">
+                      {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
+                    </Alert>
+                  )}
+                  {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
+                </Box>
+              </Stack>
             </Box>
 
             <DcaCard drawdown={stock.drawdown_from_high} />
