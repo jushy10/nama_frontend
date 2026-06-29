@@ -12,11 +12,13 @@ import {
   ApiError,
   getCandles,
   getEarnings,
+  getRecommendations,
   getRsi,
   getScreener,
   getSectors,
   getStock,
   getStocks,
+  type AnalystRecommendations,
   type CandleSeries,
   type ChartRange,
   type EarningsHistory,
@@ -123,6 +125,20 @@ export function useEarnings(
   return useQuery({
     queryKey: ['earnings', symbol, limit],
     queryFn: ({ signal }) => getEarnings(symbol as string, { limit, signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * Analyst recommendation trends for a ticker (the buy/hold/sell split by month).
+ * Idle until `symbol` is set.
+ */
+export function useRecommendations(
+  symbol: string | null | undefined,
+): UseQueryResult<AnalystRecommendations> {
+  return useQuery({
+    queryKey: ['recommendations', symbol],
+    queryFn: ({ signal }) => getRecommendations(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

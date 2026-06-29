@@ -542,3 +542,67 @@ export async function getEarnings(
   }
   return data
 }
+
+/**
+ * A five-step analyst rating, most to least bullish. Deliberately the same
+ * vocabulary as the RSI verdict (`RsiAction`) so the analyst and technical reads
+ * can share a colour language on the page.
+ */
+export type Recommendation =
+  | 'Strong Buy'
+  | 'Buy'
+  | 'Hold'
+  | 'Sell'
+  | 'Strong Sell'
+
+/** How the consensus moved from the prior monthly snapshot to the latest. */
+export type RecommendationDirection = 'upgraded' | 'downgraded' | 'unchanged'
+
+/**
+ * Analysts' buy/hold/sell split for one monthly snapshot. The five buckets are
+ * the analyst counts per stance; `total` sums them, `score` is the consensus
+ * mean on the 1 (Strong Buy) … 5 (Strong Sell) scale (null with no coverage),
+ * and `consensus` that mean as a five-step label.
+ */
+export interface RecommendationTrend {
+  period: string // first day of the month the snapshot covers (ISO date)
+  strong_buy: number
+  buy: number
+  hold: number
+  sell: number
+  strong_sell: number
+  total: number
+  score: number | null
+  consensus: Recommendation | null
+}
+
+/**
+ * Analyst recommendation trends for a symbol, newest snapshot first. `latest`
+ * is the current month's split and `direction` how the consensus shifted from
+ * the prior month (null until there are two snapshots to compare) — the
+ * forward-looking part. An empty `trends` means no analyst covers the symbol.
+ */
+export interface AnalystRecommendations {
+  symbol: string
+  count: number
+  direction: RecommendationDirection | null
+  latest: RecommendationTrend | null
+  trends: RecommendationTrend[]
+}
+
+/** Fetch analyst recommendation trends for a ticker (newest snapshot first). */
+export async function getRecommendations(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<AnalystRecommendations> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/recommendations`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AnalystRecommendations
+  if (!Array.isArray(data?.trends)) {
+    throw new ApiError(res.status, 'Malformed recommendations response')
+  }
+  return data
+}
