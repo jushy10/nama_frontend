@@ -125,24 +125,45 @@ const earningsSample = {
   ],
 }
 
-/** A fetch stub that answers the snapshot, candles, RSI, and earnings apart. */
+const recommendationsSample = {
+  symbol: 'NVDA',
+  count: 2,
+  direction: 'upgraded',
+  latest: {
+    period: '2026-06-01',
+    strong_buy: 18,
+    buy: 20,
+    hold: 4,
+    sell: 0,
+    strong_sell: 0,
+    total: 42,
+    score: 1.67,
+    consensus: 'Buy',
+  },
+  trends: [],
+}
+
+/** A fetch stub that answers snapshot, candles, RSI, earnings, and ratings apart. */
 function stubFetch(
   stock: unknown,
   candles: unknown,
   rsi: unknown = rsiSample,
   earnings: unknown = earningsSample,
+  recommendations: unknown = recommendationsSample,
 ) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL) => {
       const u = String(url)
-      const body = u.includes('/earnings')
-        ? earnings
-        : u.includes('/rsi')
-          ? rsi
-          : u.includes('/candles')
-            ? candles
-            : stock
+      const body = u.includes('/recommendations')
+        ? recommendations
+        : u.includes('/earnings')
+          ? earnings
+          : u.includes('/rsi')
+            ? rsi
+            : u.includes('/candles')
+              ? candles
+              : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -203,9 +224,20 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'RSI' }),
     ).toBeInTheDocument()
     expect(screen.getByText('22.8')).toBeInTheDocument()
-    expect(screen.getByText('Strong Buy')).toBeInTheDocument()
+    // 'Strong Buy' is also a legend label on the analyst card below, so match all.
+    expect(screen.getAllByText('Strong Buy').length).toBeGreaterThan(0)
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/rsi'),
+      expect.anything(),
+    )
+
+    // The analyst card loads with its consensus chip and month-over-month trend.
+    expect(
+      await screen.findByRole('heading', { name: 'Analyst Ratings' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/upgraded from last month/i)).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/NVDA/recommendations'),
       expect.anything(),
     )
 
