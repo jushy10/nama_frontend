@@ -30,6 +30,8 @@ export interface Stock {
   dividend_per_share: number | null
   dividend_yield: number | null
   performance: StockPerformance | null
+  /** Percent the price sits below its all-time high (≤ 0; 0 at a new high). */
+  drawdown_from_high: number | null
 }
 
 /**
@@ -151,6 +153,34 @@ export function rsiVerdict(rsi: RsiSeries): RsiAction | null {
   if (rsi.latest <= rsi.oversold + RSI_ACTION_MARGIN) return 'Buy'
   if (rsi.latest > rsi.overbought) return 'Strong Sell'
   if (rsi.latest >= rsi.overbought - RSI_ACTION_MARGIN) return 'Sell'
+  return 'Hold'
+}
+
+/** A dollar-cost-averaging call, escalating with how deep the dip runs. */
+export type DcaAction = 'Strong Buy' | 'Moderate Buy' | 'Buy' | 'Hold'
+
+/**
+ * Buy tiers keyed by drawdown depth (percent below the all-time high). Deeper
+ * falls read as stronger entries: a 10% dip is a Buy, 20% a Moderate Buy, 30%+
+ * a Strong Buy. Ordered deepest-first so a linear scan returns the right call.
+ */
+export const DCA_TIERS: { action: DcaAction; depth: number }[] = [
+  { action: 'Strong Buy', depth: 30 },
+  { action: 'Moderate Buy', depth: 20 },
+  { action: 'Buy', depth: 10 },
+]
+
+/**
+ * Map a drawdown-from-high (a percent ≤ 0) to a DCA call. Returns null when
+ * there's no drawdown to judge; a shallow dip (under the smallest tier) is a
+ * Hold — too near the high to call it a discount.
+ */
+export function dcaVerdict(drawdownFromHigh: number | null): DcaAction | null {
+  if (drawdownFromHigh == null) return null
+  const depth = -drawdownFromHigh
+  for (const tier of DCA_TIERS) {
+    if (depth >= tier.depth) return tier.action
+  }
   return 'Hold'
 }
 

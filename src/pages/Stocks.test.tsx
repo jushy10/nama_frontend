@@ -29,6 +29,7 @@ const sample = {
     ytd: 22.3,
     '1y': 40.1,
   },
+  drawdown_from_high: -24.5,
 }
 
 const candlesSample = {
@@ -181,6 +182,11 @@ describe('Stocks search', () => {
     // The enriched fields and performance strip render.
     expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
     expect(screen.getByText('Performance')).toBeInTheDocument()
+
+    // Drawdown-from-high gets its own DCA card with a tiered buy call.
+    expect(screen.getByText('DCA Signal')).toBeInTheDocument()
+    expect(screen.getByText('24.5%')).toBeInTheDocument()
+    expect(screen.getByText('Moderate Buy')).toBeInTheDocument()
 
     // The candlestick chart loads from the candles endpoint.
     expect(
