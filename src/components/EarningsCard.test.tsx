@@ -192,6 +192,40 @@ describe('EarningsCard', () => {
     ).toBeInTheDocument()
   })
 
+  it('colours each valuation ratio green or red by how favourable it is', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          valuation: {
+            pe: 18, // cheap-to-reasonable -> green
+            peg: 2.6, // pricey for the growth -> red
+            pb: null,
+            ps: 1.2, // modest top-line multiple -> green
+            current_ratio: 0.7, // can't cover near-term bills -> red
+            debt_to_equity: 0.4, // light leverage -> green
+            beta: 1.9, // swings hard vs. the market -> red
+            week_52_high: null,
+            week_52_low: null,
+          },
+        }}
+      />,
+    )
+    // Dark theme (the test default) palette: success.main / error.main.
+    const green = 'rgb(52, 211, 153)'
+    const red = 'rgb(248, 113, 113)'
+    expect(screen.getByText('18.00')).toHaveStyle({ color: green }) // P/E
+    expect(screen.getByText('1.20')).toHaveStyle({ color: green }) // P/S
+    expect(screen.getByText('0.40')).toHaveStyle({ color: green }) // Debt/Equity
+    expect(screen.getByText('2.60')).toHaveStyle({ color: red }) // PEG
+    expect(screen.getByText('0.70')).toHaveStyle({ color: red }) // Current ratio
+    expect(screen.getByText('1.90')).toHaveStyle({ color: red }) // Beta
+    // The colour key is spelled out beneath the grid.
+    expect(
+      screen.getByText(/Green is favourable, red worth a closer look/i),
+    ).toBeInTheDocument()
+  })
+
   it('omits the valuation block when valuation is absent', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
     expect(screen.queryByText('Valuation')).not.toBeInTheDocument()
