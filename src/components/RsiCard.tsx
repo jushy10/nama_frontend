@@ -30,42 +30,18 @@ const ACTION: Record<
   {
     color: string
     filled?: { bg: string; fg: string }
-    blurb: (r: RsiSeries) => string
   }
 > = {
   'Strong Buy': {
     color: 'success.main',
     filled: { bg: 'success.main', fg: 'success.contrastText' },
-    blurb: (r) =>
-      `Below ${fmtLevel(r.oversold)}, RSI is deeply oversold — the selloff looks ` +
-      `overstretched and primed to rebound.`,
   },
-  Buy: {
-    color: 'success.main',
-    blurb: (r) =>
-      `Between ${fmtLevel(r.oversold)} and ${fmtLevel(r.oversold + RSI_ACTION_MARGIN)}, ` +
-      `RSI is leaning oversold — selling may be starting to overshoot.`,
-  },
-  Hold: {
-    color: HOLD_COLOR,
-    blurb: (r) =>
-      `Between ${fmtLevel(r.oversold + RSI_ACTION_MARGIN)} and ` +
-      `${fmtLevel(r.overbought - RSI_ACTION_MARGIN)}, RSI shows no strong ` +
-      `momentum signal either way.`,
-  },
-  Sell: {
-    color: 'error.main',
-    blurb: (r) =>
-      `Between ${fmtLevel(r.overbought - RSI_ACTION_MARGIN)} and ` +
-      `${fmtLevel(r.overbought)}, RSI is leaning overbought — the run may be ` +
-      `getting stretched.`,
-  },
+  Buy: { color: 'success.main' },
+  Hold: { color: HOLD_COLOR },
+  Sell: { color: 'error.main' },
   'Strong Sell': {
     color: 'error.main',
     filled: { bg: 'error.main', fg: 'error.contrastText' },
-    blurb: (r) =>
-      `Above ${fmtLevel(r.overbought)}, RSI is deeply overbought — the rally ` +
-      `looks overextended and primed to cool.`,
   },
 }
 
@@ -242,22 +218,17 @@ export default function RsiCard({ rsi }: { rsi: RsiSeries }) {
               >
                 {fmtRsi(rsi.latest)}
               </Typography>
-              <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
-                {SIGNAL_LABEL[rsi.signal]}
-              </Typography>
+              {/* The oversold/overbought tag only adds signal at the extremes;
+                  in the neutral middle it just contradicts the Buy/Sell/Hold
+                  recommendation, so show nothing there. */}
+              {rsi.signal !== 'neutral' && (
+                <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
+                  {SIGNAL_LABEL[rsi.signal]}
+                </Typography>
+              )}
             </Stack>
 
             <Gauge rsi={rsi} color={meta?.color ?? 'text.secondary'} />
-
-            {meta && (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 2.5 }}
-              >
-                {meta.blurb(rsi)}
-              </Typography>
-            )}
           </>
         )}
       </CardContent>

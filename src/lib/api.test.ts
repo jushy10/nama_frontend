@@ -1,0 +1,53 @@
+import { describe, expect, it } from 'vitest'
+import { gradeValuation } from '@/lib/api'
+
+describe('gradeValuation', () => {
+  it('grades P/E: cheap-to-reasonable good, elevated fair, rich or loss-making a caution', () => {
+    expect(gradeValuation('pe', 12)).toBe('good')
+    expect(gradeValuation('pe', 24.9)).toBe('good')
+    expect(gradeValuation('pe', 25)).toBe('fair')
+    expect(gradeValuation('pe', 40)).toBe('fair')
+    expect(gradeValuation('pe', 41)).toBe('caution')
+    expect(gradeValuation('pe', 0)).toBe('caution') // breakeven
+    expect(gradeValuation('pe', -5)).toBe('caution') // losses
+  })
+
+  it('grades PEG on the under-1 / over-2 rule', () => {
+    expect(gradeValuation('peg', 0.8)).toBe('good')
+    expect(gradeValuation('peg', 1)).toBe('fair')
+    expect(gradeValuation('peg', 2)).toBe('fair')
+    expect(gradeValuation('peg', 2.1)).toBe('caution')
+    expect(gradeValuation('peg', 0)).toBe('caution')
+  })
+
+  it('grades P/S: under 2× sales good, up to 6× fair, above a caution', () => {
+    expect(gradeValuation('ps', 1.5)).toBe('good')
+    expect(gradeValuation('ps', 2)).toBe('fair')
+    expect(gradeValuation('ps', 6)).toBe('fair')
+    expect(gradeValuation('ps', 6.1)).toBe('caution')
+  })
+
+  it('grades current ratio: below 1 a caution, 1–1.5 fair, 1.5+ good', () => {
+    expect(gradeValuation('current_ratio', 0.9)).toBe('caution')
+    expect(gradeValuation('current_ratio', 1)).toBe('fair')
+    expect(gradeValuation('current_ratio', 1.49)).toBe('fair')
+    expect(gradeValuation('current_ratio', 1.5)).toBe('good')
+  })
+
+  it('grades debt/equity: light good, moderate fair, heavy or negative a caution', () => {
+    expect(gradeValuation('debt_to_equity', 0.5)).toBe('good')
+    expect(gradeValuation('debt_to_equity', 1)).toBe('good')
+    expect(gradeValuation('debt_to_equity', 1.5)).toBe('fair')
+    expect(gradeValuation('debt_to_equity', 2)).toBe('fair')
+    expect(gradeValuation('debt_to_equity', 2.1)).toBe('caution')
+    expect(gradeValuation('debt_to_equity', -0.3)).toBe('caution') // negative equity
+  })
+
+  it('grades beta as a volatility read: calm good, lively fair, wild a caution', () => {
+    expect(gradeValuation('beta', 0.8)).toBe('good')
+    expect(gradeValuation('beta', 1.1)).toBe('good')
+    expect(gradeValuation('beta', 1.3)).toBe('fair')
+    expect(gradeValuation('beta', 1.5)).toBe('fair')
+    expect(gradeValuation('beta', 1.6)).toBe('caution')
+  })
+})

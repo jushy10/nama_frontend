@@ -483,6 +483,65 @@ export interface KeyMetrics {
 }
 
 /**
+ * A coarse "how does this reading look?" grade for one valuation/health ratio,
+ * driving the colour it's shown in: `good` (green), `caution` (red), or `fair`
+ * (the unremarkable middle, left the default text colour so only the notable
+ * extremes draw the eye). Deliberately broad rules of thumb for a large-cap
+ * read — NOT sector-aware (a utility's leverage or a bank's balance sheet read
+ * very differently), so the card frames the colour as a rough guide, not advice.
+ */
+export type ValuationGrade = 'good' | 'fair' | 'caution'
+
+/** The KeyMetrics ratios the earnings card grades and colours. */
+export type ValuationRatio =
+  | 'pe'
+  | 'peg'
+  | 'ps'
+  | 'current_ratio'
+  | 'debt_to_equity'
+  | 'beta'
+
+/**
+ * Grade one valuation ratio for at-a-glance colouring. The valuation multiples
+ * (P/E, PEG, P/S) read cheaper the lower they are — and a non-positive P/E means
+ * the company isn't profitable, a caution in itself; the health ratios reward a
+ * comfortable liquidity cushion and conservative leverage; beta is a volatility
+ * read, where calmer-than-the-market is the "good" end. Each branch documents
+ * its bands; anything between the good and caution edges is `fair`.
+ */
+export function gradeValuation(
+  ratio: ValuationRatio,
+  n: number,
+): ValuationGrade {
+  switch (ratio) {
+    case 'pe':
+      // A loss (≤0) or a rich multiple is a caution; cheap-to-reasonable is good.
+      if (n <= 0 || n > 40) return 'caution'
+      return n < 25 ? 'good' : 'fair'
+    case 'peg':
+      // Lynch's read: under 1 is cheap for the growth, over 2 pricey for it.
+      if (n <= 0 || n > 2) return 'caution'
+      return n < 1 ? 'good' : 'fair'
+    case 'ps':
+      // Under ~2× sales is modest; above ~6× is a rich top-line multiple.
+      if (n <= 0 || n > 6) return 'caution'
+      return n < 2 ? 'good' : 'fair'
+    case 'current_ratio':
+      // Below 1 can't cover near-term bills; a comfortable cushion is healthy.
+      if (n < 1) return 'caution'
+      return n >= 1.5 ? 'good' : 'fair'
+    case 'debt_to_equity':
+      // Negative equity or heavy leverage is risky; a light balance sheet is good.
+      if (n < 0 || n > 2) return 'caution'
+      return n <= 1 ? 'good' : 'fair'
+    case 'beta':
+      // Risk read: roughly market or calmer is good, a wild swinger a caution.
+      if (n > 1.5) return 'caution'
+      return n <= 1.1 ? 'good' : 'fair'
+  }
+}
+
+/**
  * The next scheduled earnings report and the consensus going into it — the
  * forward complement to the past-only beat history. `report_date` is the
  * expected announcement date (ISO); `session` is when in the trading day it's

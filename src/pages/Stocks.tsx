@@ -77,7 +77,7 @@ export default function Stocks() {
   const stock = stockQuery.data
 
   return (
-    <Container maxWidth="md" sx={{ py: 6 }}>
+    <Container maxWidth="lg" sx={{ py: 6 }}>
       <Typography
         variant="h4"
         component="h1"
@@ -130,19 +130,32 @@ export default function Stocks() {
         )}
         {stock && (
           <Stack spacing={3}>
-            <StockCard stock={stock} fiveYearReturn={fiveYearReturn} />
+            {/* Snapshot + RSI ride side by side on desktop (md+) and stack on
+                mobile; the chart-heavy cards below keep the full page width. */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                gap: 3,
+                alignItems: 'start',
+              }}
+            >
+              <StockCard stock={stock} fiveYearReturn={fiveYearReturn} />
 
-            {rsiQuery.isLoading && (
-              <Stack sx={{ alignItems: 'center', py: 2 }}>
-                <CircularProgress size={28} />
-              </Stack>
-            )}
-            {rsiQuery.isError && (
-              <Alert severity="warning" variant="outlined">
-                {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
-              </Alert>
-            )}
-            {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
+              <Box>
+                {rsiQuery.isLoading && (
+                  <Stack sx={{ alignItems: 'center', py: 2 }}>
+                    <CircularProgress size={28} />
+                  </Stack>
+                )}
+                {rsiQuery.isError && (
+                  <Alert severity="warning" variant="outlined">
+                    {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
+                  </Alert>
+                )}
+                {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
+              </Box>
+            </Box>
 
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3 }}>

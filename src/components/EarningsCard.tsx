@@ -14,12 +14,15 @@ import {
   useTheme,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
+import { gradeValuation } from '@/lib/api'
 import type {
   EarningsHistory,
   EarningsMetrics,
   EarningsSurprise,
   KeyMetrics,
   NextEarnings,
+  ValuationGrade,
+  ValuationRatio,
 } from '@/lib/api'
 
 // The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
@@ -813,49 +816,71 @@ function MetricTiles({
   )
 }
 
+/** Maps a ratio's grade to its tile colour: green for a favourable reading, red
+ *  for one worth a closer look, and the default text colour for the unremarkable
+ *  middle — so only the notable extremes draw the eye. */
+const GRADE_COLOR: Record<ValuationGrade, string> = {
+  good: 'success.main',
+  fair: 'text.primary',
+  caution: 'error.main',
+}
+
 /** A grid of point-in-time valuation and health ratios (P/E, PEG, P/S, current
  *  ratio, debt/equity, beta) — a subset of the KeyMetrics the stock snapshot
  *  carries, surfaced beside the trailing earnings so the "is it priced well?"
  *  read sits next to "how's it growing?". Each tile carries a one-line
- *  plain-language explainer of what it shows. All trailing; uncovered values
- *  show an em dash, and an all-empty block is dropped rather than rendered as a
- *  wall of dashes. (P/B and the 52-week range are part of KeyMetrics but aren't
- *  surfaced here.) */
+ *  plain-language explainer of what it shows, and its value is tinted green/red
+ *  by a coarse rule of thumb (see {@link gradeValuation}) so a favourable or
+ *  stretched reading stands out at a glance. All trailing; uncovered values show
+ *  an em dash (in the default colour), and an all-empty block is dropped rather
+ *  than rendered as a wall of dashes. (P/B and the 52-week range are part of
+ *  KeyMetrics but aren't surfaced here.) */
 function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
-  const tiles: { label: string; text: string; hint: string }[] = [
+  const tiles: {
+    label: string
+    ratio: ValuationRatio
+    value: number | null
+    hint: string
+  }[] = [
     {
       label: 'P/E',
-      text: orDash(valuation.pe, fmtMultiple),
+      ratio: 'pe',
+      value: valuation.pe,
       hint: 'What you pay per $1 of yearly profit',
     },
     {
       label: 'PEG',
-      text: orDash(valuation.peg, fmtMultiple),
+      ratio: 'peg',
+      value: valuation.peg,
       hint: 'P/E adjusted for growth; under 1 looks cheap',
     },
     {
       label: 'P/S',
-      text: orDash(valuation.ps, fmtMultiple),
+      ratio: 'ps',
+      value: valuation.ps,
       hint: 'What you pay per $1 of yearly sales',
     },
     {
       label: 'Current Ratio',
-      text: orDash(valuation.current_ratio, fmtMultiple),
+      ratio: 'current_ratio',
+      value: valuation.current_ratio,
       hint: 'Short-term assets vs. bills due; above 1 is healthy',
     },
     {
       label: 'Debt / Equity',
-      text: orDash(valuation.debt_to_equity, fmtMultiple),
+      ratio: 'debt_to_equity',
+      value: valuation.debt_to_equity,
       hint: 'Debt vs. shareholder money; lower is safer',
     },
     {
       label: 'Beta',
-      text: orDash(valuation.beta, fmtMultiple),
+      ratio: 'beta',
+      value: valuation.beta,
       hint: 'How much it swings vs. the market; 1.0 = in step',
     },
   ]
   // Nothing covered → drop the section rather than show a grid of em dashes.
-  if (tiles.every((t) => t.text === '—')) return null
+  if (tiles.every((t) => t.value == null)) return null
   return (
     <Box
       sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
@@ -880,7 +905,12 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
           <StatTile
             key={t.label}
             label={t.label}
-            value={t.text}
+            value={orDash(t.value, fmtMultiple)}
+            color={
+              t.value == null
+                ? 'text.primary'
+                : GRADE_COLOR[gradeValuation(t.ratio, t.value)]
+            }
             hint={t.hint}
           />
         ))}
@@ -890,8 +920,9 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
         color="text.secondary"
         sx={{ display: 'block', mt: 1.5 }}
       >
-        Trailing ratios (no forward estimates). PEG is P/E over trailing EPS
-        growth.
+        Green is favourable, red worth a closer look — a rough guide that varies
+        by sector. Trailing ratios (no forward estimates); PEG is P/E over
+        trailing EPS growth.
       </Typography>
     </Box>
   )

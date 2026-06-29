@@ -23,21 +23,20 @@ describe('RsiCard', () => {
     expect(screen.getByText('22.8')).toBeInTheDocument()
     expect(screen.getByText('Oversold')).toBeInTheDocument()
     expect(screen.getByText('Strong Buy')).toBeInTheDocument()
-    expect(screen.getByText(/deeply oversold/i)).toBeInTheDocument()
   })
 
   it('calls Buy in the softer band just above oversold', () => {
     renderWithProviders(<RsiCard rsi={{ ...base, latest: 35 }} />)
     expect(screen.getByText('35.0')).toBeInTheDocument()
     expect(screen.getByText('Buy')).toBeInTheDocument()
-    expect(screen.getByText(/leaning oversold/i)).toBeInTheDocument()
+    // The neutral signal tag is hidden here — it would contradict the Buy call.
+    expect(screen.queryByText('Neutral')).not.toBeInTheDocument()
   })
 
   it('calls Sell in the softer band just below overbought', () => {
     renderWithProviders(<RsiCard rsi={{ ...base, latest: 65 }} />)
     expect(screen.getByText('65.0')).toBeInTheDocument()
     expect(screen.getByText('Sell')).toBeInTheDocument()
-    expect(screen.getByText(/leaning overbought/i)).toBeInTheDocument()
   })
 
   it('calls Strong Sell when the reading is above overbought', () => {
@@ -45,14 +44,15 @@ describe('RsiCard', () => {
       <RsiCard rsi={{ ...base, latest: 81.2, signal: 'overbought' }} />,
     )
     expect(screen.getByText('81.2')).toBeInTheDocument()
+    expect(screen.getByText('Overbought')).toBeInTheDocument()
     expect(screen.getByText('Strong Sell')).toBeInTheDocument()
-    expect(screen.getByText(/deeply overbought/i)).toBeInTheDocument()
   })
 
   it('calls Hold when the latest reading sits in the neutral band', () => {
     renderWithProviders(<RsiCard rsi={{ ...base, latest: 51.08 }} />)
     expect(screen.getByText('51.1')).toBeInTheDocument()
-    expect(screen.getByText('Neutral')).toBeInTheDocument()
+    // No signal word in the neutral middle — only Oversold/Overbought show.
+    expect(screen.queryByText('Neutral')).not.toBeInTheDocument()
     expect(screen.getByText('Hold')).toBeInTheDocument()
   })
 
