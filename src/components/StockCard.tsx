@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { stockLogoUrl, type Stock, type StockPerformance } from '@/lib/api'
+import { stockLogoUrl, type Stock } from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null
@@ -30,106 +30,11 @@ const fmtMoney = (n: number | null) =>
         maximumFractionDigits: 2,
       })
 
-/** Signed percent for directional figures (returns/changes). */
-const fmtPct = (n: number | null) =>
-  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
-
 /** Unsigned percent — a dividend yield has no direction. */
 const fmtYield = (n: number | null) => (n == null ? '—' : `${n.toFixed(2)}%`)
 
 /** Per-share dollar amount. */
 const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
-
-const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
-  { key: '1w', label: '1W' },
-  { key: '1m', label: '1M' },
-  { key: '3m', label: '3M' },
-  { key: '6m', label: '6M' },
-  { key: 'ytd', label: 'YTD' },
-  { key: '1y', label: '1Y' },
-]
-
-/** A single color-coded return pill. */
-function PerfPill({ label, value }: { label: string; value: number | null }) {
-  const color =
-    value == null
-      ? 'text.secondary'
-      : value >= 0
-        ? 'success.main'
-        : 'error.main'
-  return (
-    <Box
-      sx={{
-        borderRadius: 2,
-        bgcolor: 'action.hover',
-        px: 1,
-        py: 0.75,
-        textAlign: 'center',
-      }}
-    >
-      <Typography
-        variant="caption"
-        sx={{ color: 'text.secondary', display: 'block' }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        sx={{
-          fontWeight: 600,
-          color,
-          fontVariantNumeric: 'tabular-nums',
-          fontSize: '0.85rem',
-        }}
-      >
-        {fmtPct(value)}
-      </Typography>
-    </Box>
-  )
-}
-
-/**
- * Row of trailing-return pills, color-coded green/red by sign. The 5Y return
- * isn't in the snapshot's `performance` object — it's derived from 5Y candles
- * upstream and passed in, so it loads a beat later and shows `—` until ready.
- */
-function PerformanceStrip({
-  perf,
-  fiveYearReturn,
-}: {
-  perf: StockPerformance
-  fiveYearReturn?: number | null
-}) {
-  const entries: { label: string; value: number | null }[] = [
-    ...PERF_WINDOWS.map(({ key, label }) => ({ label, value: perf[key] })),
-    { label: '5Y', value: fiveYearReturn ?? null },
-  ]
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        sx={{
-          color: 'text.secondary',
-          textTransform: 'uppercase',
-          letterSpacing: '0.05em',
-        }}
-      >
-        Performance
-      </Typography>
-      <Box
-        sx={{
-          mt: 0.75,
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(4, 1fr)', sm: 'repeat(7, 1fr)' },
-          gap: 1,
-        }}
-      >
-        {entries.map((e) => (
-          <PerfPill key={e.label} label={e.label} value={e.value} />
-        ))}
-      </Box>
-    </Box>
-  )
-}
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -167,13 +72,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function StockCard({
-  stock,
-  fiveYearReturn,
-}: {
-  stock: Stock
-  fiveYearReturn?: number | null
-}) {
+export default function StockCard({ stock }: { stock: Stock }) {
   const up = (stock.change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
@@ -263,15 +162,6 @@ export default function StockCard({
             value={fmtDollars(stock.dividend_per_share)}
           />
         </Box>
-
-        {stock.performance && (
-          <Box sx={{ mt: 2.5 }}>
-            <PerformanceStrip
-              perf={stock.performance}
-              fiveYearReturn={fiveYearReturn}
-            />
-          </Box>
-        )}
 
         <Typography
           variant="caption"
