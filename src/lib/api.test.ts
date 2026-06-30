@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gradeValuation } from '@/lib/api'
+import { gradeValuation, profitabilityVerdict } from '@/lib/api'
 
 describe('gradeValuation', () => {
   it('grades P/E: cheap-to-reasonable good, elevated fair, rich or loss-making a caution', () => {
@@ -49,5 +49,25 @@ describe('gradeValuation', () => {
     expect(gradeValuation('beta', 1.3)).toBe('fair')
     expect(gradeValuation('beta', 1.5)).toBe('fair')
     expect(gradeValuation('beta', 1.6)).toBe('caution')
+  })
+})
+
+describe('profitabilityVerdict', () => {
+  it('grades net margin: 20%+ exceptional, double-digit healthy, thin, or a loss', () => {
+    expect(profitabilityVerdict(31.2)).toBe('Highly Profitable')
+    expect(profitabilityVerdict(20)).toBe('Highly Profitable')
+    expect(profitabilityVerdict(19.9)).toBe('Profitable')
+    expect(profitabilityVerdict(10)).toBe('Profitable')
+    expect(profitabilityVerdict(9.9)).toBe('Marginally Profitable')
+    expect(profitabilityVerdict(0.1)).toBe('Marginally Profitable')
+  })
+
+  it('treats break-even and losses as Unprofitable', () => {
+    expect(profitabilityVerdict(0)).toBe('Unprofitable')
+    expect(profitabilityVerdict(-4.2)).toBe('Unprofitable')
+  })
+
+  it('returns null when there is no margin to judge', () => {
+    expect(profitabilityVerdict(null)).toBeNull()
   })
 })

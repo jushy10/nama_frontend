@@ -184,6 +184,51 @@ export function dcaVerdict(drawdownFromHigh: number | null): DcaAction | null {
   return 'Hold'
 }
 
+/**
+ * A bottom-line profitability call from trailing net margin: is the company
+ * actually making money, and how comfortably. Net margin is THE profit read —
+ * gross or operating margin can be positive while the net line bleeds, so this
+ * keys off net alone.
+ */
+export type ProfitabilityVerdict =
+  | 'Highly Profitable'
+  | 'Profitable'
+  | 'Marginally Profitable'
+  | 'Unprofitable'
+
+/**
+ * Net-margin tiers, richest-first. Net margin (net income ÷ revenue) is the
+ * share of every sales dollar kept as profit: above zero the company earns a
+ * profit, at or below zero it loses money. The cutoffs are broad large-cap
+ * rules of thumb — 20%+ is exceptional, double digits healthy, a thin
+ * single-digit margin leaves little cushion. NOT sector-aware (a grocer runs on
+ * thin margins by nature, software far fatter), so it's a rough guide.
+ */
+export const PROFIT_TIERS: { verdict: ProfitabilityVerdict; floor: number }[] = [
+  { verdict: 'Highly Profitable', floor: 20 },
+  { verdict: 'Profitable', floor: 10 },
+  { verdict: 'Marginally Profitable', floor: 0 },
+]
+
+/**
+ * Map a trailing net margin (a percent) to a profitability call. Returns null
+ * when there's no margin to judge. A flat-or-negative margin (≤ 0) is
+ * Unprofitable — no bottom-line profit; above zero the tiers grade how
+ * comfortable the profit is. The 0% floor is strict, so exactly break-even
+ * reads as Unprofitable rather than a wafer-thin profit.
+ */
+export function profitabilityVerdict(
+  netMargin: number | null,
+): ProfitabilityVerdict | null {
+  if (netMargin == null) return null
+  if (netMargin <= 0) return 'Unprofitable'
+  for (const tier of PROFIT_TIERS) {
+    if (netMargin >= tier.floor) return tier.verdict
+  }
+  /* c8 ignore next — any margin > 0 clears the 0 floor above */
+  return 'Unprofitable'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
