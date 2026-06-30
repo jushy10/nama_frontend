@@ -32,8 +32,8 @@ const RANGE_OPTIONS: ChartRange[] = [
 ]
 
 // Categorical hues for the member lines — distinct and legible on both canvases.
-// The benchmark index ETFs are coloured/dashed separately (see BENCH_DASH) so
-// they read as neutral references drawn on top of the members.
+// The benchmark index draws as a solid, thicker, high-contrast neutral line on
+// top of the members (see benchColors), so it reads as the reference.
 const LINE_COLORS = [
   '#60a5fa', // blue-400
   '#34d399', // emerald-400
@@ -43,11 +43,6 @@ const LINE_COLORS = [
   '#22d3ee', // cyan-400
   '#fb923c', // orange-400
 ]
-
-// Dash patterns per benchmark, by position — the primary (SPY) gets a bold
-// dash, the next (QQQ) a finer dotted line, so two neutral references stay
-// distinguishable beyond just their shade.
-const BENCH_DASH = ['6 3', '2 4']
 
 /** Close-to-close returns keyed by ISO timestamp, for correlation alignment. */
 function dailyReturns(candles: Candle[]): Map<string, number> {
@@ -89,19 +84,19 @@ interface Props {
   /** The member tickers to overlay (the Mag 7). */
   items: QuoteDef[]
   /**
-   * Benchmark index ETFs to overlay as references (e.g. SPY, QQQ). The first is
-   * the primary: every other line's ρ is measured against it.
+   * Benchmark index ETF(s) to overlay as references (e.g. QQQ for the
+   * Nasdaq-100). The first is the primary: every member's ρ is measured against
+   * it. Today there's one; the array keeps adding another cheap.
    */
   benchmarks: QuoteDef[]
 }
 
 /**
- * Overlays each Mag 7 member and the benchmark indices (S&P 500 via SPY,
- * Nasdaq-100 via QQQ) on one chart, every line rebased to 0% at the start of
- * the chosen range so paths are comparable across wildly different share
- * prices. Lines that track together are visibly correlated; each line also
- * carries ρ, the Pearson correlation of its daily returns to the primary
- * benchmark's, as a hard number beside the visual.
+ * Overlays each Mag 7 member and the Nasdaq-100 benchmark (via QQQ) on one
+ * chart, every line rebased to 0% at the start of the chosen range so paths are
+ * comparable across wildly different share prices. Lines that track together
+ * are visibly correlated; each member also carries ρ, the Pearson correlation
+ * of its daily returns to the benchmark's, as a hard number beside the visual.
  */
 export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const theme = useTheme()
@@ -118,12 +113,11 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const allFailed = !loading && results.every((r) => !r.data)
 
   const series = useMemo<ComparisonSeries[]>(() => {
-    // Neutral reference colours for the benchmark lines; the primary leads.
-    const benchColors = [
-      theme.palette.text.primary,
-      theme.palette.text.secondary,
-    ]
-    // The primary benchmark (first one, SPY) is the correlation reference.
+    // The benchmark draws in the highest-contrast neutral — black on the light
+    // canvas, white on the dark one (a literal black would vanish on the near-
+    // black dark background).
+    const benchColor = theme.palette.text.primary
+    // The primary benchmark (first one, QQQ) is the correlation reference.
     const primaryIdx = items.length
     const primaryData = results[primaryIdx]?.data
     const primaryReturns = primaryData
@@ -145,8 +139,7 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
         pct: (c.close / first - 1) * 100,
       }))
 
-      // Every line but the primary itself correlates against it — including the
-      // other index (QQQ), which shows how tightly the Nasdaq-100 tracks SPY.
+      // Every member correlates against the benchmark (the primary).
       let corr: number | null = null
       if (i !== primaryIdx && primaryReturns) {
         const sr = dailyReturns(candles)
@@ -165,27 +158,17 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
       out.push({
         symbol: symbols[i],
         label: isBenchmark ? benchmarks[benchPos].label : items[i].label,
-        color: isBenchmark
-          ? (benchColors[benchPos] ?? theme.palette.text.primary)
-          : LINE_COLORS[i % LINE_COLORS.length],
+        color: isBenchmark ? benchColor : LINE_COLORS[i % LINE_COLORS.length],
         isBenchmark,
-        dash: isBenchmark
-          ? (BENCH_DASH[benchPos] ?? BENCH_DASH[BENCH_DASH.length - 1])
-          : undefined,
+        // Benchmark is a solid line; members are solid too — colour carries them.
+        dash: undefined,
         points,
         totalPct: points[points.length - 1].pct,
         corr,
       })
     }
     return out
-  }, [
-    results,
-    symbols,
-    items,
-    benchmarks,
-    theme.palette.text.primary,
-    theme.palette.text.secondary,
-  ])
+  }, [results, symbols, items, benchmarks, theme.palette.text.primary])
 
   const intraday = useMemo(() => {
     const tf = results.find((r) => r.data)?.data?.timeframe ?? ''
@@ -205,7 +188,7 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
           }}
         >
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-            Performance vs. the indices
+            Performance vs. the Nasdaq 100
           </Typography>
           <ToggleButtonGroup
             size="small"
@@ -225,9 +208,9 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
 
         <Typography color="text.secondary" sx={{ fontSize: '0.85rem', mb: 2 }}>
           Each line is rebased to 0% at the start of the range, so paths that
-          move together are correlated regardless of share price. The S&amp;P
-          500 (SPY) and Nasdaq-100 (QQQ) are dashed; ρ is each line&apos;s
-          daily-return correlation to SPY (1.0 = lockstep).
+          move together are correlated regardless of share price. The Nasdaq-100
+          (QQQ) is the solid benchmark line; ρ is each stock&apos;s daily-return
+          correlation to QQQ (1.0 = lockstep).
         </Typography>
 
         {loading && (
