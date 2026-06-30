@@ -1,5 +1,6 @@
-import { Box, Container, Typography } from '@mui/material'
+import { Box, Container, Stack, Typography } from '@mui/material'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
+import Mag7ComparisonCard from '@/components/Mag7ComparisonCard'
 
 // The "Magnificent 7" mega-caps. These are tradeable tickers Alpaca quotes
 // directly, so no ETF proxy is needed — each tile is the stock itself.
@@ -11,6 +12,14 @@ const MAG7: QuoteDef[] = [
   { label: 'Nvidia', symbol: 'NVDA' },
   { label: 'Meta', symbol: 'META' },
   { label: 'Tesla', symbol: 'TSLA' },
+]
+
+// Benchmark indices to overlay. The backend 400s raw index tickers (^GSPC,
+// ^NDX), so we use the SPY and QQQ ETF proxies — the same path the rest of the
+// app takes. SPY leads, so it's the correlation reference for every line.
+const BENCHMARKS: QuoteDef[] = [
+  { label: 'S&P 500', symbol: 'SPY' },
+  { label: 'Nasdaq 100', symbol: 'QQQ' },
 ]
 
 /** Dedicated page for the Magnificent 7 mega-caps and their move for the day. */
@@ -32,7 +41,10 @@ export default function Mag7() {
         </Typography>
       </Box>
 
-      <QuoteGrid items={MAG7} />
+      <Stack spacing={4}>
+        <QuoteGrid items={MAG7} />
+        <Mag7ComparisonCard items={MAG7} benchmarks={BENCHMARKS} />
+      </Stack>
     </Container>
   )
 }
