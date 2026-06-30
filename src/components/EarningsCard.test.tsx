@@ -43,6 +43,26 @@ const base: EarningsHistory = {
   ],
 }
 
+const growthSample = {
+  revenue_yoy: 8.0,
+  eps_yoy: 12.0,
+  forward_revenue_growth: 8.3,
+  forward_eps_growth: 15.0,
+}
+
+const estimatesSample = {
+  fiscal_year: 2027,
+  period_end: '2027-01-31',
+  eps_avg: 5.2,
+  eps_low: 4.8,
+  eps_high: 5.6,
+  revenue_avg: 250_000_000_000,
+  num_analysts_eps: 42,
+  num_analysts_revenue: 40,
+  eps_avg_fy2: 6.4,
+  fiscal_year_fy2: 2028,
+}
+
 describe('EarningsCard', () => {
   it('shows the header and per-quarter EPS', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
@@ -425,5 +445,67 @@ describe('EarningsCard', () => {
     expect(screen.getByText('after close')).toBeInTheDocument()
     // The EPS consensus rides on the chart's forecast column, not in this chip.
     expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument()
+  })
+
+  it('renders the forward estimates section from the snapshot props', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        growth={growthSample}
+        estimates={estimatesSample}
+        forwardPe={38.5}
+        forwardPs={22.0}
+      />,
+    )
+
+    expect(screen.getByText('Forward estimates')).toBeInTheDocument()
+
+    // Forward valuation multiples.
+    expect(screen.getByText('Fwd P/E')).toBeInTheDocument()
+    expect(screen.getByText('38.50')).toBeInTheDocument()
+    expect(screen.getByText('22.00')).toBeInTheDocument()
+
+    // Analyst-expected next-year (FY1→FY2) growth, signed.
+    expect(screen.getByText('+8.3%')).toBeInTheDocument() // revenue
+    expect(screen.getByText('+15.0%')).toBeInTheDocument() // EPS
+
+    // FY1 / FY2 consensus estimates, prefixed by the fiscal year.
+    expect(screen.getByText('FY27 EPS est.')).toBeInTheDocument()
+    expect(screen.getByText('$5.20')).toBeInTheDocument()
+    expect(screen.getByText(/\$4\.80.*\$5\.60/)).toBeInTheDocument() // low–high
+    expect(screen.getByText('42 analysts')).toBeInTheDocument()
+    expect(screen.getByText('FY28 EPS est.')).toBeInTheDocument()
+    expect(screen.getByText('$6.40')).toBeInTheDocument()
+  })
+
+  it('colours a negative forward growth figure as a loss', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        growth={{ ...growthSample, forward_eps_growth: -4.2 }}
+        forwardPe={20}
+      />,
+    )
+    expect(screen.getByText('-4.2%')).toBeInTheDocument()
+  })
+
+  it('omits the forward section entirely when no snapshot estimates are passed', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    expect(screen.queryByText('Forward estimates')).not.toBeInTheDocument()
+  })
+
+  it('drops the FY2 tile when only one forward year is covered', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        estimates={{
+          ...estimatesSample,
+          eps_avg_fy2: null,
+          fiscal_year_fy2: null,
+        }}
+      />,
+    )
+    expect(screen.getByText('FY27 EPS est.')).toBeInTheDocument()
+    expect(screen.queryByText('FY28 EPS est.')).not.toBeInTheDocument()
   })
 })
