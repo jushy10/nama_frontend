@@ -17,9 +17,6 @@ const fmt = (n: number | null) =>
         maximumFractionDigits: 2,
       })
 
-const fmtInt = (n: number | null) =>
-  n == null ? '—' : n.toLocaleString('en-US')
-
 /** Compact dollar magnitude, e.g. 3.21T / 845.0B / 12.4M. */
 const fmtMoney = (n: number | null) =>
   n == null
@@ -150,11 +147,10 @@ export default function StockCard({ stock }: { stock: Stock }) {
             mt: 3,
             mb: 0,
             display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(4, 1fr)' },
+            gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
             gap: 1,
           }}
         >
-          <Stat label="Volume" value={fmtInt(stock.volume)} />
           <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
           <Stat label="Div Yield" value={fmtYield(stock.dividend_yield)} />
           <Stat

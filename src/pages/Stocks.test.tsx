@@ -204,6 +204,9 @@ describe('Stocks search', () => {
     expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
     expect(screen.getByText('Performance')).toBeInTheDocument()
 
+    // Volume was dropped from the snapshot card.
+    expect(screen.queryByText('Volume')).not.toBeInTheDocument()
+
     // Drawdown-from-high gets its own DCA card with a tiered buy call.
     expect(screen.getByText('DCA Signal')).toBeInTheDocument()
     expect(screen.getByText('24.5%')).toBeInTheDocument()
