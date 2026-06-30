@@ -212,6 +212,14 @@ describe('Stocks search', () => {
     expect(screen.getByText('24.5%')).toBeInTheDocument()
     expect(screen.getByText('Moderate Buy')).toBeInTheDocument()
 
+    // Net margin drives a profitability verdict card; 27.2% reads Highly
+    // Profitable. (Rides the earnings query, so await its heading.)
+    expect(
+      await screen.findByRole('heading', { name: 'Profitability' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('net profit margin')).toBeInTheDocument()
+    expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
+
     // The candlestick chart loads from the candles endpoint.
     expect(
       await screen.findByRole('heading', { name: /price chart/i }),
@@ -255,7 +263,8 @@ describe('Stocks search', () => {
     // Trailing earnings metrics relocated from the stock endpoint render as tiles.
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
     expect(screen.getByText('Net Margin')).toBeInTheDocument()
-    expect(screen.getByText('27.2%')).toBeInTheDocument()
+    // 27.2% shows on this tile and as the profitability card's headline figure.
+    expect(screen.getAllByText('27.2%').length).toBeGreaterThan(0)
     // The next-earnings consensus plots forward "expected" bars on the EPS and
     // revenue charts, labelled with the forecast quarter (Q2 '27) and the
     // consensus value beneath — the report date is no longer drawn on the bars.
