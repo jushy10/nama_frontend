@@ -283,7 +283,13 @@ export default function Stocks() {
               </Alert>
             )}
             {earningsQuery.data && (
-              <EarningsCard earnings={earningsQuery.data} />
+              <EarningsCard
+                earnings={earningsQuery.data}
+                growth={stock.growth}
+                estimates={stock.analyst_estimates}
+                forwardPe={stock.forward_pe}
+                forwardPs={stock.forward_ps}
+              />
             )}
           </Stack>
         )}
