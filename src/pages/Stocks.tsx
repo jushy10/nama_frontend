@@ -144,7 +144,7 @@ export default function Stocks() {
                 display: 'grid',
                 gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
                 gap: 3,
-                alignItems: 'start',
+                alignItems: 'stretch',
               }}
             >
               <StockCard stock={stock} />
