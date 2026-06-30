@@ -27,6 +27,7 @@ import {
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import DcaCard from '@/components/DcaCard'
+import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
@@ -174,6 +175,14 @@ export default function Stocks() {
             </Box>
 
             <DcaCard drawdown={stock.drawdown_from_high} />
+
+            {/* Bottom-line profitability from trailing net margin; rides the
+                earnings query's metrics, so it pops in once those resolve. */}
+            {earningsQuery.data?.metrics && (
+              <ProfitabilityCard
+                netMargin={earningsQuery.data.metrics.net_margin}
+              />
+            )}
 
             {recommendationsQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
