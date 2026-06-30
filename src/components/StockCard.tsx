@@ -76,8 +76,24 @@ export default function StockCard({ stock }: { stock: Stock }) {
   const asOf = stock.as_of ? new Date(stock.as_of).toLocaleString() : '—'
 
   return (
-    <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+    <Card
+      variant="outlined"
+      sx={{
+        borderColor: 'divider',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+    >
+      <CardContent
+        sx={{
+          p: 3,
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
