@@ -10,16 +10,19 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import { type Candle, type ChartRange } from '@/lib/api'
+import { type ChartRange } from '@/lib/api'
 import { useManyCandles } from '@/lib/queries'
 import type { QuoteDef } from '@/components/QuoteGrid'
 import PerformanceComparisonChart, {
   type ComparisonSeries,
 } from '@/components/PerformanceComparisonChart'
+import RelativePerformanceBars, {
+  type RelRow,
+} from '@/components/RelativePerformanceBars'
 
 // Mirror the stock page's price-chart ranges (intraday first, YTD last) so the
-// two charts share one mental model. Intraday ranges make ρ a per-bar co-move;
-// the rebased overlay reads the same at any horizon.
+// two charts share one mental model. The rebased overlay reads the same at any
+// horizon, intraday included.
 const RANGE_OPTIONS: ChartRange[] = [
   '1D',
   '5D',
@@ -44,49 +47,13 @@ const LINE_COLORS = [
   '#fb923c', // orange-400
 ]
 
-/** Close-to-close returns keyed by ISO timestamp, for correlation alignment. */
-function dailyReturns(candles: Candle[]): Map<string, number> {
-  const m = new Map<string, number>()
-  for (let i = 1; i < candles.length; i++) {
-    const prev = candles[i - 1].close
-    if (prev) m.set(candles[i].timestamp, candles[i].close / prev - 1)
-  }
-  return m
-}
-
-/** Pearson correlation of two equal-length samples; null when undefined. */
-function pearson(a: number[], b: number[]): number | null {
-  const n = a.length
-  if (n < 2) return null
-  let sa = 0
-  let sb = 0
-  for (let i = 0; i < n; i++) {
-    sa += a[i]
-    sb += b[i]
-  }
-  const ma = sa / n
-  const mb = sb / n
-  let num = 0
-  let da = 0
-  let db = 0
-  for (let i = 0; i < n; i++) {
-    const dx = a[i] - ma
-    const dy = b[i] - mb
-    num += dx * dy
-    da += dx * dx
-    db += dy * dy
-  }
-  const den = Math.sqrt(da * db)
-  return den ? num / den : null
-}
-
 interface Props {
   /** The member tickers to overlay (the Mag 7). */
   items: QuoteDef[]
   /**
    * Benchmark index ETF(s) to overlay as references (e.g. QQQ for the
-   * Nasdaq-100). The first is the primary: every member's ρ is measured against
-   * it. Today there's one; the array keeps adding another cheap.
+   * Nasdaq-100). The first is the one members are measured against. Today
+   * there's one; the array keeps adding another cheap.
    */
   benchmarks: QuoteDef[]
 }
@@ -94,9 +61,9 @@ interface Props {
 /**
  * Overlays each Mag 7 member and the Nasdaq-100 benchmark (via QQQ) on one
  * chart, every line rebased to 0% at the start of the chosen range so paths are
- * comparable across wildly different share prices. Lines that track together
- * are visibly correlated; each member also carries ρ, the Pearson correlation
- * of its daily returns to the benchmark's, as a hard number beside the visual.
+ * comparable across wildly different share prices. Below the chart, a
+ * diverging-bar breakdown shows how much each member beat or lagged QQQ over
+ * that same range.
  */
 export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const theme = useTheme()
@@ -117,12 +84,6 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
     // canvas, white on the dark one (a literal black would vanish on the near-
     // black dark background).
     const benchColor = theme.palette.text.primary
-    // The primary benchmark (first one, QQQ) is the correlation reference.
-    const primaryIdx = items.length
-    const primaryData = results[primaryIdx]?.data
-    const primaryReturns = primaryData
-      ? dailyReturns(primaryData.candles)
-      : null
 
     const out: ComparisonSeries[] = []
     for (let i = 0; i < symbols.length; i++) {
@@ -139,22 +100,6 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
         pct: (c.close / first - 1) * 100,
       }))
 
-      // Every member correlates against the benchmark (the primary).
-      let corr: number | null = null
-      if (i !== primaryIdx && primaryReturns) {
-        const sr = dailyReturns(candles)
-        const a: number[] = []
-        const b: number[] = []
-        for (const [ts, ret] of sr) {
-          const bret = primaryReturns.get(ts)
-          if (bret !== undefined) {
-            a.push(ret)
-            b.push(bret)
-          }
-        }
-        corr = pearson(a, b)
-      }
-
       out.push({
         symbol: symbols[i],
         label: isBenchmark ? benchmarks[benchPos].label : items[i].label,
@@ -164,11 +109,26 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
         dash: undefined,
         points,
         totalPct: points[points.length - 1].pct,
-        corr,
       })
     }
     return out
   }, [results, symbols, items, benchmarks, theme.palette.text.primary])
+
+  // How each member fared against the benchmark over the range: its return
+  // minus the benchmark's, in percentage points (positive = it beat QQQ).
+  const benchmarkSeries = series.find((s) => s.isBenchmark)
+  const relRows: RelRow[] =
+    benchmarkSeries == null
+      ? []
+      : series
+          .filter((s) => !s.isBenchmark)
+          .map((s) => ({
+            symbol: s.symbol,
+            label: s.label,
+            color: s.color,
+            totalPct: s.totalPct,
+            rel: s.totalPct - benchmarkSeries.totalPct,
+          }))
 
   const intraday = useMemo(() => {
     const tf = results.find((r) => r.data)?.data?.timeframe ?? ''
@@ -208,9 +168,9 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
 
         <Typography color="text.secondary" sx={{ fontSize: '0.85rem', mb: 2 }}>
           Each line is rebased to 0% at the start of the range, so paths that
-          move together are correlated regardless of share price. The Nasdaq-100
-          (QQQ) is the solid benchmark line; ρ is each stock&apos;s daily-return
-          correlation to QQQ (1.0 = lockstep).
+          move together track regardless of share price. The Nasdaq-100 (QQQ) is
+          the solid benchmark line; the bars below show how much each stock has
+          gained or lost against QQQ over the selected range.
         </Typography>
 
         {loading && (
@@ -230,7 +190,17 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
           </Alert>
         )}
         {!loading && !allFailed && (
-          <PerformanceComparisonChart series={series} intraday={intraday} />
+          <>
+            <PerformanceComparisonChart series={series} intraday={intraday} />
+            {relRows.length > 0 && benchmarkSeries && (
+              <RelativePerformanceBars
+                rows={relRows}
+                benchmarkSymbol={benchmarkSeries.symbol}
+                benchmarkReturn={benchmarkSeries.totalPct}
+                rangeLabel={range}
+              />
+            )}
+          </>
         )}
       </CardContent>
     </Card>
