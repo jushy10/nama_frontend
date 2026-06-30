@@ -7,7 +7,11 @@
  * Every hook forwards React Query's `signal` to the fetcher, so an in-flight
  * request is aborted when its inputs change or the component unmounts.
  */
-import { useQuery, type UseQueryResult } from '@tanstack/react-query'
+import {
+  useQueries,
+  useQuery,
+  type UseQueryResult,
+} from '@tanstack/react-query'
 import {
   ApiError,
   getCandles,
@@ -78,6 +82,27 @@ export function useCandles(
     queryKey: ['candles', symbol, range],
     queryFn: ({ signal }) => getCandles(symbol as string, { range, signal }),
     enabled: !!symbol,
+  })
+}
+
+/**
+ * Candlestick series for several tickers over one range, results in input order.
+ * Each entry is its own query keyed the same as `useCandles`, so a symbol shared
+ * with a single-ticker chart reuses the cache. A failed symbol surfaces on its
+ * own result (`isError`) without sinking the others, which lets a comparison
+ * overlay plot the lines that did load. Idle for any empty symbol.
+ */
+export function useManyCandles(
+  symbols: string[],
+  range: ChartRange,
+): UseQueryResult<CandleSeries>[] {
+  return useQueries({
+    queries: symbols.map((symbol) => ({
+      queryKey: ['candles', symbol, range],
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        getCandles(symbol, { range, signal }),
+      enabled: !!symbol,
+    })),
   })
 }
 
