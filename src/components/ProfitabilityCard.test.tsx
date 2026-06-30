@@ -30,7 +30,9 @@ describe('ProfitabilityCard', () => {
   })
 
   it('treats the tier thresholds as inclusive', () => {
-    const { rerender } = renderWithProviders(<ProfitabilityCard netMargin={10} />)
+    const { rerender } = renderWithProviders(
+      <ProfitabilityCard netMargin={10} />,
+    )
     expect(screen.getByText('Profitable')).toBeInTheDocument()
     rerender(<ProfitabilityCard netMargin={20} />)
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()

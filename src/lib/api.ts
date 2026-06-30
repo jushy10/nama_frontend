@@ -204,11 +204,12 @@ export type ProfitabilityVerdict =
  * single-digit margin leaves little cushion. NOT sector-aware (a grocer runs on
  * thin margins by nature, software far fatter), so it's a rough guide.
  */
-export const PROFIT_TIERS: { verdict: ProfitabilityVerdict; floor: number }[] = [
-  { verdict: 'Highly Profitable', floor: 20 },
-  { verdict: 'Profitable', floor: 10 },
-  { verdict: 'Marginally Profitable', floor: 0 },
-]
+export const PROFIT_TIERS: { verdict: ProfitabilityVerdict; floor: number }[] =
+  [
+    { verdict: 'Highly Profitable', floor: 20 },
+    { verdict: 'Profitable', floor: 10 },
+    { verdict: 'Marginally Profitable', floor: 0 },
+  ]
 
 /**
  * Map a trailing net margin (a percent) to a profitability call. Returns null

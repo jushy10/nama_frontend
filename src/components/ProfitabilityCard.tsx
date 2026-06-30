@@ -108,14 +108,20 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
             height: 16,
             borderRadius: 1,
             bgcolor: color,
-            boxShadow: (theme) => `0 0 0 2px ${theme.palette.background.default}`,
+            boxShadow: (theme) =>
+              `0 0 0 2px ${theme.palette.background.default}`,
           }}
         />
       </Box>
       <Box sx={{ position: 'relative', mt: 0.75, height: 28 }}>
         {[
           { v: `${MIN}%`, at: 0, anchor: 'left' as const, sub: null },
-          { v: '0%', at: breakeven, anchor: 'center' as const, sub: 'break-even' },
+          {
+            v: '0%',
+            at: breakeven,
+            anchor: 'center' as const,
+            sub: 'break-even',
+          },
           { v: '+20%', at: edge(20), anchor: 'center' as const, sub: null },
           { v: `+${MAX}%`, at: 100, anchor: 'right' as const, sub: null },
         ].map(({ v, at, anchor, sub }) => (
@@ -140,7 +146,10 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
           >
             <Typography
               variant="caption"
-              sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
+              sx={{
+                color: 'text.secondary',
+                fontVariantNumeric: 'tabular-nums',
+              }}
             >
               {v}
             </Typography>
@@ -254,7 +263,11 @@ export default function ProfitabilityCard({
             <Gauge margin={netMargin} color={meta?.color ?? 'text.secondary'} />
 
             {meta && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ mt: 2.5 }}
+              >
                 {meta.blurb}
               </Typography>
             )}
