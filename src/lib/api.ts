@@ -10,6 +10,38 @@ export interface StockPerformance {
   '1y': number | null
 }
 
+/**
+ * Forward sell-side consensus estimates for the next fiscal year(s). `fiscal_year`
+ * is FY1 — the nearest full fiscal year still being estimated — carrying its
+ * consensus mean EPS/revenue (with the low–high EPS range and the analyst counts
+ * behind them); `*_fy2` carry the year after. Best-effort: any field a vendor
+ * doesn't cover is null.
+ */
+export interface AnalystEstimates {
+  fiscal_year: number | null
+  period_end: string | null
+  eps_avg: number | null
+  eps_low: number | null
+  eps_high: number | null
+  revenue_avg: number | null
+  num_analysts_eps: number | null
+  num_analysts_revenue: number | null
+  eps_avg_fy2: number | null
+  fiscal_year_fy2: number | null
+}
+
+/**
+ * Revenue & earnings growth, all percent. `*_yoy` is the trailing one-year change
+ * from reported figures (Finnhub TTM); `forward_*_growth` is the analyst-expected
+ * one-year change next year — FY1 → FY2 (FMP estimates). Any leg may be null.
+ */
+export interface GrowthMetrics {
+  revenue_yoy: number | null
+  eps_yoy: number | null
+  forward_revenue_growth: number | null
+  forward_eps_growth: number | null
+}
+
 export interface Stock {
   symbol: string
   name: string | null
@@ -32,6 +64,12 @@ export interface Stock {
   performance: StockPerformance | null
   /** Percent the price sits below its all-time high (≤ 0; 0 at a new high). */
   drawdown_from_high: number | null
+  // Forward-looking enrichment (best-effort; null when the estimates vendor is
+  // unavailable or doesn't cover the symbol).
+  forward_pe: number | null // price ÷ FY1 consensus EPS
+  forward_ps: number | null // market cap ÷ FY1 consensus revenue
+  analyst_estimates: AnalystEstimates | null
+  growth: GrowthMetrics | null
 }
 
 /**
