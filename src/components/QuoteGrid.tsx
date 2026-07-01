@@ -1,7 +1,8 @@
-import { Box, Skeleton, Stack, Typography } from '@mui/material'
+import { Avatar, Box, Skeleton, Stack, Typography } from '@mui/material'
+import { Link as RouterLink } from 'react-router-dom'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { type Stock } from '@/lib/api'
+import { stockLogoUrl, type Stock } from '@/lib/api'
 import { useStocks } from '@/lib/queries'
 
 export type QuoteDef = {
@@ -23,32 +24,86 @@ const fmtPct = (n: number | null) =>
 const fmtChange = (n: number | null) =>
   n == null ? '' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
 
-function QuoteTile({ def, stock }: { def: QuoteDef; stock: Stock | null }) {
+// Shared tile chrome. As a link it also carries color/decoration resets so the
+// anchor reads like the surrounding card, and a hover cue for its clickability.
+const TILE_SX = {
+  display: 'block',
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 2,
+  bgcolor: 'action.hover',
+  p: 2,
+  color: 'inherit',
+  textDecoration: 'none',
+  transition: 'border-color 150ms',
+  '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
+} as const
+
+function QuoteTile({
+  def,
+  stock,
+  linkToStock,
+}: {
+  def: QuoteDef
+  stock: Stock | null
+  linkToStock: boolean
+}) {
   const pct = stock?.change_percent ?? null
   const up = (pct ?? 0) >= 0
   const color =
     pct == null ? 'text.secondary' : up ? 'success.main' : 'error.main'
 
-  return (
-    <Box
-      sx={{
-        border: 1,
-        borderColor: 'divider',
-        borderRadius: 2,
-        bgcolor: 'action.hover',
-        p: 2,
-        transition: 'border-color 150ms',
-        '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
-      }}
-    >
+  const body = (
+    <>
       <Stack
         direction="row"
-        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+        sx={{
+          justifyContent: 'space-between',
+          alignItems: linkToStock ? 'center' : 'baseline',
+          gap: 1,
+        }}
       >
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          {def.label}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Stack
+          direction="row"
+          sx={{ alignItems: 'center', gap: 1, minWidth: 0 }}
+        >
+          {/* Only company tiles carry a logo; the Avatar falls back to the
+              ticker's first letter if the logo image fails to load. */}
+          {linkToStock && (
+            <Avatar
+              variant="rounded"
+              src={stockLogoUrl(def.symbol)}
+              alt={`${def.symbol} logo`}
+              slotProps={{
+                img: { loading: 'lazy', style: { objectFit: 'contain' } },
+              }}
+              sx={{
+                width: 28,
+                height: 28,
+                bgcolor: '#fff',
+                color: '#111',
+                p: 0.5,
+                flexShrink: 0,
+                fontSize: '0.8rem',
+                fontWeight: 700,
+              }}
+            >
+              {def.symbol.charAt(0)}
+            </Avatar>
+          )}
+          <Typography
+            variant="subtitle2"
+            noWrap
+            sx={{ fontWeight: 600, minWidth: 0 }}
+          >
+            {def.label}
+          </Typography>
+        </Stack>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ flexShrink: 0 }}
+        >
           {def.symbol}
         </Typography>
       </Stack>
@@ -93,11 +148,28 @@ function QuoteTile({ def, stock }: { def: QuoteDef; stock: Stock | null }) {
           </Typography>
         )}
       </Stack>
-    </Box>
+    </>
   )
+
+  // A company tile is a link to that ticker's snapshot; an index proxy is a
+  // plain, non-interactive card.
+  if (linkToStock) {
+    return (
+      <Box
+        component={RouterLink}
+        to={`/stocks?symbol=${encodeURIComponent(def.symbol)}`}
+        aria-label={`View ${def.label} (${def.symbol}) details`}
+        sx={TILE_SX}
+      >
+        {body}
+      </Box>
+    )
+  }
+
+  return <Box sx={TILE_SX}>{body}</Box>
 }
 
-function SkeletonTile() {
+function SkeletonTile({ linkToStock }: { linkToStock: boolean }) {
   return (
     <Box
       sx={{
@@ -108,7 +180,17 @@ function SkeletonTile() {
         p: 2,
       }}
     >
-      <Skeleton width="60%" />
+      <Stack direction="row" sx={{ alignItems: 'center', gap: 1 }}>
+        {linkToStock && (
+          <Skeleton
+            variant="rounded"
+            width={28}
+            height={28}
+            sx={{ flexShrink: 0 }}
+          />
+        )}
+        <Skeleton width="60%" />
+      </Stack>
       <Skeleton width="50%" sx={{ mt: 0.75, fontSize: '1.15rem' }} />
       <Skeleton width="40%" />
     </Box>
@@ -130,13 +212,19 @@ const GRID_SX = {
  * move. Loads on mount and re-polls every `refreshMs`; a symbol that fails comes
  * back as a dash rather than blanking the row, and a wholesale failure shows a
  * single unavailable note instead of a wall of dashes.
+ *
+ * With `linkToStock`, each tile carries the company logo and links to that
+ * ticker's snapshot (/stocks?symbol=…) — for the Mag 7, where every tile is a
+ * real, drill-into-able company. Index proxies leave it off.
  */
 export default function QuoteGrid({
   items,
   refreshMs = 60_000,
+  linkToStock = false,
 }: {
   items: QuoteDef[]
   refreshMs?: number
+  linkToStock?: boolean
 }) {
   const symbols = items.map((i) => i.symbol)
   const { data } = useStocks(symbols, { refetchInterval: refreshMs })
@@ -155,9 +243,16 @@ export default function QuoteGrid({
   return (
     <Box sx={GRID_SX}>
       {quotes == null
-        ? items.map((def) => <SkeletonTile key={def.symbol} />)
+        ? items.map((def) => (
+            <SkeletonTile key={def.symbol} linkToStock={linkToStock} />
+          ))
         : items.map((def, i) => (
-            <QuoteTile key={def.symbol} def={def} stock={quotes[i]} />
+            <QuoteTile
+              key={def.symbol}
+              def={def}
+              stock={quotes[i]}
+              linkToStock={linkToStock}
+            />
           ))}
     </Box>
   )
