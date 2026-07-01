@@ -39,7 +39,7 @@ export default function Mag7() {
       </Box>
 
       <Stack spacing={4}>
-        <QuoteGrid items={MAG7} />
+        <QuoteGrid items={MAG7} linkToStock />
         <Mag7ComparisonCard items={MAG7} benchmarks={BENCHMARKS} />
       </Stack>
     </Container>
