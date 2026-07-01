@@ -16,6 +16,7 @@ import {
   ApiError,
   getCandles,
   getEarnings,
+  getQuarterlyEarnings,
   getRecommendations,
   getRsi,
   getScreener,
@@ -26,6 +27,7 @@ import {
   type CandleSeries,
   type ChartRange,
   type EarningsHistory,
+  type QuarterlyEarnings,
   type RsiSeries,
   type ScreenerResult,
   type Sector,
@@ -150,6 +152,21 @@ export function useEarnings(
   return useQuery({
     queryKey: ['earnings', symbol, limit],
     queryFn: ({ signal }) => getEarnings(symbol as string, { limit, signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * The consolidated quarterly earnings series (reported + upcoming quarters in
+ * one call) for a ticker — the successor to `useEarnings` for the beat charts.
+ * Idle until `symbol` is set.
+ */
+export function useQuarterlyEarnings(
+  symbol: string | null | undefined,
+): UseQueryResult<QuarterlyEarnings> {
+  return useQuery({
+    queryKey: ['earnings-quarterly', symbol],
+    queryFn: ({ signal }) => getQuarterlyEarnings(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

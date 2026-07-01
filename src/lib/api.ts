@@ -717,6 +717,139 @@ export async function getEarnings(
 }
 
 /**
+ * One quarter from the consolidated quarterly-earnings series — reported and
+ * upcoming quarters in a single list. A reported quarter (`is_reported`) carries
+ * the actual EPS/revenue and the surprise vs. the consensus going in; an
+ * upcoming one carries the forward estimates (`eps_estimate`/`revenue_estimate`)
+ * with actuals null. `period_end` is the fiscal period's last day, `report_date`
+ * the (expected) announcement date; `beat` is the met-or-beat flag, null until
+ * the quarter reports. Unlike the older beat history, this DOES serve a forward
+ * `revenue_estimate` for the scheduled quarters.
+ */
+export interface QuarterlyEarningsQuarter {
+  fiscal_year: number | null
+  fiscal_quarter: number | null
+  period_end: string | null
+  report_date: string | null
+  eps_actual: number | null
+  eps_estimate: number | null
+  eps_surprise: number | null
+  eps_surprise_percent: number | null
+  revenue_estimate: number | null
+  revenue_actual: number | null
+  beat: boolean | null
+  is_reported: boolean
+}
+
+/**
+ * The consolidated quarterly earnings series for a ticker, oldest → newest:
+ * reported quarters followed by the upcoming scheduled ones, split by
+ * `reported_count`/`upcoming_count` (summing to `count`). The successor to the
+ * `/earnings` beat history — richer, since it carries every scheduled quarter
+ * (not just the next one) and a forward revenue estimate for each.
+ */
+export interface QuarterlyEarnings {
+  symbol: string
+  count: number
+  reported_count: number
+  upcoming_count: number
+  quarters: QuarterlyEarningsQuarter[]
+}
+
+/**
+ * Fetch the consolidated quarterly earnings series (reported + upcoming) for a
+ * ticker. Oldest → newest, so consumers that read newest-first reverse it.
+ */
+export async function getQuarterlyEarnings(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<QuarterlyEarnings> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings/quarterly`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as QuarterlyEarnings
+  if (!Array.isArray(data?.quarters)) {
+    throw new ApiError(res.status, 'Malformed quarterly earnings response')
+  }
+  return data
+}
+
+/**
+ * Every upcoming (scheduled, not-yet-reported) quarter from the series, mapped
+ * to the `NextEarnings` shape the earnings card draws its forward "expected"
+ * columns from — oldest → newest, so they append to the right of the reported
+ * bars in order. The trading `session` (before/after close) only meaningfully
+ * applies to the immediate next report, so it's borrowed from `base` for the
+ * first quarter and left null for the ones beyond it.
+ */
+export function quarterlyUpcoming(
+  quarterly: QuarterlyEarnings,
+  base?: EarningsHistory | null,
+): NextEarnings[] {
+  return quarterly.quarters
+    .filter((q) => !q.is_reported)
+    .map((q, i) => ({
+      report_date: q.report_date,
+      fiscal_year: q.fiscal_year,
+      fiscal_quarter: q.fiscal_quarter,
+      eps_estimate: q.eps_estimate,
+      revenue_estimate: q.revenue_estimate,
+      session: i === 0 ? (base?.next_report?.session ?? null) : null,
+    }))
+}
+
+/**
+ * Adapt the new quarterly series into the `EarningsHistory` shape the earnings
+ * card renders, so the EPS/revenue charts, the adjusted-TTM tile and the
+ * next-report chip all run off `/earnings/quarterly`. Reported quarters become
+ * the (newest-first) `quarters` history; the first upcoming quarter becomes
+ * `next_report`. What the quarterly endpoint doesn't carry yet — the trailing
+ * `metrics`, the `valuation` ratios and the report `session` — rides in from
+ * `base` (the existing `/earnings` response) until those move over too. `base`
+ * is optional: with none, the charts still render and the trailing/valuation
+ * tiles simply drop.
+ */
+export function quarterlyToEarningsHistory(
+  quarterly: QuarterlyEarnings,
+  base?: EarningsHistory | null,
+): EarningsHistory {
+  const reported = quarterly.quarters.filter((q) => q.is_reported)
+  // The card reads newest-first; the endpoint serves oldest-first.
+  const quarters: EarningsSurprise[] = reported
+    .slice()
+    .reverse()
+    .map((q) => ({
+      period: q.period_end,
+      fiscal_year: q.fiscal_year,
+      fiscal_quarter: q.fiscal_quarter,
+      actual: q.eps_actual,
+      estimate: q.eps_estimate,
+      surprise: q.eps_surprise,
+      surprise_percent: q.eps_surprise_percent,
+      beat: q.beat,
+      revenue_actual: q.revenue_actual,
+    }))
+  // The chip names the single *next* report — the first upcoming quarter; the
+  // charts draw every upcoming quarter via the card's `upcoming` prop. Fall back
+  // to the existing response when the quarterly series has no upcoming quarter.
+  const next_report: NextEarnings | null =
+    quarterlyUpcoming(quarterly, base)[0] ?? base?.next_report ?? null
+  return {
+    symbol: quarterly.symbol,
+    count: quarterly.reported_count,
+    beats: base?.beats ?? 0,
+    scored: base?.scored ?? 0,
+    beat_rate: base?.beat_rate ?? null,
+    quarters,
+    metrics: base?.metrics ?? null,
+    valuation: base?.valuation ?? null,
+    next_report,
+  }
+}
+
+/**
  * A five-step analyst rating, most to least bullish. Deliberately the same
  * vocabulary as the RSI verdict (`RsiAction`) so the analyst and technical reads
  * can share a colour language on the page.
