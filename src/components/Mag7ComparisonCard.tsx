@@ -115,20 +115,32 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   }, [results, symbols, items, benchmarks, theme.palette.text.primary])
 
   // How each member fared against the benchmark over the range: its return
-  // minus the benchmark's, in percentage points (positive = it beat QQQ).
+  // minus the benchmark's, in percentage points (positive = it beat QQQ). The
+  // benchmark rides along as its own row (rel 0) so it anchors the zero line,
+  // with members that beat it above and members that lagged it below.
   const benchmarkSeries = series.find((s) => s.isBenchmark)
   const relRows: RelRow[] =
     benchmarkSeries == null
       ? []
-      : series
-          .filter((s) => !s.isBenchmark)
-          .map((s) => ({
-            symbol: s.symbol,
-            label: s.label,
-            color: s.color,
-            totalPct: s.totalPct,
-            rel: s.totalPct - benchmarkSeries.totalPct,
-          }))
+      : [
+          ...series
+            .filter((s) => !s.isBenchmark)
+            .map((s) => ({
+              symbol: s.symbol,
+              label: s.label,
+              color: s.color,
+              totalPct: s.totalPct,
+              rel: s.totalPct - benchmarkSeries.totalPct,
+            })),
+          {
+            symbol: benchmarkSeries.symbol,
+            label: benchmarkSeries.label,
+            color: benchmarkSeries.color,
+            totalPct: benchmarkSeries.totalPct,
+            rel: 0,
+            isBenchmark: true,
+          },
+        ]
 
   const intraday = useMemo(() => {
     const tf = results.find((r) => r.data)?.data?.timeframe ?? ''
@@ -137,7 +149,7 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={1.5}
@@ -196,7 +208,6 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
               <RelativePerformanceBars
                 rows={relRows}
                 benchmarkSymbol={benchmarkSeries.symbol}
-                benchmarkReturn={benchmarkSeries.totalPct}
                 rangeLabel={range}
               />
             )}
