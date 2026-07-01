@@ -14,6 +14,7 @@ import {
 } from '@tanstack/react-query'
 import {
   ApiError,
+  getAnnualEarnings,
   getCandles,
   getEarnings,
   getQuarterlyEarnings,
@@ -24,6 +25,7 @@ import {
   getStock,
   getStocks,
   type AnalystRecommendations,
+  type AnnualEarnings,
   type CandleSeries,
   type ChartRange,
   type EarningsHistory,
@@ -167,6 +169,21 @@ export function useQuarterlyEarnings(
   return useQuery({
     queryKey: ['earnings-quarterly', symbol],
     queryFn: ({ signal }) => getQuarterlyEarnings(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * The annual earnings series (reported + upcoming fiscal years in one call) for
+ * a ticker — the yearly counterpart of `useQuarterlyEarnings`. Idle until
+ * `symbol` is set.
+ */
+export function useAnnualEarnings(
+  symbol: string | null | undefined,
+): UseQueryResult<AnnualEarnings> {
+  return useQuery({
+    queryKey: ['earnings-annual', symbol],
+    queryFn: ({ signal }) => getAnnualEarnings(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

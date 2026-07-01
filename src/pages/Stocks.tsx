@@ -21,6 +21,7 @@ import {
 } from '@/lib/api'
 import {
   errorMessage,
+  useAnnualEarnings,
   useCandles,
   useEarnings,
   useFiveYearReturn,
@@ -73,6 +74,9 @@ export default function Stocks() {
   // profitability read) it still owns, until those move over too.
   const earningsQuery = useEarnings(loadedSymbol, 8)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
+  // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
+  // if it fails the toggle simply doesn't appear, so no error state is shown.
+  const annualQuery = useAnnualEarnings(loadedSymbol)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -301,6 +305,7 @@ export default function Stocks() {
                   quarterlyQuery.data,
                   earningsQuery.data,
                 )}
+                annual={annualQuery.data ?? null}
                 growth={stock.growth}
                 estimates={stock.analyst_estimates}
                 forwardPe={stock.forward_pe}
