@@ -10,13 +10,16 @@ import {
   Card,
   CardContent,
   Stack,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
   useTheme,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
-import { gradeValuation } from '@/lib/api'
+import { annualReported, annualUpcoming, gradeValuation } from '@/lib/api'
 import type {
   AnalystEstimates,
+  AnnualEarnings,
   EarningsHistory,
   EarningsMetrics,
   EarningsSurprise,
@@ -49,10 +52,14 @@ const fmtMultiple = (n: number) => n.toFixed(2)
 const estimateColor = (theme: Theme) =>
   theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)'
 
-/** "Q2 '24" from the fiscal period, falling back to the report month. */
+/** "Q2 '24" from the fiscal period — or "FY24" for an annual row (a fiscal
+ *  year with no quarter) — falling back to the report month. */
 function quarterLabel(q: EarningsSurprise): string {
   if (q.fiscal_quarter && q.fiscal_year) {
     return `Q${q.fiscal_quarter} '${String(q.fiscal_year).slice(-2)}`
+  }
+  if (q.fiscal_year) {
+    return `FY${String(q.fiscal_year).slice(-2)}`
   }
   if (q.period) {
     return new Date(q.period).toLocaleDateString('en-US', {
@@ -70,10 +77,14 @@ function parseDateOnly(iso: string): Date {
   return new Date(y, m - 1, d)
 }
 
-/** "Q3 '26" for the upcoming report, falling back to its expected month. */
+/** "Q3 '26" for the upcoming report — or "FY27" for an upcoming fiscal year —
+ *  falling back to its expected month. */
 function nextLabel(n: NextEarnings): string {
   if (n.fiscal_quarter && n.fiscal_year) {
     return `Q${n.fiscal_quarter} '${String(n.fiscal_year).slice(-2)}`
+  }
+  if (n.fiscal_year) {
+    return `FY${String(n.fiscal_year).slice(-2)}`
   }
   if (n.report_date) {
     return parseDateOnly(n.report_date).toLocaleDateString('en-US', {
@@ -98,6 +109,16 @@ const fmtRev = (n: number) =>
     style: 'currency',
     currency: 'USD',
     maximumFractionDigits: 1,
+  })
+
+/** Extra-compact revenue ("$216B") for the under-bar value labels when the
+ *  columns run too narrow for the decimal ("$215.9B") — i.e. on phones. */
+const fmtRevShort = (n: number) =>
+  n.toLocaleString('en-US', {
+    notation: 'compact',
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
   })
 
 /** Format a value with `fmt`, or an em dash when it's missing. */
@@ -187,12 +208,17 @@ function SurpriseChart({
   bars,
   forecasts,
   fmt,
+  fmtShort,
   ariaLabel,
   neutralColor,
 }: {
   bars: ChartBar[]
   forecasts: ChartForecast[]
   fmt: (n: number) => string
+  /** Tighter format for the under-bar value labels, used when the columns run
+   *  too narrow for `fmt` (phones). The axis and detail line keep `fmt`, so the
+   *  full precision stays a tap away. Omit to always label with `fmt`. */
+  fmtShort?: (n: number) => string
   ariaLabel: string
   /** Bar/value colour for a series with no beat-or-miss meaning (revenue, which
    *  has no consensus estimate). Defaults to the muted axis grey EPS uses for the
@@ -296,6 +322,11 @@ function SurpriseChart({
 
   const { cx, y, groupW, gap, barW, ticks, zeroY, slot, n } = geo
   const fcIndex = data.length // the forecast column's slot, at the right edge
+
+  // Value labels ride beneath every column, so on narrow slots (a phone-width
+  // chart) the full format collides with its neighbours — swap in the tighter
+  // one. 50 units ≈ what an 11px "$130.5B" needs to clear its slot.
+  const barFmt = fmtShort && slot < 50 ? fmtShort : fmt
 
   // Default the detail to the latest column that actually carries a value — the
   // newest reported quarter normally, but the forecast when only a forward
@@ -569,7 +600,7 @@ function SurpriseChart({
                 fill={isGap ? axis : actColor}
                 textAnchor="middle"
               >
-                {isGap ? 'no data' : b.actual != null ? fmt(b.actual) : ''}
+                {isGap ? 'no data' : b.actual != null ? barFmt(b.actual) : ''}
               </text>
             </g>
           )
@@ -616,7 +647,7 @@ function SurpriseChart({
                 fill={forecast}
                 textAnchor="middle"
               >
-                {fmt(e)}
+                {barFmt(e)}
               </text>
             </g>
           )
@@ -1081,6 +1112,7 @@ const chartLabelSx: SxProps<Theme> = {
 export default function EarningsCard({
   earnings,
   upcoming = null,
+  annual = null,
   growth = null,
   estimates = null,
   forwardPe = null,
@@ -1092,6 +1124,11 @@ export default function EarningsCard({
   // single `earnings.next_report` when not supplied, so callers that only have
   // the beat history keep their one forecast column.
   upcoming?: NextEarnings[] | null
+  // The annual earnings series. When present, a Quarterly/Annual toggle lets the
+  // EPS & revenue charts switch to fiscal years — reported years as bars,
+  // upcoming (estimated) years as forecast columns. The trailing/valuation/
+  // forward tiles are period-independent and stay put.
+  annual?: AnnualEarnings | null
   // Forward-looking enrichment off the stock snapshot (a different endpoint than
   // the earnings history), threaded in by the page; the forward section drops
   // when none of it is present.
@@ -1102,21 +1139,34 @@ export default function EarningsCard({
 }) {
   const theme = useTheme()
   const { quarters } = earnings
+  // Always summed from the quarterly history, whichever view is showing.
   const epsTtm = adjustedTtmEps(quarters)
   // The scheduled next report, if any — the header chip shows its date alone.
   const nextRpt = earnings.next_report
 
-  // The forward consensus the charts draw from: every upcoming quarter the page
-  // passes, else the single scheduled next report.
-  const forecastList =
-    upcoming && upcoming.length > 0
+  // The annual series, adapted to the same shapes the quarterly charts consume.
+  // The period toggle only appears when there's annual data to switch to.
+  const annualQuarters = annual ? annualReported(annual) : []
+  const annualForecasts = annual ? annualUpcoming(annual) : []
+  const hasAnnual = annualQuarters.length > 0 || annualForecasts.length > 0
+  const [period, setPeriod] = useState<'quarterly' | 'annual'>('quarterly')
+  const isAnnual = hasAnnual && period === 'annual'
+
+  // The reported history the bars draw — quarters or fiscal years, per the
+  // toggle — and the forward consensus columns beside it: every upcoming
+  // quarter the page passes (else the single scheduled next report), or the
+  // upcoming fiscal years in the annual view.
+  const activeQuarters = isAnnual ? annualQuarters : quarters
+  const forecastList = isAnnual
+    ? annualForecasts
+    : upcoming && upcoming.length > 0
       ? upcoming
       : earnings.next_report
         ? [earnings.next_report]
         : []
   const epsForecasts = forecastSeries(forecastList, (f) => f.eps_estimate)
   const revForecasts = forecastSeries(forecastList, (f) => f.revenue_estimate)
-  const revBars = revenueSeries(quarters)
+  const revBars = revenueSeries(activeQuarters)
 
   // Show the reported-revenue columns (gaps included — see revenueSeries) only
   // when at least one quarter actually reported revenue. With no history at all
@@ -1143,9 +1193,13 @@ export default function EarningsCard({
               Earnings
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              {hasRevenue
-                ? 'Quarterly EPS & revenue'
-                : 'Quarterly EPS — actual vs. estimate'}
+              {isAnnual
+                ? hasRevenue
+                  ? 'Annual EPS & revenue by fiscal year'
+                  : 'Annual EPS by fiscal year'
+                : hasRevenue
+                  ? 'Quarterly EPS & revenue'
+                  : 'Quarterly EPS — actual vs. estimate'}
             </Typography>
           </Box>
 
@@ -1193,7 +1247,27 @@ export default function EarningsCard({
           )}
         </Stack>
 
-        {quarters.length === 0 ? (
+        {hasAnnual && (
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={period}
+            onChange={(_, value: 'quarterly' | 'annual' | null) =>
+              value && setPeriod(value)
+            }
+            aria-label="Earnings period"
+            sx={{ mt: 2 }}
+          >
+            <ToggleButton value="quarterly" sx={{ px: 1.5, py: 0.25 }}>
+              Quarterly
+            </ToggleButton>
+            <ToggleButton value="annual" sx={{ px: 1.5, py: 0.25 }}>
+              Annual
+            </ToggleButton>
+          </ToggleButtonGroup>
+        )}
+
+        {activeQuarters.length === 0 ? (
           <Typography color="text.secondary" sx={{ mt: 2 }}>
             No earnings history available for this stock.
           </Typography>
@@ -1202,14 +1276,25 @@ export default function EarningsCard({
             <Box sx={{ mt: 2.5 }}>
               {hasRevenue && (
                 <Typography variant="caption" sx={chartLabelSx}>
-                  EPS (adjusted)
+                  {/* The annual EPS the API reports is the plain (GAAP) fiscal-
+                      year figure, not the adjusted consensus basis the quarterly
+                      bars are on — so the annual chart drops the qualifier. */}
+                  {isAnnual ? 'EPS' : 'EPS (adjusted)'}
                 </Typography>
               )}
               <SurpriseChart
-                bars={epsSeries(quarters)}
+                bars={epsSeries(activeQuarters)}
                 forecasts={epsForecasts}
+                // Reported fiscal years carry no consensus, so their bars have
+                // no beat colour — paint them the same green the quarterly
+                // actuals wear, not the washed-out axis grey.
+                neutralColor={isAnnual ? theme.palette.success.main : undefined}
                 fmt={fmtEps}
-                ariaLabel="Quarterly actual versus estimated earnings per share"
+                ariaLabel={
+                  isAnnual
+                    ? 'Annual earnings per share by fiscal year'
+                    : 'Quarterly actual versus estimated earnings per share'
+                }
               />
             </Box>
             {hasRevenue && (
@@ -1221,8 +1306,13 @@ export default function EarningsCard({
                   bars={revChartBars}
                   forecasts={revForecasts}
                   fmt={fmtRev}
+                  fmtShort={fmtRevShort}
                   neutralColor={theme.palette.secondary.main}
-                  ariaLabel="Quarterly reported revenue"
+                  ariaLabel={
+                    isAnnual
+                      ? 'Annual reported revenue by fiscal year'
+                      : 'Quarterly reported revenue'
+                  }
                 />
               </Box>
             )}
@@ -1232,9 +1322,17 @@ export default function EarningsCard({
               useFlexGap
               sx={{ flexWrap: 'wrap', mt: 1.5 }}
             >
-              <LegendItem color={estimateColor} label="EPS estimate" />
-              <LegendItem color="success.main" label="Beat" />
-              <LegendItem color="error.main" label="Missed" />
+              {isAnnual ? (
+                // Annual reported years have no estimate bars or beat/miss
+                // reading — just the EPS series itself.
+                <LegendItem color="success.main" label="EPS" />
+              ) : (
+                <>
+                  <LegendItem color={estimateColor} label="EPS estimate" />
+                  <LegendItem color="success.main" label="Beat" />
+                  <LegendItem color="error.main" label="Missed" />
+                </>
+              )}
               {hasRevenue && (
                 <LegendItem color="secondary.main" label="Revenue" />
               )}

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, renderWithProviders, screen } from '@/test/test-utils'
 import EarningsCard from '@/components/EarningsCard'
-import type { EarningsHistory } from '@/lib/api'
+import type { AnnualEarnings, EarningsHistory } from '@/lib/api'
 
 const base: EarningsHistory = {
   symbol: 'NVDA',
@@ -39,6 +39,57 @@ const base: EarningsHistory = {
       surprise: -0.02,
       surprise_percent: -2.5,
       beat: false,
+    },
+  ],
+}
+
+// Three reported fiscal years plus one upcoming (estimated) one, oldest →
+// newest as the endpoint serves them.
+const annualSample: AnnualEarnings = {
+  symbol: 'NVDA',
+  count: 4,
+  reported_count: 3,
+  upcoming_count: 1,
+  years: [
+    {
+      fiscal_year: 2024,
+      period_end: '2024-01-31',
+      eps_actual: 1.19,
+      eps_estimate: null,
+      revenue_actual: 60_922_000_000,
+      revenue_estimate: null,
+      net_income: 29_760_000_000,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2025,
+      period_end: '2025-01-31',
+      eps_actual: 2.94,
+      eps_estimate: null,
+      revenue_actual: 130_497_000_000,
+      revenue_estimate: null,
+      net_income: 72_880_000_000,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2026,
+      period_end: '2026-01-31',
+      eps_actual: 4.9,
+      eps_estimate: null,
+      revenue_actual: 215_938_000_000,
+      revenue_estimate: null,
+      net_income: 120_067_000_000,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      period_end: '2027-01-25',
+      eps_actual: null,
+      eps_estimate: 8.97,
+      revenue_actual: null,
+      revenue_estimate: 392_638_707_720,
+      net_income: null,
+      is_reported: false,
     },
   ],
 }
@@ -524,6 +575,85 @@ describe('EarningsCard', () => {
   it('omits the forward section entirely when no snapshot estimates are passed', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
     expect(screen.queryByText('Forward estimates')).not.toBeInTheDocument()
+  })
+
+  it('hides the period toggle when no annual data is passed', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    expect(
+      screen.queryByRole('button', { name: 'Annual' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('switches the charts to fiscal years when Annual is selected', async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard earnings={base} annual={annualSample} />,
+    )
+
+    // Starts on the quarterly view: quarter labels, no fiscal-year ones.
+    expect(screen.getAllByText("Q1 '27").length).toBeGreaterThan(0)
+    expect(screen.queryByText('FY26')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+
+    // Reported fiscal years render as bars with the annual EPS and revenue;
+    // the newest year (FY26) also fills the detail line, hence getAll.
+    expect(screen.getAllByText('FY24').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('FY26').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$4.90').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$215.9B').length).toBeGreaterThan(0)
+    // The upcoming fiscal year plots as a forecast column on both charts.
+    expect(screen.getAllByText('FY27').length).toBeGreaterThan(0)
+    expect(screen.getByText('$8.97')).toBeInTheDocument()
+    expect(screen.getAllByText('$392.6B').length).toBeGreaterThan(0)
+    expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
+    // Reported years carry no consensus, so the beat legend gives way to a
+    // plain EPS swatch (which shares its label with the chart heading).
+    expect(screen.queryByText('Beat')).not.toBeInTheDocument()
+    expect(screen.queryByText('Missed')).not.toBeInTheDocument()
+    expect(screen.getAllByText('EPS').length).toBeGreaterThan(0)
+    // The quarterly labels are gone until toggled back.
+    expect(screen.queryByText("Q1 '27")).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Quarterly' }))
+    expect(screen.getAllByText("Q1 '27").length).toBeGreaterThan(0)
+    expect(screen.queryByText('FY26')).not.toBeInTheDocument()
+  })
+
+  it('shortens the revenue bar labels on a narrow (phone-width) chart', async () => {
+    // jsdom has no layout, so the chart measures 0 and keeps its 820-unit
+    // desktop fallback. Mock the measurement narrow enough that the sample's
+    // four annual columns run as tight as six do on a real phone (slot < 50),
+    // tripping the compact bar labels.
+    const spy = vi
+      .spyOn(Element.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        left: 0,
+        top: 0,
+        right: 220,
+        bottom: 300,
+        width: 220,
+        height: 300,
+        x: 0,
+        y: 0,
+        toJSON: () => ({}),
+      } as DOMRect)
+    try {
+      const { user } = renderWithProviders(
+        <EarningsCard earnings={base} annual={annualSample} />,
+      )
+      await user.click(screen.getByRole('button', { name: 'Annual' }))
+
+      // Bar and forecast labels drop the decimal ("$216B", "$393B")…
+      expect(screen.getByText('$216B')).toBeInTheDocument()
+      expect(screen.getByText('$393B')).toBeInTheDocument()
+      // …while the detail line above the plot keeps the full precision.
+      expect(screen.getByText('$215.9B')).toBeInTheDocument()
+      expect(screen.queryByText('$392.6B')).not.toBeInTheDocument()
+      // EPS passes no short format, so its labels are untouched.
+      expect(screen.getAllByText('$4.90').length).toBeGreaterThan(0)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('drops the FY2 tile when only one forward year is covered', () => {

@@ -850,6 +850,99 @@ export function quarterlyToEarningsHistory(
 }
 
 /**
+ * One fiscal year from the annual earnings series — reported and upcoming years
+ * in a single list, the yearly counterpart of `QuarterlyEarningsQuarter`. A
+ * reported year (`is_reported`) carries the actual EPS, revenue and net income;
+ * an upcoming one carries the forward consensus (`eps_estimate`/
+ * `revenue_estimate`) with actuals null. The API serves no consensus for years
+ * already reported, so there's no surprise or beat to score. `period_end` is
+ * the fiscal year's last day — which can sit in the next calendar year (NVDA's
+ * FY2026 ended January 2026).
+ */
+export interface AnnualEarningsYear {
+  fiscal_year: number | null
+  period_end: string | null
+  eps_actual: number | null
+  eps_estimate: number | null
+  revenue_actual: number | null
+  revenue_estimate: number | null
+  net_income: number | null
+  is_reported: boolean
+}
+
+/**
+ * The annual earnings series for a ticker, oldest → newest: reported fiscal
+ * years followed by the upcoming estimated ones, split by
+ * `reported_count`/`upcoming_count` (summing to `count`).
+ */
+export interface AnnualEarnings {
+  symbol: string
+  count: number
+  reported_count: number
+  upcoming_count: number
+  years: AnnualEarningsYear[]
+}
+
+/** Fetch the annual earnings series (reported + upcoming fiscal years). */
+export async function getAnnualEarnings(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<AnnualEarnings> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings/annual`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AnnualEarnings
+  if (!Array.isArray(data?.years)) {
+    throw new ApiError(res.status, 'Malformed annual earnings response')
+  }
+  return data
+}
+
+/**
+ * Reported fiscal years mapped to the per-quarter shape the earnings card's
+ * charts consume, newest-first (the order the card reads). A null
+ * `fiscal_quarter` is what labels a row "FY26" rather than "Q2 '26"; with no
+ * consensus served for reported years there's no surprise or beat to carry.
+ */
+export function annualReported(annual: AnnualEarnings): EarningsSurprise[] {
+  return annual.years
+    .filter((y) => y.is_reported)
+    .reverse()
+    .map((y) => ({
+      period: y.period_end,
+      fiscal_year: y.fiscal_year,
+      fiscal_quarter: null,
+      actual: y.eps_actual,
+      estimate: y.eps_estimate,
+      surprise: null,
+      surprise_percent: null,
+      beat: null,
+      revenue_actual: y.revenue_actual,
+    }))
+}
+
+/**
+ * Upcoming (estimated, not-yet-reported) fiscal years mapped to the
+ * `NextEarnings` shape the card's forecast columns read, oldest → newest.
+ * Annual rows carry no announcement date or session — only the fiscal year the
+ * consensus is for.
+ */
+export function annualUpcoming(annual: AnnualEarnings): NextEarnings[] {
+  return annual.years
+    .filter((y) => !y.is_reported)
+    .map((y) => ({
+      report_date: null,
+      fiscal_year: y.fiscal_year,
+      fiscal_quarter: null,
+      eps_estimate: y.eps_estimate,
+      revenue_estimate: y.revenue_estimate,
+      session: null,
+    }))
+}
+
+/**
  * A five-step analyst rating, most to least bullish. Deliberately the same
  * vocabulary as the RSI verdict (`RsiAction`) so the analyst and technical reads
  * can share a colour language on the page.
