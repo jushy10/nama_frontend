@@ -281,6 +281,38 @@ describe('EarningsCard', () => {
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
   })
 
+  it('plots a forward column for every upcoming quarter passed', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        upcoming={[
+          {
+            report_date: '2026-07-30',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: 1.05,
+            revenue_estimate: 89_000_000_000,
+            session: 'amc',
+          },
+          {
+            report_date: '2026-10-29',
+            fiscal_year: 2027,
+            fiscal_quarter: 3,
+            eps_estimate: 1.18,
+            revenue_estimate: 95_400_000_000,
+            session: null,
+          },
+        ]}
+      />,
+    )
+    // Both upcoming quarters render as their own forecast column (EPS + revenue),
+    // not just the single immediate next report.
+    expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
+    expect(screen.getAllByText("Q3 '27").length).toBeGreaterThan(0)
+    expect(screen.getByText('$1.05')).toBeInTheDocument()
+    expect(screen.getByText('$1.18')).toBeInTheDocument()
+  })
+
   it('omits the forward bar when there is no upcoming consensus', () => {
     renderWithProviders(
       <EarningsCard

@@ -1080,12 +1080,18 @@ const chartLabelSx: SxProps<Theme> = {
 
 export default function EarningsCard({
   earnings,
+  upcoming = null,
   growth = null,
   estimates = null,
   forwardPe = null,
   forwardPs = null,
 }: {
   earnings: EarningsHistory
+  // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
+  // "expected" columns for — one per quarter, oldest → newest. Defaults to the
+  // single `earnings.next_report` when not supplied, so callers that only have
+  // the beat history keep their one forecast column.
+  upcoming?: NextEarnings[] | null
   // Forward-looking enrichment off the stock snapshot (a different endpoint than
   // the earnings history), threaded in by the page; the forward section drops
   // when none of it is present.
@@ -1100,8 +1106,14 @@ export default function EarningsCard({
   // The scheduled next report, if any — the header chip shows its date alone.
   const nextRpt = earnings.next_report
 
-  // The forward consensus the charts draw from: the single scheduled next report.
-  const forecastList = earnings.next_report ? [earnings.next_report] : []
+  // The forward consensus the charts draw from: every upcoming quarter the page
+  // passes, else the single scheduled next report.
+  const forecastList =
+    upcoming && upcoming.length > 0
+      ? upcoming
+      : earnings.next_report
+        ? [earnings.next_report]
+        : []
   const epsForecasts = forecastSeries(forecastList, (f) => f.eps_estimate)
   const revForecasts = forecastSeries(forecastList, (f) => f.revenue_estimate)
   const revBars = revenueSeries(quarters)

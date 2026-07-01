@@ -14,12 +14,17 @@ import {
   ToggleButtonGroup,
   Typography,
 } from '@mui/material'
-import { type ChartRange } from '@/lib/api'
+import {
+  quarterlyToEarningsHistory,
+  quarterlyUpcoming,
+  type ChartRange,
+} from '@/lib/api'
 import {
   errorMessage,
   useCandles,
   useEarnings,
   useFiveYearReturn,
+  useQuarterlyEarnings,
   useRecommendations,
   useRsi,
   useStock,
@@ -63,7 +68,11 @@ export default function Stocks() {
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
+  // The beat charts now ride the new consolidated quarterly endpoint; the older
+  // `/earnings` call stays for the trailing metrics + valuation tiles (and the
+  // profitability read) it still owns, until those move over too.
   const earningsQuery = useEarnings(loadedSymbol, 8)
+  const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -269,22 +278,29 @@ export default function Stocks() {
               </CardContent>
             </Card>
 
-            {earningsQuery.isLoading && (
+            {quarterlyQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
                 <CircularProgress size={28} />
               </Stack>
             )}
-            {earningsQuery.isError && (
+            {quarterlyQuery.isError && (
               <Alert severity="warning" variant="outlined">
                 {errorMessage(
-                  earningsQuery.error,
+                  quarterlyQuery.error,
                   'Could not load earnings data.',
                 )}
               </Alert>
             )}
-            {earningsQuery.data && (
+            {quarterlyQuery.data && (
               <EarningsCard
-                earnings={earningsQuery.data}
+                earnings={quarterlyToEarningsHistory(
+                  quarterlyQuery.data,
+                  earningsQuery.data,
+                )}
+                upcoming={quarterlyUpcoming(
+                  quarterlyQuery.data,
+                  earningsQuery.data,
+                )}
                 growth={stock.growth}
                 estimates={stock.analyst_estimates}
                 forwardPe={stock.forward_pe}

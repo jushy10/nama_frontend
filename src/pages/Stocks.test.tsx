@@ -125,6 +125,74 @@ const earningsSample = {
   ],
 }
 
+// The consolidated quarterly series (oldest → newest): the two reported quarters
+// mirror `earningsSample.quarters`, plus two upcoming quarters carrying the
+// forward EPS/revenue consensus. Drives the beat charts + next-report chip.
+const quarterlyEarningsSample = {
+  symbol: 'NVDA',
+  count: 4,
+  reported_count: 2,
+  upcoming_count: 2,
+  quarters: [
+    {
+      fiscal_year: 2026,
+      fiscal_quarter: 3,
+      period_end: '2025-11-20',
+      report_date: '2025-11-19',
+      eps_actual: 0.81,
+      eps_estimate: 0.75,
+      eps_surprise: 0.06,
+      eps_surprise_percent: 8.0,
+      revenue_estimate: null,
+      revenue_actual: null,
+      beat: true,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 1,
+      period_end: '2026-05-28',
+      report_date: '2026-05-27',
+      eps_actual: 0.96,
+      eps_estimate: 0.92,
+      eps_surprise: 0.04,
+      eps_surprise_percent: 4.3,
+      revenue_estimate: null,
+      revenue_actual: null,
+      beat: true,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 2,
+      period_end: '2026-08-27',
+      report_date: '2026-07-30',
+      eps_actual: null,
+      eps_estimate: 1.05,
+      eps_surprise: null,
+      eps_surprise_percent: null,
+      revenue_estimate: 89_000_000_000,
+      revenue_actual: null,
+      beat: null,
+      is_reported: false,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 3,
+      period_end: '2026-11-26',
+      report_date: '2026-10-29',
+      eps_actual: null,
+      eps_estimate: 1.18,
+      eps_surprise: null,
+      eps_surprise_percent: null,
+      revenue_estimate: 95_400_000_000,
+      revenue_actual: null,
+      beat: null,
+      is_reported: false,
+    },
+  ],
+}
+
 const recommendationsSample = {
   symbol: 'NVDA',
   count: 2,
@@ -150,20 +218,25 @@ function stubFetch(
   rsi: unknown = rsiSample,
   earnings: unknown = earningsSample,
   recommendations: unknown = recommendationsSample,
+  quarterly: unknown = quarterlyEarningsSample,
 ) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL) => {
       const u = String(url)
+      // `/earnings/quarterly` must be matched before the `/earnings` history,
+      // since it also contains that substring.
       const body = u.includes('/recommendations')
         ? recommendations
-        : u.includes('/earnings')
-          ? earnings
-          : u.includes('/rsi')
-            ? rsi
-            : u.includes('/candles')
-              ? candles
-              : stock
+        : u.includes('/earnings/quarterly')
+          ? quarterly
+          : u.includes('/earnings')
+            ? earnings
+            : u.includes('/rsi')
+              ? rsi
+              : u.includes('/candles')
+                ? candles
+                : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -272,6 +345,11 @@ describe('Stocks search', () => {
     // Round billions render "$89B" or "$89.0B" depending on the ICU version.
     expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
+    // Both upcoming quarters the endpoint returns plot as their own forecast
+    // column, not just the immediate next report.
+    expect(screen.getAllByText("Q3 '27").length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$1.18').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/\$95\.4B/).length).toBeGreaterThan(0)
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
