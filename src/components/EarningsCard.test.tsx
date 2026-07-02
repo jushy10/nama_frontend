@@ -295,6 +295,82 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument() // legend entry
+    // The forecast column carries the sequential (QoQ) growth its consensus
+    // implies vs. the quarter right before it: Q2'27E 1.05 over Q1'27's
+    // reported 0.96 → +9.4%.
+    expect(screen.getByText('+9.4%')).toBeInTheDocument()
+  })
+
+  it('labels only upcoming columns with the consensus-implied QoQ growth', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+        }}
+        upcoming={[
+          {
+            report_date: '2026-07-30',
+            fiscal_year: 2027,
+            fiscal_quarter: 2,
+            eps_estimate: 1.05,
+            revenue_estimate: null,
+            session: null,
+          },
+          {
+            report_date: '2026-10-29',
+            fiscal_year: 2027,
+            fiscal_quarter: 3,
+            eps_estimate: 1.18,
+            revenue_estimate: null,
+            session: null,
+          },
+        ]}
+      />,
+    )
+    // Upcoming quarters read sequentially (QoQ), against the quarter right
+    // before them: Q2'27E vs the reported Q1'27 (1.05/0.96 → +9.4%), and
+    // Q3'27E — whose prior quarter is itself unreported — chained over
+    // Q2'27's own consensus (1.18/1.05 → +12.4%).
+    expect(screen.getByText('+9.4%')).toBeInTheDocument()
+    expect(screen.getByText('+12.4%')).toBeInTheDocument()
+    // Reported columns carry NO growth figure — Q3'26 vs Q2'26 (+19.1%) would
+    // be computable, but past bars already show their growth by height.
+    expect(screen.queryByText('+19.1%')).not.toBeInTheDocument()
+    // The growth row is explained beneath the legend.
+    expect(
+      screen.getByText(/growth its consensus implies/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/quarter right before it/i)).toBeInTheDocument()
+  })
+
+  it("chains an upcoming year's growth off the prior year's estimate", async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        annual={{
+          ...annualSample,
+          count: 5,
+          upcoming_count: 2,
+          years: [
+            ...annualSample.years,
+            {
+              fiscal_year: 2028,
+              period_end: '2028-01-24',
+              eps_actual: null,
+              eps_estimate: 12.5,
+              revenue_actual: null,
+              revenue_estimate: null,
+              net_income: null,
+              is_reported: false,
+            },
+          ],
+        }}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+    // FY28E has no reported FY27 to compare against, so its growth reads over
+    // FY27's own consensus: 12.5 / 8.97 → +39.4%.
+    expect(screen.getByText('+39.4%')).toBeInTheDocument()
   })
 
   it('plots a forward column for every upcoming quarter passed', () => {
@@ -496,21 +572,17 @@ describe('EarningsCard', () => {
   })
 
   it('renders the forward estimates section from the snapshot props', () => {
-    renderWithProviders(
-      <EarningsCard earnings={base} growth={growthSample} forwardPe={38.5} />,
-    )
+    renderWithProviders(<EarningsCard earnings={base} growth={growthSample} />)
 
     expect(screen.getByText('Forward estimates')).toBeInTheDocument()
-
-    // Forward valuation multiple.
-    expect(screen.getByText('Fwd P/E')).toBeInTheDocument()
-    expect(screen.getByText('38.50')).toBeInTheDocument()
 
     // Analyst-expected next-year (FY1→FY2) growth, signed.
     expect(screen.getByText('+8.3%')).toBeInTheDocument() // revenue
     expect(screen.getByText('+15.0%')).toBeInTheDocument() // EPS
 
-    // The Fwd P/S and per-fiscal-year consensus tiles were dropped.
+    // The Fwd P/E tile moved to its own ForwardPeCard; the Fwd P/S and
+    // per-fiscal-year consensus tiles were dropped earlier.
+    expect(screen.queryByText('Fwd P/E')).not.toBeInTheDocument()
     expect(screen.queryByText('Fwd P/S')).not.toBeInTheDocument()
     expect(screen.queryByText(/EPS est\./)).not.toBeInTheDocument()
     expect(screen.queryByText(/Rev est\./)).not.toBeInTheDocument()
@@ -521,7 +593,6 @@ describe('EarningsCard', () => {
       <EarningsCard
         earnings={base}
         growth={{ ...growthSample, forward_eps_growth: -4.2 }}
-        forwardPe={20}
       />,
     )
     expect(screen.getByText('-4.2%')).toBeInTheDocument()
@@ -561,6 +632,16 @@ describe('EarningsCard', () => {
     expect(screen.getByText('$8.97')).toBeInTheDocument()
     expect(screen.getAllByText('$392.6B').length).toBeGreaterThan(0)
     expect(screen.getByText('Upcoming (est.)')).toBeInTheDocument()
+    // Only the upcoming year carries a growth figure — its consensus-implied
+    // YoY vs. the reported FY26 (+83.1% EPS, +81.8% revenue). Reported years
+    // show no percentage; their bar heights already tell the growth story.
+    expect(screen.getByText('+83.1%')).toBeInTheDocument()
+    expect(screen.getByText('+81.8%')).toBeInTheDocument()
+    expect(screen.queryByText('+147.1%')).not.toBeInTheDocument()
+    expect(screen.queryByText('+66.7%')).not.toBeInTheDocument()
+    expect(screen.queryByText('+114.2%')).not.toBeInTheDocument()
+    expect(screen.queryByText('+65.5%')).not.toBeInTheDocument()
+    expect(screen.getByText(/prior fiscal year/i)).toBeInTheDocument()
     // Reported years carry no consensus, so the beat legend gives way to a
     // plain EPS swatch (which shares its label with the chart heading).
     expect(screen.queryByText('Beat')).not.toBeInTheDocument()
@@ -601,6 +682,9 @@ describe('EarningsCard', () => {
       // Bar and forecast labels drop the decimal ("$216B", "$393B")…
       expect(screen.getByText('$216B')).toBeInTheDocument()
       expect(screen.getByText('$393B')).toBeInTheDocument()
+      // …and so does the upcoming column's growth row ("+83%" EPS, "+82%" rev).
+      expect(screen.getByText('+83%')).toBeInTheDocument()
+      expect(screen.getByText('+82%')).toBeInTheDocument()
       // …while the detail line above the plot keeps the full precision.
       expect(screen.getByText('$215.9B')).toBeInTheDocument()
       expect(screen.queryByText('$392.6B')).not.toBeInTheDocument()

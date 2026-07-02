@@ -41,6 +41,9 @@ const PAD = { top: 30, right: 56, bottom: 46, left: 12 }
 
 const fmtEps = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`
 const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
+/** Compact signed percent ("+33%") for the growth row on narrow (phone) slots. */
+const fmtPctShort = (n: number) =>
+  `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(0)}%`
 const fmtPlainPct = (n: number) => `${n.toFixed(1)}%`
 /** A valuation multiple or ratio (P/E, PEG, current ratio, D/E) —
  *  two decimals, no unit. */
@@ -133,7 +136,9 @@ const SESSION_LABEL: Record<string, string> = {
 }
 
 /** One reported column for the grouped-bar chart: a muted "estimate" bar beside
- *  the reported "actual", coloured by whether it met or beat. */
+ *  the reported "actual", coloured by whether it met or beat. Reported columns
+ *  carry no growth figure — the bar heights already tell that story; only the
+ *  forward columns annotate the growth their consensus implies. */
 interface ChartBar {
   key: string
   label: string
@@ -143,11 +148,42 @@ interface ChartBar {
   surprise: number | null
 }
 
-/** One forward "expected" column — an analyst consensus for an upcoming report. */
+/** One forward "expected" column — an analyst consensus for an upcoming report.
+ *  `growth` is the change the consensus implies on the period right before it:
+ *  the prior quarter (QoQ) for quarterly rows, the prior fiscal year (YoY) for
+ *  annual ones. */
 interface ChartForecast {
   key: string
   label: string
   estimate: number | null
+  growth: number | null
+}
+
+/**
+ * Growth of `value` on the immediately preceding period's figure, as a
+ * percent. null when either side is missing or the base isn't positive — a
+ * growth rate measured off a loss (or zero) base is meaningless.
+ */
+function growthPct(
+  value: number | null,
+  prior: number | null | undefined,
+): number | null {
+  if (value == null || prior == null || prior <= 0) return null
+  return (value / prior - 1) * 100
+}
+
+/** The fiscal period immediately before `q`: the previous quarter (Q1 wraps to
+ *  the prior year's Q4) — or, for annual rows (null quarter), the prior fiscal
+ *  year. null when `q` names no fiscal year. */
+function prevPeriodOf(q: {
+  fiscal_year: number | null
+  fiscal_quarter: number | null
+}): { fy: number; fq: number | null } | null {
+  if (q.fiscal_year == null) return null
+  if (q.fiscal_quarter == null) return { fy: q.fiscal_year - 1, fq: null }
+  return q.fiscal_quarter === 1
+    ? { fy: q.fiscal_year - 1, fq: 4 }
+    : { fy: q.fiscal_year, fq: q.fiscal_quarter - 1 }
 }
 
 /** The EPS series (newest-first), straight from the per-quarter fields. */
@@ -180,16 +216,39 @@ function revenueSeries(quarters: EarningsSurprise[]): ChartBar[] {
   }))
 }
 
-/** Forward columns from a consensus list, keeping only those with a value. */
+/**
+ * Forward columns from a consensus list, keeping only those with a value. Each
+ * carries the growth its estimate implies on the *immediately preceding*
+ * period — the prior quarter (QoQ) for quarterly rows, the prior fiscal year
+ * (YoY) for annual ones. The base is the reported figure when `history`
+ * reaches it, else the preceding *consensus* from the same list (so a later
+ * estimate reads over the one before it, e.g. FY2 over FY1's estimate).
+ */
 function forecastSeries(
   list: NextEarnings[],
   value: (f: NextEarnings) => number | null,
+  history: EarningsSurprise[],
+  reportedValue: (q: EarningsSurprise) => number | null,
 ): ChartForecast[] {
+  const priorFor = (f: NextEarnings): number | null => {
+    const prev = prevPeriodOf(f)
+    if (!prev) return null
+    const reported = history.find(
+      (q) => q.fiscal_year === prev.fy && q.fiscal_quarter === prev.fq,
+    )
+    const actual = reported ? reportedValue(reported) : null
+    if (actual != null) return actual
+    const consensus = list.find(
+      (g) => g.fiscal_year === prev.fy && g.fiscal_quarter === prev.fq,
+    )
+    return consensus ? value(consensus) : null
+  }
   return list
     .map((f, i) => ({
       key: f.report_date ?? String(i),
       label: nextLabel(f),
       estimate: value(f),
+      growth: growthPct(value(f), priorFor(f)),
     }))
     .filter((f) => f.estimate != null)
 }
@@ -210,6 +269,7 @@ function SurpriseChart({
   fmtShort,
   ariaLabel,
   neutralColor,
+  growthLabel = 'QoQ',
 }: {
   bars: ChartBar[]
   forecasts: ChartForecast[]
@@ -224,6 +284,9 @@ function SurpriseChart({
    *  rare estimate-less quarter; revenue passes its own accent so its bars read
    *  as a deliberate series, not a greyed-out one. */
   neutralColor?: string
+  /** What the forecast growth figure compares against, for the detail line:
+   *  "QoQ" on the quarterly charts, "YoY" on the annual ones. */
+  growthLabel?: string
 }) {
   const theme = useTheme()
   const up = theme.palette.success.main
@@ -257,6 +320,13 @@ function SurpriseChart({
   const W = cw
 
   const hasForecast = forecasts.length > 0
+
+  // Whether any forecast column carries a YoY growth figure (reported columns
+  // never do — their bar heights already show the growth). The growth row
+  // rides in 14 extra viewBox units beneath the value labels, so charts with
+  // nothing to show keep their original height instead of a blank strip.
+  const growthRow = forecasts.some((f) => f.growth != null)
+  const vbH = growthRow ? H + 14 : H
 
   // API is newest-first; a time axis reads oldest → newest, left → right. The
   // forecasts sit at the far right, after the last reported quarter.
@@ -326,6 +396,9 @@ function SurpriseChart({
   // chart) the full format collides with its neighbours — swap in the tighter
   // one. 50 units ≈ what an 11px "$130.5B" needs to clear its slot.
   const barFmt = fmtShort && slot < 50 ? fmtShort : fmt
+  // The growth row shortens the same way ("+34%"), keeping the decimal for
+  // the detail line above the plot.
+  const growthFmt = slot < 50 ? fmtPctShort : fmtPct
 
   // Default the detail to the latest column that actually carries a value — the
   // newest reported quarter normally, but the forecast when only a forward
@@ -423,6 +496,8 @@ function SurpriseChart({
                 {f.label}
               </Box>
               {cell('Est', orDash(f.estimate, fmt), forecast)}
+              {f.growth != null &&
+                cell(growthLabel, fmtPct(f.growth), f.growth >= 0 ? up : down)}
             </>
           )
         })()
@@ -453,7 +528,7 @@ function SurpriseChart({
 
       <Box
         component="svg"
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${W} ${vbH}`}
         preserveAspectRatio="none"
         role="img"
         aria-label={ariaLabel}
@@ -648,6 +723,19 @@ function SurpriseChart({
               >
                 {barFmt(e)}
               </text>
+              {/* the YoY growth the consensus implies vs. a year earlier */}
+              {f.growth != null && (
+                <text
+                  x={center}
+                  y={H + 2}
+                  fontSize={10}
+                  fontWeight={500}
+                  fill={f.growth >= 0 ? up : down}
+                  textAnchor="middle"
+                >
+                  {growthFmt(f.growth)}
+                </text>
+              )}
             </g>
           )
         })}
@@ -925,19 +1013,13 @@ const growthColor = (n: number | null): string =>
   n == null ? 'text.primary' : n >= 0 ? 'success.main' : 'error.main'
 
 /** The forward-looking complement to the trailing metrics + valuation grids:
- *  the forward P/E and the analyst-expected growth for next year. All of this
- *  rides on the *stock snapshot* (not the earnings endpoint), so the page
- *  threads it in as optional props and the whole section drops when the
- *  estimates vendor didn't cover the symbol. Forward growth is the plain
- *  FY1→FY2 percentage change — what next year's consensus implies versus this
- *  year's — not a multi-year rate. */
-function ForwardTiles({
-  growth,
-  forwardPe,
-}: {
-  growth: GrowthMetrics | null
-  forwardPe: number | null
-}) {
+ *  the analyst-expected growth for next year. Rides on the *stock snapshot*
+ *  (not the earnings endpoint), so the page threads it in as an optional prop
+ *  and the whole section drops when the estimates vendor didn't cover the
+ *  symbol. Forward growth is the plain FY1→FY2 percentage change — what next
+ *  year's consensus implies versus this year's — not a multi-year rate. (The
+ *  forward P/E itself gets a fuller treatment on its own ForwardPeCard.) */
+function ForwardTiles({ growth }: { growth: GrowthMetrics | null }) {
   const fwdRev = growth?.forward_revenue_growth ?? null
   const fwdEps = growth?.forward_eps_growth ?? null
 
@@ -948,12 +1030,6 @@ function ForwardTiles({
     color?: string
     hint?: string
   }[] = [
-    {
-      label: 'Fwd P/E',
-      raw: forwardPe,
-      fmt: fmtMultiple,
-      hint: "Price ÷ next year's expected EPS",
-    },
     {
       label: 'Rev Gr. (next yr)',
       raw: fwdRev,
@@ -1028,7 +1104,6 @@ export default function EarningsCard({
   upcoming = null,
   annual = null,
   growth = null,
-  forwardPe = null,
 }: {
   earnings: EarningsHistory
   // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
@@ -1045,7 +1120,6 @@ export default function EarningsCard({
   // the earnings history), threaded in by the page; the forward section drops
   // when none of it is present.
   growth?: GrowthMetrics | null
-  forwardPe?: number | null
 }) {
   const theme = useTheme()
   const { quarters } = earnings
@@ -1072,8 +1146,19 @@ export default function EarningsCard({
       : earnings.next_report
         ? [earnings.next_report]
         : []
-  const epsForecasts = forecastSeries(forecastList, (f) => f.eps_estimate)
-  const revForecasts = forecastSeries(forecastList, (f) => f.revenue_estimate)
+  const epsBars = epsSeries(activeQuarters)
+  const epsForecasts = forecastSeries(
+    forecastList,
+    (f) => f.eps_estimate,
+    activeQuarters,
+    (q) => q.actual,
+  )
+  const revForecasts = forecastSeries(
+    forecastList,
+    (f) => f.revenue_estimate,
+    activeQuarters,
+    (q) => q.revenue_actual ?? null,
+  )
   const revBars = revenueSeries(activeQuarters)
 
   // Show the reported-revenue columns (gaps included — see revenueSeries) only
@@ -1087,6 +1172,11 @@ export default function EarningsCard({
   // figures or a forward consensus. Many tickers don't carry revenue at all.
   const hasRevenue = hasRevenueHistory || revForecasts.length > 0
   const hasUpcoming = epsForecasts.length > 0 || revForecasts.length > 0
+  // Whether any forecast column carries a YoY growth figure — gates the
+  // one-line explainer of the growth row beneath the legend.
+  const hasGrowth = [...epsForecasts, ...revForecasts].some(
+    (f) => f.growth != null,
+  )
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -1191,8 +1281,9 @@ export default function EarningsCard({
                 </Typography>
               )}
               <SurpriseChart
-                bars={epsSeries(activeQuarters)}
+                bars={epsBars}
                 forecasts={epsForecasts}
+                growthLabel={isAnnual ? 'YoY' : 'QoQ'}
                 // Reported fiscal years carry no consensus, so their bars have
                 // no beat colour — paint them the same green the quarterly
                 // actuals wear, not the washed-out axis grey.
@@ -1213,6 +1304,7 @@ export default function EarningsCard({
                 <SurpriseChart
                   bars={revChartBars}
                   forecasts={revForecasts}
+                  growthLabel={isAnnual ? 'YoY' : 'QoQ'}
                   fmt={fmtRev}
                   fmtShort={fmtRevShort}
                   neutralColor={theme.palette.secondary.main}
@@ -1248,6 +1340,20 @@ export default function EarningsCard({
                 <LegendItem color="primary.main" label="Upcoming (est.)" />
               )}
             </Stack>
+            {hasGrowth && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: 'block', mt: 1 }}
+              >
+                The % beneath an upcoming column is the growth its consensus
+                implies vs.{' '}
+                {isAnnual
+                  ? 'the prior fiscal year (YoY)'
+                  : 'the quarter right before it (QoQ)'}
+                .
+              </Typography>
+            )}
           </>
         )}
 
@@ -1255,7 +1361,7 @@ export default function EarningsCard({
         {earnings.valuation && (
           <ValuationTiles valuation={earnings.valuation} />
         )}
-        <ForwardTiles growth={growth} forwardPe={forwardPe} />
+        <ForwardTiles growth={growth} />
       </CardContent>
     </Card>
   )
