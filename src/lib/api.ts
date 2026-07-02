@@ -833,6 +833,12 @@ export function quarterlyToEarningsHistory(
  * already reported, so there's no surprise or beat to score. `period_end` is
  * the fiscal year's last day — which can sit in the next calendar year (NVDA's
  * FY2026 ended January 2026).
+ *
+ * `eps_actual` is GAAP diluted EPS while `eps_estimate` is analyst consensus —
+ * an adjusted basis that can sit well above GAAP. A reported year may also
+ * carry `eps_actual_consensus`, the year's actual on that same consensus basis
+ * (best-effort — null when the backend couldn't assemble it), so an actual can
+ * be compared with the forward estimates without mixing bases.
  */
 export interface AnnualEarningsYear {
   fiscal_year: number | null
@@ -842,6 +848,7 @@ export interface AnnualEarningsYear {
   revenue_actual: number | null
   revenue_estimate: number | null
   net_income: number | null
+  eps_actual_consensus: number | null
   is_reported: boolean
 }
 
