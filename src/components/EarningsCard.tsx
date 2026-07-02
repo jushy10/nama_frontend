@@ -989,15 +989,6 @@ function ForwardTiles({
   // "FY26 EPS est." — a two-digit fiscal year prefix, matching the quarter labels.
   const yr = (y: number | null, suffix: string) =>
     y != null ? `FY${String(y).slice(-2)} ${suffix}` : suffix
-  // The low–high consensus spread, shown beneath the FY1 EPS estimate.
-  const epsRange =
-    estimates?.eps_low != null && estimates?.eps_high != null
-      ? `${fmtEps(estimates.eps_low)}–${fmtEps(estimates.eps_high)} range`
-      : undefined
-  const analystHint =
-    estimates?.num_analysts_eps != null
-      ? `${estimates.num_analysts_eps} analyst${estimates.num_analysts_eps === 1 ? '' : 's'}`
-      : undefined
   const fwdRev = growth?.forward_revenue_growth ?? null
   const fwdEps = growth?.forward_eps_growth ?? null
 
@@ -1038,13 +1029,13 @@ function ForwardTiles({
       label: yr(fy1, 'EPS est.'),
       raw: estimates?.eps_avg ?? null,
       fmt: fmtEps,
-      hint: epsRange,
+      hint: 'Consensus for the current fiscal year',
     },
     {
       label: yr(fy1, 'Rev est.'),
       raw: estimates?.revenue_avg ?? null,
       fmt: fmtRev,
-      hint: analystHint,
+      hint: 'Consensus for the current fiscal year',
     },
   ]
   // The year after FY1, only when the vendor reaches that far.

@@ -23,7 +23,6 @@ import {
   errorMessage,
   useAnnualEarnings,
   useCandles,
-  useEarnings,
   useFiveYearReturn,
   useQuarterlyEarnings,
   useRecommendations,
@@ -69,10 +68,9 @@ export default function Stocks() {
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
-  // The beat charts now ride the new consolidated quarterly endpoint; the older
-  // `/earnings` call stays for the trailing metrics + valuation tiles (and the
-  // profitability read) it still owns, until those move over too.
-  const earningsQuery = useEarnings(loadedSymbol, 8)
+  // The earnings card runs entirely off the consolidated quarterly endpoint;
+  // the trailing metrics, valuation tiles and profitability read ride on the
+  // snapshot's `metrics`/`growth` blocks (the legacy /earnings call is gone).
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
   // if it fails the toggle simply doesn't appear, so no error state is shown.
@@ -190,11 +188,9 @@ export default function Stocks() {
             <DcaCard drawdown={stock.drawdown_from_high} />
 
             {/* Bottom-line profitability from trailing net margin; rides the
-                earnings query's metrics, so it pops in once those resolve. */}
-            {earningsQuery.data?.metrics && (
-              <ProfitabilityCard
-                netMargin={earningsQuery.data.metrics.net_margin}
-              />
+                snapshot's metrics block, so it renders with the rest. */}
+            {stock.metrics && (
+              <ProfitabilityCard netMargin={stock.metrics.net_margin} />
             )}
 
             {recommendationsQuery.isLoading && (
@@ -299,12 +295,9 @@ export default function Stocks() {
               <EarningsCard
                 earnings={quarterlyToEarningsHistory(
                   quarterlyQuery.data,
-                  earningsQuery.data,
+                  stock,
                 )}
-                upcoming={quarterlyUpcoming(
-                  quarterlyQuery.data,
-                  earningsQuery.data,
-                )}
+                upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                 annual={annualQuery.data ?? null}
                 growth={stock.growth}
                 estimates={stock.analyst_estimates}

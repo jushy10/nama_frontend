@@ -11,21 +11,18 @@ export interface StockPerformance {
 }
 
 /**
- * Forward sell-side consensus estimates for the next fiscal year(s). `fiscal_year`
- * is FY1 — the nearest full fiscal year still being estimated — carrying its
- * consensus mean EPS/revenue (with the low–high EPS range and the analyst counts
- * behind them); `*_fy2` carry the year after. Best-effort: any field a vendor
+ * Forward sell-side consensus estimates for the next fiscal year(s).
+ * `fiscal_year` is FY1 — the nearest full fiscal year still being estimated —
+ * carrying its consensus mean EPS/revenue; `*_fy2` carry the year after. (The
+ * low–high range and analyst counts were dropped when the API consolidated
+ * estimates into the annual earnings data.) Best-effort: any field the source
  * doesn't cover is null.
  */
 export interface AnalystEstimates {
   fiscal_year: number | null
   period_end: string | null
   eps_avg: number | null
-  eps_low: number | null
-  eps_high: number | null
   revenue_avg: number | null
-  num_analysts_eps: number | null
-  num_analysts_revenue: number | null
   eps_avg_fy2: number | null
   fiscal_year_fy2: number | null
 }
@@ -33,7 +30,7 @@ export interface AnalystEstimates {
 /**
  * Revenue & earnings growth, all percent. `*_yoy` is the trailing one-year change
  * from reported figures (Finnhub TTM); `forward_*_growth` is the analyst-expected
- * one-year change next year — FY1 → FY2 (FMP estimates). Any leg may be null.
+ * one-year change next year — FY1 → FY2 (Yahoo consensus). Any leg may be null.
  */
 export interface GrowthMetrics {
   revenue_yoy: number | null
@@ -62,6 +59,8 @@ export interface Stock {
   dividend_per_share: number | null
   dividend_yield: number | null
   performance: StockPerformance | null
+  /** Trailing valuation/health/profitability ratios (see `KeyMetrics`). */
+  metrics: KeyMetrics | null
   /** Percent the price sits below its all-time high (≤ 0; 0 at a new high). */
   drawdown_from_high: number | null
   // Forward-looking enrichment (best-effort; null when the estimates vendor is
@@ -592,23 +591,18 @@ export interface EarningsSurprise {
 }
 
 /**
- * Trailing earnings/profitability snapshot served alongside the beat history:
- * trailing EPS, year-over-year EPS/revenue growth, the margin stack, the
- * returns (ROE/ROIC) and the dividend payout ratio. All percentages except
- * `eps`; any field a vendor doesn't cover is null. (Valuation/market ratios —
- * P/E, PEG, beta, the 52-week range — ride alongside as `valuation`, the same
- * block the stock snapshot carries on its `metrics`.)
+ * Trailing earnings/profitability read for the earnings card's metric tiles:
+ * year-over-year EPS/revenue growth plus the margin stack, all percent. A
+ * view-model assembled from the stock snapshot (`growth` + the margins on
+ * `metrics`) — see `quarterlyToEarningsHistory`; any leg the vendor doesn't
+ * cover is null.
  */
 export interface EarningsMetrics {
-  eps: number | null
   eps_growth_yoy: number | null
   revenue_growth_yoy: number | null
   gross_margin: number | null
   operating_margin: number | null
   net_margin: number | null
-  roe: number | null
-  roic: number | null
-  payout_ratio: number | null
 }
 
 /**
@@ -625,6 +619,11 @@ export interface KeyMetrics {
   peg: number | null
   pb: number | null
   ps: number | null
+  // Profitability margins (percent) — served on the snapshot so the stock page
+  // keeps them as the legacy /earnings endpoint is phased out.
+  gross_margin: number | null
+  operating_margin: number | null
+  net_margin: number | null
   current_ratio: number | null
   debt_to_equity: number | null
   beta: number | null
@@ -708,14 +707,15 @@ export interface NextEarnings {
 }
 
 /**
- * Recent quarterly earnings surprises (newest first) plus a beat summary.
- * `beat_rate` is the percent of *scored* quarters (those with both an actual
- * and an estimate) that met or beat — the "beats consistently?" read; `scored`
- * is how many of `count` quarters could be scored, `beats` how many of those
- * cleared the bar. `metrics` is an optional trailing earnings snapshot,
- * `valuation` the point-in-time valuation/health/market ratios, and
- * `next_report` the next scheduled report's consensus (all best-effort; absent
- * on older API builds, null when the vendor has no data).
+ * The earnings card's view-model: recent quarterly earnings surprises (newest
+ * first) plus a beat summary. Assembled by `quarterlyToEarningsHistory` from
+ * `/earnings/quarterly` and the stock snapshot — no longer fetched from an
+ * endpoint of its own. `beat_rate` is the percent of *scored* quarters (those
+ * with both an actual and an estimate) that met or beat; `scored` is how many
+ * of `count` quarters could be scored, `beats` how many of those cleared the
+ * bar. `metrics` is the trailing growth/margin read, `valuation` the
+ * point-in-time valuation/health/market ratios (both from the snapshot), and
+ * `next_report` the next scheduled report's consensus.
  */
 export interface EarningsHistory {
   symbol: string
@@ -727,29 +727,6 @@ export interface EarningsHistory {
   metrics?: EarningsMetrics | null
   valuation?: KeyMetrics | null
   next_report?: NextEarnings | null
-}
-
-/**
- * Fetch recent quarterly earnings (actual EPS vs. consensus estimate) for a
- * ticker, newest first. `limit` is how many quarters to pull back, clamped by
- * the API to 1–40 (default 4).
- */
-export async function getEarnings(
-  symbol: string,
-  opts: { limit?: number; signal?: AbortSignal } = {},
-): Promise<EarningsHistory> {
-  const qs = new URLSearchParams()
-  if (opts.limit != null) qs.set('limit', String(opts.limit))
-  const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings?${qs}`,
-    { signal: opts.signal },
-  )
-  if (!res.ok) throw await toApiError(res)
-  const data = (await res.json()) as EarningsHistory
-  if (!Array.isArray(data?.quarters)) {
-    throw new ApiError(res.status, 'Malformed earnings response')
-  }
-  return data
 }
 
 /**
@@ -816,40 +793,57 @@ export async function getQuarterlyEarnings(
  * Every upcoming (scheduled, not-yet-reported) quarter from the series, mapped
  * to the `NextEarnings` shape the earnings card draws its forward "expected"
  * columns from — oldest → newest, so they append to the right of the reported
- * bars in order. The trading `session` (before/after close) only meaningfully
- * applies to the immediate next report, so it's borrowed from `base` for the
- * first quarter and left null for the ones beyond it.
+ * bars in order. The trading `session` (before/after close) came from the
+ * retired `/earnings` endpoint's calendar and is no longer sourced, so it's
+ * always null (the chip simply shows the date alone).
  */
 export function quarterlyUpcoming(
   quarterly: QuarterlyEarnings,
-  base?: EarningsHistory | null,
 ): NextEarnings[] {
   return quarterly.quarters
     .filter((q) => !q.is_reported)
-    .map((q, i) => ({
+    .map((q) => ({
       report_date: q.report_date,
       fiscal_year: q.fiscal_year,
       fiscal_quarter: q.fiscal_quarter,
       eps_estimate: q.eps_estimate,
       revenue_estimate: q.revenue_estimate,
-      session: i === 0 ? (base?.next_report?.session ?? null) : null,
+      session: null,
     }))
 }
 
 /**
- * Adapt the new quarterly series into the `EarningsHistory` shape the earnings
- * card renders, so the EPS/revenue charts, the adjusted-TTM tile and the
- * next-report chip all run off `/earnings/quarterly`. Reported quarters become
- * the (newest-first) `quarters` history; the first upcoming quarter becomes
- * `next_report`. What the quarterly endpoint doesn't carry yet — the trailing
- * `metrics`, the `valuation` ratios and the report `session` — rides in from
- * `base` (the existing `/earnings` response) until those move over too. `base`
- * is optional: with none, the charts still render and the trailing/valuation
- * tiles simply drop.
+ * The trailing growth + margin tiles, assembled from the stock snapshot: the
+ * YoY growth legs ride on `growth` and the margin stack on `metrics` — the
+ * same Finnhub figures the retired `/earnings` endpoint used to relay. Null
+ * when the snapshot carries neither block, so the tiles simply drop.
+ */
+function stockToEarningsMetrics(stock?: Stock | null): EarningsMetrics | null {
+  const growth = stock?.growth ?? null
+  const metrics = stock?.metrics ?? null
+  if (!growth && !metrics) return null
+  return {
+    eps_growth_yoy: growth?.eps_yoy ?? null,
+    revenue_growth_yoy: growth?.revenue_yoy ?? null,
+    gross_margin: metrics?.gross_margin ?? null,
+    operating_margin: metrics?.operating_margin ?? null,
+    net_margin: metrics?.net_margin ?? null,
+  }
+}
+
+/**
+ * Adapt the quarterly series (+ the stock snapshot) into the `EarningsHistory`
+ * shape the earnings card renders, so the EPS/revenue charts, the adjusted-TTM
+ * tile and the next-report chip all run off `/earnings/quarterly`. Reported
+ * quarters become the (newest-first) `quarters` history and the beat summary
+ * is scored from their `beat` flags; the first upcoming quarter becomes
+ * `next_report`; the trailing `metrics` and `valuation` ratios ride in from
+ * the snapshot (`growth` + `metrics`). `stock` is optional: with none, the
+ * charts still render and the trailing/valuation tiles simply drop.
  */
 export function quarterlyToEarningsHistory(
   quarterly: QuarterlyEarnings,
-  base?: EarningsHistory | null,
+  stock?: Stock | null,
 ): EarningsHistory {
   const reported = quarterly.quarters.filter((q) => q.is_reported)
   // The card reads newest-first; the endpoint serves oldest-first.
@@ -867,20 +861,23 @@ export function quarterlyToEarningsHistory(
       beat: q.beat,
       revenue_actual: q.revenue_actual,
     }))
+  const scoreable = reported.filter((q) => q.beat != null)
+  const beats = scoreable.filter((q) => q.beat).length
   // The chip names the single *next* report — the first upcoming quarter; the
-  // charts draw every upcoming quarter via the card's `upcoming` prop. Fall back
-  // to the existing response when the quarterly series has no upcoming quarter.
+  // charts draw every upcoming quarter via the card's `upcoming` prop.
   const next_report: NextEarnings | null =
-    quarterlyUpcoming(quarterly, base)[0] ?? base?.next_report ?? null
+    quarterlyUpcoming(quarterly)[0] ?? null
   return {
     symbol: quarterly.symbol,
     count: quarterly.reported_count,
-    beats: base?.beats ?? 0,
-    scored: base?.scored ?? 0,
-    beat_rate: base?.beat_rate ?? null,
+    beats,
+    scored: scoreable.length,
+    beat_rate: scoreable.length
+      ? Math.round((beats / scoreable.length) * 1000) / 10
+      : null,
     quarters,
-    metrics: base?.metrics ?? null,
-    valuation: base?.valuation ?? null,
+    metrics: stockToEarningsMetrics(stock),
+    valuation: stock?.metrics ?? null,
     next_report,
   }
 }
