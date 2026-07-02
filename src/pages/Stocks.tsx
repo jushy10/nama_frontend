@@ -29,7 +29,6 @@ import {
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
-import DcaCard from '@/components/DcaCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
@@ -172,8 +171,6 @@ export default function Stocks() {
                 </Box>
               </Stack>
             </Box>
-
-            <DcaCard drawdown={stock.drawdown_from_high} />
 
             {/* Bottom-line profitability from trailing net margin; rides the
                 snapshot's metrics block, so it renders with the rest. */}
