@@ -125,7 +125,6 @@ describe('ForwardPeCard', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
-        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={annualSample}
       />,
@@ -135,11 +134,11 @@ describe('ForwardPeCard', () => {
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()
 
-    // Current: the snapshot's actual trailing P/E, passed straight through.
-    // The multiple shows on the tile and again on the charts' "Now" bars.
+    // Current: 200 ÷ 3.34 (TTM — the last four reported actuals summed). The
+    // multiple shows on the tile and again on the charts' "Now" bars.
     expect(screen.getByText('Current P/E')).toBeInTheDocument()
     expect(screen.getAllByText('59.88').length).toBeGreaterThan(0)
-    expect(screen.getByText('Price ÷ trailing 12-mo EPS')).toBeInTheDocument()
+    expect(screen.getByText('TTM EPS $3.34')).toBeInTheDocument()
 
     // FY1: 200 ÷ 4.00 and FY2: 200 ÷ 5.00, labelled with their fiscal years.
     // Each multiple shows on its tile and again on the fiscal-year chart.
@@ -164,14 +163,15 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('-33.2% vs now')).toBeInTheDocument()
 
     // The bases are spelled out beneath the walk.
-    expect(screen.getByText(/standard trailing multiple/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/same basis the analyst estimates use/i),
+    ).toBeInTheDocument()
   })
 
   it('tints a compressing multiple green and an expanding one red', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
-        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={{
           ...annualSample,
@@ -196,7 +196,6 @@ describe('ForwardPeCard', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
-        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={annualSample}
       />,
@@ -235,8 +234,8 @@ describe('ForwardPeCard', () => {
     )
     expect(screen.queryByText("Q2 '27")).not.toBeInTheDocument()
     expect(screen.getByText("Q3 '27")).toBeInTheDocument()
-    // With no trailing P/E passed, there's no "Now" anchor and the Current
-    // tile shows an em dash.
+    // Only three usable actuals remain, so there's no TTM Current P/E either:
+    // no "Now" anchor, and the Current tile shows an em dash.
     expect(screen.queryByText('Now')).not.toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
   })

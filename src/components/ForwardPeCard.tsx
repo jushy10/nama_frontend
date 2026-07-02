@@ -36,6 +36,29 @@ function quarterLabel(q: QuarterlyEarningsQuarter): string {
   return '—'
 }
 
+/**
+ * Today's price over the adjusted trailing-twelve-month EPS — the last four
+ * reported quarters' actuals summed, the same (consensus) basis the forward
+ * estimates are on, so every step of the Current → Fwd walk compares like
+ * with like. nulls are skipped and the newest four actuals summed. null until
+ * four actuals exist or when the TTM is a loss (a P/E over negative earnings
+ * is meaningless).
+ */
+function currentTtmPe(
+  quarterly: QuarterlyEarnings | null,
+  price: number,
+): { pe: number; ttmEps: number } | null {
+  const actuals = (quarterly?.quarters ?? [])
+    .filter((q) => q.is_reported)
+    .map((q) => q.eps_actual)
+    .filter((v): v is number => v != null)
+  if (actuals.length < 4) return null
+  // Oldest → newest, so the newest four are at the tail.
+  const ttmEps = actuals.slice(-4).reduce((sum, v) => sum + v, 0)
+  if (ttmEps <= 0) return null
+  return { pe: price / ttmEps, ttmEps }
+}
+
 /** One step of the Current → FY1 → FY2 walk: a fiscal year's forward P/E. */
 interface FyStep {
   label: string // "FY27", or "(next FY)" for the snapshot fallback
@@ -329,44 +352,40 @@ function PeStep({
 
 /**
  * The forward P/E, given room to breathe: a Current P/E → FY1 → FY2 walk
- * (the snapshot's actual trailing P/E, then today's price over each forecast
- * year's consensus EPS — the annual series carries two years of estimates),
- * the same walk drawn as a bar chart, and a by-quarter chart of the rolling
- * 12-month P/E as the EPS window rolls across the upcoming quarters. Every
- * forward multiple is at *today's* price, so a falling multiple is purely the
- * expected earnings growth. The card drops entirely when there's no forward
- * consensus to show.
+ * (today's price over the last four reported quarters' EPS, then over each
+ * forecast year's consensus EPS — the annual series carries two years of
+ * estimates), the same walk drawn as a bar chart, and a by-quarter chart of
+ * the rolling 12-month P/E as the EPS window rolls across the upcoming
+ * quarters. Every multiple divides the SAME price by an EPS on the SAME
+ * (consensus) basis, so a falling multiple is purely the expected earnings
+ * growth. The card drops entirely when there's no forward consensus to show.
  */
 export default function ForwardPeCard({
   price,
-  trailingPe = null,
   quarterly = null,
   annual = null,
   forwardPe = null,
 }: {
-  /** Today's price, from the stock snapshot — every forward multiple uses it. */
+  /** Today's price, from the stock snapshot — every multiple uses it. */
   price: number
-  /** The snapshot's actual trailing P/E (the vendor's standard calculation) —
-   *  the "now" anchor every forward multiple is read against. */
-  trailingPe?: number | null
-  /** Feeds the by-quarter rolling forward P/E chart. */
+  /** Feeds the Current P/E anchor (TTM of its reported quarters) and the
+   *  by-quarter rolling forward P/E chart. */
   quarterly?: QuarterlyEarnings | null
   annual?: AnnualEarnings | null
   /** The snapshot's own forward P/E (price ÷ FY1 consensus): the fallback
    *  first step when the annual series isn't available. */
   forwardPe?: number | null
 }) {
-  const current = trailingPe
+  const current = currentTtmPe(quarterly, price)
   const fySteps = fiscalYearSteps(annual, price, forwardPe)
   const qBars = rollingQuarterBars(quarterly, price)
   // No forward consensus anywhere → nothing to say; drop the card.
   if (fySteps.length === 0 && qBars.length === 0) return null
 
   // Both charts open on the same trailing anchor bar, when there is one.
-  const nowBar: PeBar[] =
-    current != null
-      ? [{ key: 'now', label: 'Now', pe: current, estimated: false }]
-      : []
+  const nowBar: PeBar[] = current
+    ? [{ key: 'now', label: 'Now', pe: current.pe, estimated: false }]
+    : []
   const quarterBars: PeBar[] = [...nowBar, ...qBars]
   // The fiscal-year walk as chart columns — only the years whose consensus
   // yields a meaningful (positive-earnings) multiple.
@@ -385,8 +404,8 @@ export default function ForwardPeCard({
   // The move from today's multiple, green when the multiple compresses
   // (earnings expected to grow into the price), red when it expands.
   const deltaVsNow = (pe: number | null) => {
-    if (pe == null || current == null) return null
-    const pct = (pe / current - 1) * 100
+    if (pe == null || !current) return null
+    const pct = (pe / current.pe - 1) * 100
     return {
       text: `${fmtPct(pct)} vs now`,
       color:
@@ -415,8 +434,8 @@ export default function ForwardPeCard({
             >
               <PeStep
                 label="Current P/E"
-                value={current == null ? '—' : fmtMultiple(current)}
-                hint={current == null ? null : 'Price ÷ trailing 12-mo EPS'}
+                value={current ? fmtMultiple(current.pe) : '—'}
+                hint={current ? `TTM EPS ${fmtEps(current.ttmEps)}` : null}
               />
               {fySteps.map((s, i) => (
                 <Fragment key={`${s.label}-${i}`}>
@@ -448,9 +467,10 @@ export default function ForwardPeCard({
               color="text.secondary"
               sx={{ display: 'block', mt: 1.5 }}
             >
-              Current P/E is the standard trailing multiple — today&apos;s price
-              over the last twelve months&apos; reported EPS. Each forward step
-              divides the same price by that fiscal year&apos;s consensus EPS.
+              Current P/E is today&apos;s price over the last four reported
+              quarters&apos; EPS — the same basis the analyst estimates use, so
+              every step compares like with like. Each forward step divides the
+              same price by that fiscal year&apos;s consensus EPS.
             </Typography>
           </>
         )}
