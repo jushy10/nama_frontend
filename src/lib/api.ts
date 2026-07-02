@@ -186,34 +186,6 @@ export function rsiVerdict(rsi: RsiSeries): RsiAction | null {
   return 'Hold'
 }
 
-/** A dollar-cost-averaging call, escalating with how deep the dip runs. */
-export type DcaAction = 'Strong Buy' | 'Moderate Buy' | 'Buy' | 'Hold'
-
-/**
- * Buy tiers keyed by drawdown depth (percent below the all-time high). Deeper
- * falls read as stronger entries: a 10% dip is a Buy, 20% a Moderate Buy, 30%+
- * a Strong Buy. Ordered deepest-first so a linear scan returns the right call.
- */
-export const DCA_TIERS: { action: DcaAction; depth: number }[] = [
-  { action: 'Strong Buy', depth: 30 },
-  { action: 'Moderate Buy', depth: 20 },
-  { action: 'Buy', depth: 10 },
-]
-
-/**
- * Map a drawdown-from-high (a percent ≤ 0) to a DCA call. Returns null when
- * there's no drawdown to judge; a shallow dip (under the smallest tier) is a
- * Hold — too near the high to call it a discount.
- */
-export function dcaVerdict(drawdownFromHigh: number | null): DcaAction | null {
-  if (drawdownFromHigh == null) return null
-  const depth = -drawdownFromHigh
-  for (const tier of DCA_TIERS) {
-    if (depth >= tier.depth) return tier.action
-  }
-  return 'Hold'
-}
-
 /**
  * A bottom-line profitability call from trailing net margin: is the company
  * actually making money, and how comfortably. Net margin is THE profit read —
