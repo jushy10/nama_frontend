@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { gradeValuation, profitabilityVerdict } from '@/lib/api'
+import {
+  clampToRegularHours,
+  gradeValuation,
+  profitabilityVerdict,
+  type Candle,
+  type CandleSeries,
+} from '@/lib/api'
 
 describe('gradeValuation', () => {
   it('grades P/E: cheap-to-reasonable good, elevated fair, rich or loss-making a caution', () => {
@@ -49,6 +55,78 @@ describe('gradeValuation', () => {
     expect(gradeValuation('beta', 1.3)).toBe('fair')
     expect(gradeValuation('beta', 1.5)).toBe('fair')
     expect(gradeValuation('beta', 1.6)).toBe('caution')
+  })
+})
+
+describe('clampToRegularHours', () => {
+  // A bar at the given UTC wall-clock time; only `time` matters to the clamp.
+  const barAtUtc = (
+    y: number,
+    mo: number,
+    d: number,
+    h: number,
+    mi: number,
+  ): Candle => {
+    const time = Date.UTC(y, mo - 1, d, h, mi) / 1000
+    return {
+      time,
+      timestamp: new Date(time * 1000).toISOString(),
+      open: 1,
+      high: 2,
+      low: 1,
+      close: 2,
+      volume: 100,
+      direction: 'up',
+    }
+  }
+
+  const series = (timeframe: string, candles: Candle[]): CandleSeries => ({
+    symbol: 'TEST',
+    timeframe,
+    count: candles.length,
+    candles,
+  })
+
+  it('keeps only 9:30–4:00 ET bars on intraday series (EDT: UTC-4)', () => {
+    // July 1 is EDT, so 9:30 AM ET = 13:30 UTC and 4:00 PM ET = 20:00 UTC.
+    const s = series('5Min', [
+      barAtUtc(2026, 7, 1, 13, 25), // 9:25 AM ET — pre-market
+      barAtUtc(2026, 7, 1, 13, 30), // 9:30 AM ET — first session bar
+      barAtUtc(2026, 7, 1, 19, 55), // 3:55 PM ET — last session bar
+      barAtUtc(2026, 7, 1, 20, 0), // 4:00 PM ET — after-hours window
+      barAtUtc(2026, 7, 1, 20, 40), // 4:40 PM ET — after-hours
+    ])
+    const clamped = clampToRegularHours(s)
+    expect(clamped.candles.map((c) => c.time)).toEqual([
+      s.candles[1].time,
+      s.candles[2].time,
+    ])
+    expect(clamped.count).toBe(2)
+  })
+
+  it('respects the ET offset in winter (EST: UTC-5)', () => {
+    // January 15 is EST, so 9:30 AM ET = 14:30 UTC and 4:00 PM ET = 21:00 UTC.
+    const s = series('5Min', [
+      barAtUtc(2026, 1, 15, 13, 30), // 8:30 AM ET — pre-market in winter
+      barAtUtc(2026, 1, 15, 14, 30), // 9:30 AM ET — first session bar
+      barAtUtc(2026, 1, 15, 20, 55), // 3:55 PM ET — last session bar
+      barAtUtc(2026, 1, 15, 21, 0), // 4:00 PM ET — after-hours window
+    ])
+    const clamped = clampToRegularHours(s)
+    expect(clamped.candles.map((c) => c.time)).toEqual([
+      s.candles[1].time,
+      s.candles[2].time,
+    ])
+  })
+
+  it('passes daily and coarser series through untouched', () => {
+    // Daily bars are stamped at midnight/early-morning ET — a session filter
+    // would wrongly empty them.
+    const s = series('1Day', [
+      barAtUtc(2026, 7, 1, 4, 0),
+      barAtUtc(2026, 7, 2, 4, 0),
+    ])
+    expect(clampToRegularHours(s)).toBe(s)
   })
 })
 
