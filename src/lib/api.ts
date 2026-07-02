@@ -138,6 +138,18 @@ export interface CandleSeries {
   candles: Candle[]
 }
 
+/**
+ * Percent move across a candle series, from the first bar's open to the last
+ * bar's close — the whole charted window, including the first bar's own move.
+ * `null` when the series is empty or has no usable base price.
+ */
+export function rangeReturnPct(candles: Candle[]): number | null {
+  const first = candles[0]
+  const last = candles[candles.length - 1]
+  if (!first || !last || !first.open) return null
+  return ((last.close - first.open) / first.open) * 100
+}
+
 /** Where the latest RSI sits relative to the overbought/oversold thresholds. */
 export type RsiSignal = 'oversold' | 'overbought' | 'neutral'
 

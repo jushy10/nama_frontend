@@ -43,10 +43,14 @@ function QuoteTile({
   def,
   stock,
   linkToStock,
+  selected,
+  onSelect,
 }: {
   def: QuoteDef
   stock: Stock | null
   linkToStock: boolean
+  selected: boolean
+  onSelect?: (symbol: string) => void
 }) {
   const pct = stock?.change_percent ?? null
   const up = (pct ?? 0) >= 0
@@ -151,8 +155,33 @@ function QuoteTile({
     </>
   )
 
-  // A company tile is a link to that ticker's snapshot; an index proxy is a
-  // plain, non-interactive card.
+  // A selectable tile is a toggle button that elects its symbol (e.g. picking
+  // which index the home-page chart shows); a company tile is a link to that
+  // ticker's snapshot; anything else is a plain, non-interactive card.
+  if (onSelect) {
+    return (
+      <Box
+        component="button"
+        type="button"
+        onClick={() => onSelect(def.symbol)}
+        aria-pressed={selected}
+        sx={{
+          ...TILE_SX,
+          width: '100%',
+          textAlign: 'left',
+          font: 'inherit',
+          cursor: 'pointer',
+          ...(selected && {
+            borderColor: 'primary.main',
+            '&:hover': { borderColor: 'primary.main' },
+          }),
+        }}
+      >
+        {body}
+      </Box>
+    )
+  }
+
   if (linkToStock) {
     return (
       <Box
@@ -216,15 +245,23 @@ const GRID_SX = {
  * With `linkToStock`, each tile carries the company logo and links to that
  * ticker's snapshot (/stocks?symbol=…) — for the Mag 7, where every tile is a
  * real, drill-into-able company. Index proxies leave it off.
+ *
+ * With `onSelect`, each tile is instead a toggle button and the tile matching
+ * `selectedSymbol` is highlighted — for the home page, where picking a tile
+ * chooses which index the chart below shows.
  */
 export default function QuoteGrid({
   items,
   refreshMs = 60_000,
   linkToStock = false,
+  selectedSymbol = null,
+  onSelect,
 }: {
   items: QuoteDef[]
   refreshMs?: number
   linkToStock?: boolean
+  selectedSymbol?: string | null
+  onSelect?: (symbol: string) => void
 }) {
   const symbols = items.map((i) => i.symbol)
   const { data } = useStocks(symbols, { refetchInterval: refreshMs })
@@ -252,6 +289,8 @@ export default function QuoteGrid({
               def={def}
               stock={quotes[i]}
               linkToStock={linkToStock}
+              selected={def.symbol === selectedSymbol}
+              onSelect={onSelect}
             />
           ))}
     </Box>

@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   gradeValuation,
   profitabilityVerdict,
+  rangeReturnPct,
   type Candle,
   type CandleSeries,
 } from '@/lib/api'
@@ -127,6 +128,33 @@ describe('clampToRegularHours', () => {
       barAtUtc(2026, 7, 2, 4, 0),
     ])
     expect(clampToRegularHours(s)).toBe(s)
+  })
+})
+
+describe('rangeReturnPct', () => {
+  // Only open/close feed the calculation; the rest is boilerplate.
+  const bar = (open: number, close: number): Candle => ({
+    time: 0,
+    timestamp: '2026-07-01T00:00:00Z',
+    open,
+    high: Math.max(open, close),
+    low: Math.min(open, close),
+    close,
+    volume: null,
+    direction: close >= open ? 'up' : 'down',
+  })
+
+  it('measures first open to last close across the window', () => {
+    // 200 → 250 over three bars, including the first bar's own move.
+    expect(rangeReturnPct([bar(200, 210), bar(210, 220), bar(220, 250)])).toBe(
+      25,
+    )
+    expect(rangeReturnPct([bar(200, 190), bar(190, 150)])).toBe(-25)
+  })
+
+  it('returns null for an empty series or a zero base price', () => {
+    expect(rangeReturnPct([])).toBeNull()
+    expect(rangeReturnPct([bar(0, 10)])).toBeNull()
   })
 })
 

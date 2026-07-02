@@ -10,8 +10,6 @@ import {
   Container,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
 import {
@@ -34,21 +32,11 @@ import PerformanceCard from '@/components/PerformanceCard'
 import DcaCard from '@/components/DcaCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CandleChart from '@/components/CandleChart'
+import ChartRangeToggle from '@/components/ChartRangeToggle'
+import RangeReturn from '@/components/RangeReturn'
 import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
-
-// Curated subset of the API's ranges — the ones worth a one-tap button.
-const RANGE_OPTIONS: ChartRange[] = [
-  '1D',
-  '5D',
-  '1M',
-  '3M',
-  '6M',
-  '1Y',
-  '5Y',
-  'YTD',
-]
 
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
@@ -221,33 +209,23 @@ export default function Stocks() {
                     mb: 2,
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    component="h2"
-                    sx={{ fontWeight: 600 }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'baseline' }}
                   >
-                    Price chart
-                  </Typography>
-                  <ToggleButtonGroup
-                    size="small"
-                    exclusive
-                    value={range}
-                    onChange={(_, value: ChartRange | null) =>
-                      value && setRange(value)
-                    }
-                    aria-label="Chart range"
-                    sx={{ flexWrap: 'wrap' }}
-                  >
-                    {RANGE_OPTIONS.map((r) => (
-                      <ToggleButton
-                        key={r}
-                        value={r}
-                        sx={{ px: 1.5, py: 0.25 }}
-                      >
-                        {r}
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
+                    <Typography
+                      variant="h6"
+                      component="h2"
+                      sx={{ fontWeight: 600 }}
+                    >
+                      Price chart
+                    </Typography>
+                    {candleQuery.data && (
+                      <RangeReturn candles={candleQuery.data.candles} />
+                    )}
+                  </Stack>
+                  <ChartRangeToggle value={range} onChange={setRange} />
                 </Stack>
 
                 {candleQuery.isLoading && (

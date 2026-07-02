@@ -303,11 +303,13 @@ describe('Stocks search', () => {
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
 
-    // The candlestick chart loads from the candles endpoint.
+    // The candlestick chart loads from the candles endpoint, and the header
+    // carries the range's move: first open (200) → last close (209.97).
     expect(
       await screen.findByRole('heading', { name: /price chart/i }),
     ).toBeInTheDocument()
     expect(await screen.findByText('Vol')).toBeInTheDocument()
+    expect(screen.getByText(/\+4\.9[89]%/)).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/candles'),
       expect.anything(),

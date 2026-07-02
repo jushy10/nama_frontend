@@ -5,34 +5,19 @@ import {
   CardContent,
   CircularProgress,
   Stack,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
   useTheme,
 } from '@mui/material'
 import { type ChartRange } from '@/lib/api'
 import { useManyCandles } from '@/lib/queries'
 import type { QuoteDef } from '@/components/QuoteGrid'
+import ChartRangeToggle from '@/components/ChartRangeToggle'
 import PerformanceComparisonChart, {
   type ComparisonSeries,
 } from '@/components/PerformanceComparisonChart'
 import RelativePerformanceBars, {
   type RelRow,
 } from '@/components/RelativePerformanceBars'
-
-// Mirror the stock page's price-chart ranges (intraday first, YTD last) so the
-// two charts share one mental model. The rebased overlay reads the same at any
-// horizon, intraday included.
-const RANGE_OPTIONS: ChartRange[] = [
-  '1D',
-  '5D',
-  '1M',
-  '3M',
-  '6M',
-  '1Y',
-  '5Y',
-  'YTD',
-]
 
 // Categorical hues for the member lines — distinct and legible on both canvases.
 // The benchmark index draws as a solid, thicker, high-contrast neutral line on
@@ -162,20 +147,11 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Performance vs. the Nasdaq 100
           </Typography>
-          <ToggleButtonGroup
-            size="small"
-            exclusive
+          <ChartRangeToggle
             value={range}
-            onChange={(_, value: ChartRange | null) => value && setRange(value)}
-            aria-label="Comparison range"
-            sx={{ flexWrap: 'wrap' }}
-          >
-            {RANGE_OPTIONS.map((r) => (
-              <ToggleButton key={r} value={r} sx={{ px: 1.5, py: 0.25 }}>
-                {r}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+            onChange={setRange}
+            ariaLabel="Comparison range"
+          />
         </Stack>
 
         <Typography color="text.secondary" sx={{ fontSize: '0.85rem', mb: 2 }}>
