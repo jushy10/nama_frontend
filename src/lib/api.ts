@@ -472,6 +472,42 @@ export async function getScreener(
   return data
 }
 
+/** True for minute/hour bars — the granularities where extended-hours windows appear. */
+const isIntradayTimeframe = (timeframe: string) => /Min|Hour/.test(timeframe)
+
+// One reusable ET wall-clock formatter (construction is the expensive part).
+// h23 keeps midnight as "00"; the IANA zone tracks EST/EDT automatically.
+const ET_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hourCycle: 'h23',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+// The regular NYSE/Nasdaq session, in minutes-of-day ET.
+const RTH_OPEN = 9 * 60 + 30 // 9:30 AM
+const RTH_CLOSE = 16 * 60 // 4:00 PM
+
+/**
+ * Drop extended-hours bars from an intraday series; non-intraday series pass
+ * through untouched. The API's bars come from Alpaca's IEX feed, which only
+ * prints a bar for a window that saw an IEX trade — outside the regular
+ * session that's sparse and ends at a different time per symbol (the 4 PM
+ * closing auction never trades on IEX), so overlaid charts would trail off
+ * raggedly. Clamping to the 9:30–4:00 ET session makes every intraday line
+ * start and stop together. A bar's `time` marks its window's start, so the
+ * session's last 5-minute bar is the 3:55 PM one.
+ */
+export function clampToRegularHours(series: CandleSeries): CandleSeries {
+  if (!isIntradayTimeframe(series.timeframe)) return series
+  const candles = series.candles.filter((c) => {
+    const [h, m] = ET_CLOCK.format(new Date(c.time * 1000)).split(':')
+    const minute = Number(h) * 60 + Number(m)
+    return minute >= RTH_OPEN && minute < RTH_CLOSE
+  })
+  return { ...series, candles, count: candles.length }
+}
+
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
 export async function getCandles(
   symbol: string,
@@ -501,7 +537,7 @@ export async function getCandles(
   if (!Array.isArray(data?.candles)) {
     throw new ApiError(res.status, 'Malformed candle response')
   }
-  return data
+  return clampToRegularHours(data)
 }
 
 /**
