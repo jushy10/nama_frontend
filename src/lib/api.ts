@@ -11,23 +11,6 @@ export interface StockPerformance {
 }
 
 /**
- * Forward sell-side consensus estimates for the next fiscal year(s).
- * `fiscal_year` is FY1 — the nearest full fiscal year still being estimated —
- * carrying its consensus mean EPS/revenue; `*_fy2` carry the year after. (The
- * low–high range and analyst counts were dropped when the API consolidated
- * estimates into the annual earnings data.) Best-effort: any field the source
- * doesn't cover is null.
- */
-export interface AnalystEstimates {
-  fiscal_year: number | null
-  period_end: string | null
-  eps_avg: number | null
-  revenue_avg: number | null
-  eps_avg_fy2: number | null
-  fiscal_year_fy2: number | null
-}
-
-/**
  * Revenue & earnings growth, all percent. `*_yoy` is the trailing one-year change
  * from reported figures (Finnhub TTM); `forward_*_growth` is the analyst-expected
  * one-year change next year — FY1 → FY2 (Yahoo consensus). Any leg may be null.
@@ -66,8 +49,6 @@ export interface Stock {
   // Forward-looking enrichment (best-effort; null when the estimates vendor is
   // unavailable or doesn't cover the symbol).
   forward_pe: number | null // price ÷ FY1 consensus EPS
-  forward_ps: number | null // market cap ÷ FY1 consensus revenue
-  analyst_estimates: AnalystEstimates | null
   growth: GrowthMetrics | null
 }
 
@@ -619,18 +600,17 @@ export interface EarningsMetrics {
 
 /**
  * Point-in-time valuation, financial-health and market ratios — the "is it
- * priced well?" read that complements the trailing earnings. `pe`/`pb`/`ps` are
+ * priced well?" read that complements the trailing earnings. `pe`/`pb` are
  * valuation multiples and `peg` the trailing P/E over EPS growth (null on losses
  * or non-positive growth); `current_ratio` and `debt_to_equity` gauge
- * balance-sheet health; `beta` is volatility vs. the market (1.0 = moves with
- * it); `week_52_high`/`week_52_low` bound the trailing year's price range. All
- * trailing (no forward estimates); any field a vendor doesn't cover is null.
+ * balance-sheet health; `week_52_high`/`week_52_low` bound the trailing year's
+ * price range. All trailing (no forward estimates); any field a vendor doesn't
+ * cover is null.
  */
 export interface KeyMetrics {
   pe: number | null
   peg: number | null
   pb: number | null
-  ps: number | null
   // Profitability margins (percent) — served on the snapshot so the stock page
   // keeps them as the legacy /earnings endpoint is phased out.
   gross_margin: number | null
@@ -638,7 +618,6 @@ export interface KeyMetrics {
   net_margin: number | null
   current_ratio: number | null
   debt_to_equity: number | null
-  beta: number | null
   week_52_high: number | null
   week_52_low: number | null
 }
@@ -654,20 +633,13 @@ export interface KeyMetrics {
 export type ValuationGrade = 'good' | 'fair' | 'caution'
 
 /** The KeyMetrics ratios the earnings card grades and colours. */
-export type ValuationRatio =
-  | 'pe'
-  | 'peg'
-  | 'ps'
-  | 'current_ratio'
-  | 'debt_to_equity'
-  | 'beta'
+export type ValuationRatio = 'pe' | 'peg' | 'current_ratio' | 'debt_to_equity'
 
 /**
  * Grade one valuation ratio for at-a-glance colouring. The valuation multiples
- * (P/E, PEG, P/S) read cheaper the lower they are — and a non-positive P/E means
+ * (P/E, PEG) read cheaper the lower they are — and a non-positive P/E means
  * the company isn't profitable, a caution in itself; the health ratios reward a
- * comfortable liquidity cushion and conservative leverage; beta is a volatility
- * read, where calmer-than-the-market is the "good" end. Each branch documents
+ * comfortable liquidity cushion and conservative leverage. Each branch documents
  * its bands; anything between the good and caution edges is `fair`.
  */
 export function gradeValuation(
@@ -683,10 +655,6 @@ export function gradeValuation(
       // Lynch's read: under 1 is cheap for the growth, over 2 pricey for it.
       if (n <= 0 || n > 2) return 'caution'
       return n < 1 ? 'good' : 'fair'
-    case 'ps':
-      // Under ~2× sales is modest; above ~6× is a rich top-line multiple.
-      if (n <= 0 || n > 6) return 'caution'
-      return n < 2 ? 'good' : 'fair'
     case 'current_ratio':
       // Below 1 can't cover near-term bills; a comfortable cushion is healthy.
       if (n < 1) return 'caution'
@@ -695,10 +663,6 @@ export function gradeValuation(
       // Negative equity or heavy leverage is risky; a light balance sheet is good.
       if (n < 0 || n > 2) return 'caution'
       return n <= 1 ? 'good' : 'fair'
-    case 'beta':
-      // Risk read: roughly market or calmer is good, a wild swinger a caution.
-      if (n > 1.5) return 'caution'
-      return n <= 1.1 ? 'good' : 'fair'
   }
 }
 

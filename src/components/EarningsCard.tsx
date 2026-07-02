@@ -18,7 +18,6 @@ import {
 import type { SxProps, Theme } from '@mui/material/styles'
 import { annualReported, annualUpcoming, gradeValuation } from '@/lib/api'
 import type {
-  AnalystEstimates,
   AnnualEarnings,
   EarningsHistory,
   EarningsMetrics,
@@ -43,7 +42,7 @@ const PAD = { top: 30, right: 56, bottom: 46, left: 12 }
 const fmtEps = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`
 const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
 const fmtPlainPct = (n: number) => `${n.toFixed(1)}%`
-/** A valuation multiple or ratio (P/E, PEG, P/S, current ratio, D/E, beta) —
+/** A valuation multiple or ratio (P/E, PEG, current ratio, D/E) —
  *  two decimals, no unit. */
 const fmtMultiple = (n: number) => n.toFixed(2)
 
@@ -858,8 +857,8 @@ const GRADE_COLOR: Record<ValuationGrade, string> = {
   caution: 'error.main',
 }
 
-/** A grid of point-in-time valuation and health ratios (P/E, PEG, P/S, current
- *  ratio, debt/equity, beta) — a subset of the KeyMetrics the stock snapshot
+/** A grid of point-in-time valuation and health ratios (P/E, PEG, current
+ *  ratio, debt/equity) — a subset of the KeyMetrics the stock snapshot
  *  carries, surfaced beside the trailing earnings so the "is it priced well?"
  *  read sits next to "how's it growing?". Each tile carries a one-line
  *  plain-language explainer of what it shows, and its value is tinted green/red
@@ -888,12 +887,6 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
       hint: 'P/E adjusted for growth; under 1 looks cheap',
     },
     {
-      label: 'P/S',
-      ratio: 'ps',
-      value: valuation.ps,
-      hint: 'What you pay per $1 of yearly sales',
-    },
-    {
       label: 'Current Ratio',
       ratio: 'current_ratio',
       value: valuation.current_ratio,
@@ -904,12 +897,6 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
       ratio: 'debt_to_equity',
       value: valuation.debt_to_equity,
       hint: 'Debt vs. shareholder money; lower is safer',
-    },
-    {
-      label: 'Beta',
-      ratio: 'beta',
-      value: valuation.beta,
-      hint: 'How much it swings vs. the market; 1.0 = in step',
     },
   ]
   // Nothing covered → drop the section rather than show a grid of em dashes.
@@ -967,28 +954,19 @@ const growthColor = (n: number | null): string =>
   n == null ? 'text.primary' : n >= 0 ? 'success.main' : 'error.main'
 
 /** The forward-looking complement to the trailing metrics + valuation grids:
- *  analyst-expected growth for next year, the forward valuation multiples, and the
- *  consensus EPS/revenue estimates for the coming fiscal year(s). All of this rides
- *  on the *stock snapshot* (not the earnings endpoint), so the page threads it in
- *  as optional props and the whole section drops when the estimates vendor didn't
- *  cover the symbol. Forward growth is the plain FY1→FY2 percentage change — what
- *  next year's consensus implies versus this year's — not a multi-year rate. */
+ *  the forward P/E and the analyst-expected growth for next year. All of this
+ *  rides on the *stock snapshot* (not the earnings endpoint), so the page
+ *  threads it in as optional props and the whole section drops when the
+ *  estimates vendor didn't cover the symbol. Forward growth is the plain
+ *  FY1→FY2 percentage change — what next year's consensus implies versus this
+ *  year's — not a multi-year rate. */
 function ForwardTiles({
   growth,
-  estimates,
   forwardPe,
-  forwardPs,
 }: {
   growth: GrowthMetrics | null
-  estimates: AnalystEstimates | null
   forwardPe: number | null
-  forwardPs: number | null
 }) {
-  const fy1 = estimates?.fiscal_year ?? null
-  const fy2 = estimates?.fiscal_year_fy2 ?? null
-  // "FY26 EPS est." — a two-digit fiscal year prefix, matching the quarter labels.
-  const yr = (y: number | null, suffix: string) =>
-    y != null ? `FY${String(y).slice(-2)} ${suffix}` : suffix
   const fwdRev = growth?.forward_revenue_growth ?? null
   const fwdEps = growth?.forward_eps_growth ?? null
 
@@ -1006,12 +984,6 @@ function ForwardTiles({
       hint: "Price ÷ next year's expected EPS",
     },
     {
-      label: 'Fwd P/S',
-      raw: forwardPs,
-      fmt: fmtMultiple,
-      hint: "Price ÷ next year's expected sales",
-    },
-    {
       label: 'Rev Gr. (next yr)',
       raw: fwdRev,
       fmt: fmtPct,
@@ -1025,27 +997,7 @@ function ForwardTiles({
       color: growthColor(fwdEps),
       hint: 'Expected EPS growth, this year → next',
     },
-    {
-      label: yr(fy1, 'EPS est.'),
-      raw: estimates?.eps_avg ?? null,
-      fmt: fmtEps,
-      hint: 'Consensus for the current fiscal year',
-    },
-    {
-      label: yr(fy1, 'Rev est.'),
-      raw: estimates?.revenue_avg ?? null,
-      fmt: fmtRev,
-      hint: 'Consensus for the current fiscal year',
-    },
   ]
-  // The year after FY1, only when the vendor reaches that far.
-  if (estimates?.eps_avg_fy2 != null) {
-    tiles.push({
-      label: fy2 != null ? yr(fy2, 'EPS est.') : 'Next yr EPS est.',
-      raw: estimates.eps_avg_fy2,
-      fmt: fmtEps,
-    })
-  }
   // Nothing covered → drop the section rather than show a grid of em dashes.
   if (tiles.every((t) => t.raw == null)) return null
   return (
@@ -1083,8 +1035,8 @@ function ForwardTiles({
         color="text.secondary"
         sx={{ display: 'block', mt: 1.5 }}
       >
-        Analyst consensus for the coming fiscal year(s); growth is the expected
-        change from this year to next (FY1 → FY2), not a multi-year rate.
+        Analyst consensus; growth is the expected change from this year to next
+        (FY1 → FY2), not a multi-year rate.
       </Typography>
     </Box>
   )
@@ -1105,9 +1057,7 @@ export default function EarningsCard({
   upcoming = null,
   annual = null,
   growth = null,
-  estimates = null,
   forwardPe = null,
-  forwardPs = null,
 }: {
   earnings: EarningsHistory
   // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
@@ -1124,9 +1074,7 @@ export default function EarningsCard({
   // the earnings history), threaded in by the page; the forward section drops
   // when none of it is present.
   growth?: GrowthMetrics | null
-  estimates?: AnalystEstimates | null
   forwardPe?: number | null
-  forwardPs?: number | null
 }) {
   const theme = useTheme()
   const { quarters } = earnings
@@ -1340,12 +1288,7 @@ export default function EarningsCard({
         {earnings.valuation && (
           <ValuationTiles valuation={earnings.valuation} />
         )}
-        <ForwardTiles
-          growth={growth}
-          estimates={estimates}
-          forwardPe={forwardPe}
-          forwardPs={forwardPs}
-        />
+        <ForwardTiles growth={growth} forwardPe={forwardPe} />
       </CardContent>
     </Card>
   )

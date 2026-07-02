@@ -278,9 +278,7 @@ export default function Stocks() {
                 upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                 annual={annualQuery.data ?? null}
                 growth={stock.growth}
-                estimates={stock.analyst_estimates}
                 forwardPe={stock.forward_pe}
-                forwardPs={stock.forward_ps}
               />
             )}
           </Stack>

@@ -27,13 +27,6 @@ describe('gradeValuation', () => {
     expect(gradeValuation('peg', 0)).toBe('caution')
   })
 
-  it('grades P/S: under 2× sales good, up to 6× fair, above a caution', () => {
-    expect(gradeValuation('ps', 1.5)).toBe('good')
-    expect(gradeValuation('ps', 2)).toBe('fair')
-    expect(gradeValuation('ps', 6)).toBe('fair')
-    expect(gradeValuation('ps', 6.1)).toBe('caution')
-  })
-
   it('grades current ratio: below 1 a caution, 1–1.5 fair, 1.5+ good', () => {
     expect(gradeValuation('current_ratio', 0.9)).toBe('caution')
     expect(gradeValuation('current_ratio', 1)).toBe('fair')
@@ -48,14 +41,6 @@ describe('gradeValuation', () => {
     expect(gradeValuation('debt_to_equity', 2)).toBe('fair')
     expect(gradeValuation('debt_to_equity', 2.1)).toBe('caution')
     expect(gradeValuation('debt_to_equity', -0.3)).toBe('caution') // negative equity
-  })
-
-  it('grades beta as a volatility read: calm good, lively fair, wild a caution', () => {
-    expect(gradeValuation('beta', 0.8)).toBe('good')
-    expect(gradeValuation('beta', 1.1)).toBe('good')
-    expect(gradeValuation('beta', 1.3)).toBe('fair')
-    expect(gradeValuation('beta', 1.5)).toBe('fair')
-    expect(gradeValuation('beta', 1.6)).toBe('caution')
   })
 })
 
