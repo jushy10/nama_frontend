@@ -31,7 +31,9 @@ const navItems = [
   { label: 'Sectors', to: '/sectors', end: false },
 ]
 
-function Brand() {
+/** `large` is for the top banner; the drawer keeps the compact size so the
+ *  wordmark still fits its 260px panel. */
+function Brand({ large = false }: { large?: boolean }) {
   return (
     <Box
       component={NavLink}
@@ -49,11 +51,24 @@ function Brand() {
         component="img"
         src="/nama-icon.png"
         alt="Nama Insights logo"
-        sx={{ height: 48, width: 48, display: 'block', flexShrink: 0 }}
+        sx={{
+          height: large ? { xs: 48, md: 64 } : 48,
+          width: large ? { xs: 48, md: 64 } : 48,
+          display: 'block',
+          flexShrink: 0,
+        }}
       />
+      {/* The large wordmark only fits beside the phone toolbar's buttons at
+          its compact size, so `large` scales up from md; nowrap so a squeeze
+          can never split "Nama Insights" onto two lines. */}
       <Typography
-        variant="h5"
-        sx={{ fontWeight: 700, letterSpacing: '-0.01em' }}
+        variant={large ? 'h4' : 'h5'}
+        sx={{
+          fontWeight: 700,
+          letterSpacing: '-0.01em',
+          whiteSpace: 'nowrap',
+          ...(large && { fontSize: { xs: '1.5rem', md: '2.125rem' } }),
+        }}
       >
         Nama{' '}
         <Box component="span" sx={{ color: 'primary.light' }}>
@@ -105,9 +120,9 @@ function App() {
           borderColor: 'divider',
         }}
       >
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            <Brand />
+            <Brand large />
             {/* Desktop: inline nav. Mobile (xs–sm): collapses to a drawer. */}
             <Stack
               direction="row"
@@ -124,6 +139,7 @@ function App() {
                   sx={{
                     color: 'text.secondary',
                     fontWeight: 500,
+                    fontSize: '1rem',
                     minWidth: 0,
                     p: 0,
                     '&:hover': {
@@ -200,7 +216,7 @@ function App() {
       </Box>
 
       <Box component="footer" sx={{ borderTop: 1, borderColor: 'divider' }}>
-        <Container maxWidth="lg">
+        <Container maxWidth="xl">
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1}

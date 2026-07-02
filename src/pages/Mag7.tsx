@@ -22,7 +22,7 @@ const BENCHMARKS: QuoteDef[] = [{ label: 'Nasdaq 100', symbol: 'QQQ' }]
 /** Dedicated page for the Magnificent 7 mega-caps and their move for the day. */
 export default function Mag7() {
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
       <Box sx={{ mb: 4 }}>
         <Typography
           variant="h4"

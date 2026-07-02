@@ -82,15 +82,20 @@ export default function Stocks() {
   const stock = stockQuery.data
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    // xl (not lg) so wide monitors actually get the side-by-side rows at a
+    // useful width instead of a 1200px column between big empty margins.
+    <Container maxWidth="xl" sx={{ py: 6 }}>
       <Typography
         variant="h4"
         component="h1"
-        sx={{ color: 'primary.light', fontWeight: 700 }}
+        sx={{ color: 'primary.light', fontWeight: 700, textAlign: 'center' }}
       >
         Stock Search
       </Typography>
-      <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+      <Typography
+        color="text.secondary"
+        sx={{ mt: 1, mb: 3, textAlign: 'center' }}
+      >
         Enter a ticker symbol for a live snapshot and candlestick chart from
         Alpaca.
       </Typography>
@@ -100,7 +105,7 @@ export default function Stocks() {
         direction="row"
         spacing={1}
         onSubmit={onSubmit}
-        sx={{ maxWidth: 520 }}
+        sx={{ maxWidth: 520, mx: 'auto' }}
       >
         <TextField
           label="Ticker symbol"
@@ -136,7 +141,7 @@ export default function Stocks() {
         {stock && (
           <Stack spacing={3}>
             {/* Snapshot rides beside the Performance + RSI stack on desktop
-                (md+) and stacks on mobile; the chart-heavy cards below keep the
+                (md+) and stacks on mobile; the price chart below keeps the
                 full page width. */}
             <Box
               sx={{
@@ -254,40 +259,57 @@ export default function Stocks() {
               </CardContent>
             </Card>
 
-            {quarterlyQuery.isLoading && (
-              <Stack sx={{ alignItems: 'center', py: 2 }}>
-                <CircularProgress size={28} />
-              </Stack>
-            )}
-            {quarterlyQuery.isError && (
-              <Alert severity="warning" variant="outlined">
-                {errorMessage(
-                  quarterlyQuery.error,
-                  'Could not load earnings data.',
-                )}
-              </Alert>
-            )}
-            {quarterlyQuery.data && (
-              <EarningsCard
-                earnings={quarterlyToEarningsHistory(
-                  quarterlyQuery.data,
-                  stock,
-                )}
-                upcoming={quarterlyUpcoming(quarterlyQuery.data)}
-                annual={annualQuery.data ?? null}
-              />
-            )}
+            {/* Earnings and Forward P/E share one full-width row on desktop.
+                auto-fit (rather than a fixed 1fr 1fr) lets whichever card is
+                present take the whole row when the other is missing — the
+                Forward P/E card self-hides without a forward consensus, and
+                the earnings slot is empty while its query loads or errors. */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns:
+                  'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
+                gap: 3,
+                alignItems: 'stretch',
+              }}
+            >
+              {quarterlyQuery.isLoading && (
+                <Stack
+                  sx={{ alignItems: 'center', justifyContent: 'center', py: 2 }}
+                >
+                  <CircularProgress size={28} />
+                </Stack>
+              )}
+              {quarterlyQuery.isError && (
+                <Alert severity="warning" variant="outlined">
+                  {errorMessage(
+                    quarterlyQuery.error,
+                    'Could not load earnings data.',
+                  )}
+                </Alert>
+              )}
+              {quarterlyQuery.data && (
+                <EarningsCard
+                  earnings={quarterlyToEarningsHistory(
+                    quarterlyQuery.data,
+                    stock,
+                  )}
+                  upcoming={quarterlyUpcoming(quarterlyQuery.data)}
+                  annual={annualQuery.data ?? null}
+                />
+              )}
 
-            {/* Forward P/E, walked from today's multiple across the two
-                forecast years and the upcoming quarters. Self-hides until a
-                forward consensus (annual estimates, upcoming quarters, or the
-                snapshot's forward P/E) is available. */}
-            <ForwardPeCard
-              price={stock.price}
-              quarterly={quarterlyQuery.data ?? null}
-              annual={annualQuery.data ?? null}
-              forwardPe={stock.forward_pe}
-            />
+              {/* Forward P/E, walked from today's multiple across the two
+                  forecast years and the upcoming quarters. Self-hides until a
+                  forward consensus (annual estimates, upcoming quarters, or the
+                  snapshot's forward P/E) is available. */}
+              <ForwardPeCard
+                price={stock.price}
+                quarterly={quarterlyQuery.data ?? null}
+                annual={annualQuery.data ?? null}
+                forwardPe={stock.forward_pe}
+              />
+            </Box>
           </Stack>
         )}
       </Box>

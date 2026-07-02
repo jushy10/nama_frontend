@@ -250,7 +250,7 @@ export default function Screener() {
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth="xl" sx={{ py: 6 }}>
         <Stack
           direction="row"
           spacing={1}
