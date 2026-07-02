@@ -101,15 +101,6 @@ const growthSample = {
   forward_eps_growth: 15.0,
 }
 
-const estimatesSample = {
-  fiscal_year: 2027,
-  period_end: '2027-01-31',
-  eps_avg: 5.2,
-  revenue_avg: 250_000_000_000,
-  eps_avg_fy2: 6.4,
-  fiscal_year_fy2: 2028,
-}
-
 describe('EarningsCard', () => {
   it('shows the header and per-quarter EPS', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
@@ -220,13 +211,11 @@ describe('EarningsCard', () => {
             pe: 45.6,
             peg: 1.85,
             pb: 38.2, // still in the payload, but no longer surfaced
-            ps: 22.4,
             gross_margin: 47.9, // in the payload; surfaced by the metric tiles
             operating_margin: 32.6,
             net_margin: 27.2,
             current_ratio: null, // vendor-uncovered -> em dash
             debt_to_equity: 0.42,
-            beta: 1.75,
             week_52_high: 320.5, // still in the payload, but no longer surfaced
             week_52_low: 210.0,
           },
@@ -238,8 +227,6 @@ describe('EarningsCard', () => {
     expect(screen.getByText('45.60')).toBeInTheDocument()
     expect(screen.getByText('PEG')).toBeInTheDocument()
     expect(screen.getByText('1.85')).toBeInTheDocument()
-    expect(screen.getByText('Beta')).toBeInTheDocument()
-    expect(screen.getByText('1.75')).toBeInTheDocument()
     // Each ratio now carries a short plain-language explainer.
     expect(
       screen.getByText('What you pay per $1 of yearly profit'),
@@ -247,8 +234,10 @@ describe('EarningsCard', () => {
     // A null ratio renders an em dash rather than vanishing.
     expect(screen.getByText('Current Ratio')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
-    // P/B and the 52-week range were dropped from the valuation grid.
+    // P/B, P/S, Beta and the 52-week range aren't part of the valuation grid.
     expect(screen.queryByText('P/B')).not.toBeInTheDocument()
+    expect(screen.queryByText('P/S')).not.toBeInTheDocument()
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
     expect(screen.queryByText('52W High')).not.toBeInTheDocument()
     expect(screen.queryByText('52W Low')).not.toBeInTheDocument()
     expect(screen.queryByText('$320.50')).not.toBeInTheDocument()
@@ -267,13 +256,11 @@ describe('EarningsCard', () => {
             pe: 18, // cheap-to-reasonable -> green
             peg: 2.6, // pricey for the growth -> red
             pb: null,
-            ps: 1.2, // modest top-line multiple -> green
             gross_margin: null,
             operating_margin: null,
             net_margin: null,
             current_ratio: 0.7, // can't cover near-term bills -> red
             debt_to_equity: 0.4, // light leverage -> green
-            beta: 1.9, // swings hard vs. the market -> red
             week_52_high: null,
             week_52_low: null,
           },
@@ -284,11 +271,9 @@ describe('EarningsCard', () => {
     const green = 'rgb(52, 211, 153)'
     const red = 'rgb(248, 113, 113)'
     expect(screen.getByText('18.00')).toHaveStyle({ color: green }) // P/E
-    expect(screen.getByText('1.20')).toHaveStyle({ color: green }) // P/S
     expect(screen.getByText('0.40')).toHaveStyle({ color: green }) // Debt/Equity
     expect(screen.getByText('2.60')).toHaveStyle({ color: red }) // PEG
     expect(screen.getByText('0.70')).toHaveStyle({ color: red }) // Current ratio
-    expect(screen.getByText('1.90')).toHaveStyle({ color: red }) // Beta
     // The colour key is spelled out beneath the grid.
     expect(
       screen.getByText(/Green is favourable, red worth a closer look/i),
@@ -530,31 +515,23 @@ describe('EarningsCard', () => {
 
   it('renders the forward estimates section from the snapshot props', () => {
     renderWithProviders(
-      <EarningsCard
-        earnings={base}
-        growth={growthSample}
-        estimates={estimatesSample}
-        forwardPe={38.5}
-        forwardPs={22.0}
-      />,
+      <EarningsCard earnings={base} growth={growthSample} forwardPe={38.5} />,
     )
 
     expect(screen.getByText('Forward estimates')).toBeInTheDocument()
 
-    // Forward valuation multiples.
+    // Forward valuation multiple.
     expect(screen.getByText('Fwd P/E')).toBeInTheDocument()
     expect(screen.getByText('38.50')).toBeInTheDocument()
-    expect(screen.getByText('22.00')).toBeInTheDocument()
 
     // Analyst-expected next-year (FY1→FY2) growth, signed.
     expect(screen.getByText('+8.3%')).toBeInTheDocument() // revenue
     expect(screen.getByText('+15.0%')).toBeInTheDocument() // EPS
 
-    // FY1 / FY2 consensus estimates, prefixed by the fiscal year.
-    expect(screen.getByText('FY27 EPS est.')).toBeInTheDocument()
-    expect(screen.getByText('$5.20')).toBeInTheDocument()
-    expect(screen.getByText('FY28 EPS est.')).toBeInTheDocument()
-    expect(screen.getByText('$6.40')).toBeInTheDocument()
+    // The Fwd P/S and per-fiscal-year consensus tiles were dropped.
+    expect(screen.queryByText('Fwd P/S')).not.toBeInTheDocument()
+    expect(screen.queryByText(/EPS est\./)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rev est\./)).not.toBeInTheDocument()
   })
 
   it('colours a negative forward growth figure as a loss', () => {
@@ -650,20 +627,5 @@ describe('EarningsCard', () => {
     } finally {
       spy.mockRestore()
     }
-  })
-
-  it('drops the FY2 tile when only one forward year is covered', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={base}
-        estimates={{
-          ...estimatesSample,
-          eps_avg_fy2: null,
-          fiscal_year_fy2: null,
-        }}
-      />,
-    )
-    expect(screen.getByText('FY27 EPS est.')).toBeInTheDocument()
-    expect(screen.queryByText('FY28 EPS est.')).not.toBeInTheDocument()
   })
 })
