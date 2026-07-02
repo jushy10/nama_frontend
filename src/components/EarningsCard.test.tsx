@@ -94,13 +94,6 @@ const annualSample: AnnualEarnings = {
   ],
 }
 
-const growthSample = {
-  revenue_yoy: 8.0,
-  eps_yoy: 12.0,
-  forward_revenue_growth: 8.3,
-  forward_eps_growth: 15.0,
-}
-
 describe('EarningsCard', () => {
   it('shows the header and per-quarter EPS', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
@@ -205,18 +198,19 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.getByText('Valuation')).toBeInTheDocument()
-    expect(screen.getByText('P/E')).toBeInTheDocument()
-    expect(screen.getByText('45.60')).toBeInTheDocument()
     expect(screen.getByText('PEG')).toBeInTheDocument()
     expect(screen.getByText('1.85')).toBeInTheDocument()
-    // Each ratio now carries a short plain-language explainer.
+    // Each ratio carries a short plain-language explainer.
     expect(
-      screen.getByText('What you pay per $1 of yearly profit'),
+      screen.getByText('P/E adjusted for growth; under 1 looks cheap'),
     ).toBeInTheDocument()
     // A null ratio renders an em dash rather than vanishing.
     expect(screen.getByText('Current Ratio')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
-    // P/B, P/S, Beta and the 52-week range aren't part of the valuation grid.
+    // The plain P/E moved to the Forward P/E card; P/B, P/S, Beta and the
+    // 52-week range aren't part of the valuation grid either.
+    expect(screen.queryByText('P/E')).not.toBeInTheDocument()
+    expect(screen.queryByText('45.60')).not.toBeInTheDocument()
     expect(screen.queryByText('P/B')).not.toBeInTheDocument()
     expect(screen.queryByText('P/S')).not.toBeInTheDocument()
     expect(screen.queryByText('Beta')).not.toBeInTheDocument()
@@ -252,10 +246,11 @@ describe('EarningsCard', () => {
     // Dark theme (the test default) palette: success.main / error.main.
     const green = 'rgb(52, 211, 153)'
     const red = 'rgb(248, 113, 113)'
-    expect(screen.getByText('18.00')).toHaveStyle({ color: green }) // P/E
     expect(screen.getByText('0.40')).toHaveStyle({ color: green }) // Debt/Equity
     expect(screen.getByText('2.60')).toHaveStyle({ color: red }) // PEG
     expect(screen.getByText('0.70')).toHaveStyle({ color: red }) // Current ratio
+    // The P/E (18) isn't tiled here any more — it lives on the Forward P/E card.
+    expect(screen.queryByText('18.00')).not.toBeInTheDocument()
     // The colour key is spelled out beneath the grid.
     expect(
       screen.getByText(/Green is favourable, red worth a closer look/i),
@@ -571,36 +566,13 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('Est $1.93')).not.toBeInTheDocument()
   })
 
-  it('renders the forward estimates section from the snapshot props', () => {
-    renderWithProviders(<EarningsCard earnings={base} growth={growthSample} />)
-
-    expect(screen.getByText('Forward estimates')).toBeInTheDocument()
-
-    // Analyst-expected next-year (FY1→FY2) growth, signed.
-    expect(screen.getByText('+8.3%')).toBeInTheDocument() // revenue
-    expect(screen.getByText('+15.0%')).toBeInTheDocument() // EPS
-
-    // The Fwd P/E tile moved to its own ForwardPeCard; the Fwd P/S and
-    // per-fiscal-year consensus tiles were dropped earlier.
-    expect(screen.queryByText('Fwd P/E')).not.toBeInTheDocument()
-    expect(screen.queryByText('Fwd P/S')).not.toBeInTheDocument()
-    expect(screen.queryByText(/EPS est\./)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Rev est\./)).not.toBeInTheDocument()
-  })
-
-  it('colours a negative forward growth figure as a loss', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={base}
-        growth={{ ...growthSample, forward_eps_growth: -4.2 }}
-      />,
-    )
-    expect(screen.getByText('-4.2%')).toBeInTheDocument()
-  })
-
-  it('omits the forward section entirely when no snapshot estimates are passed', () => {
+  it('no longer renders a forward estimates section', () => {
+    // The next-year growth tiles were dropped: the charts' upcoming columns
+    // and the Forward P/E card carry the forward story now.
     renderWithProviders(<EarningsCard earnings={base} />)
     expect(screen.queryByText('Forward estimates')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rev Gr\. \(next yr\)/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/EPS Gr\. \(next yr\)/)).not.toBeInTheDocument()
   })
 
   it('hides the period toggle when no annual data is passed', () => {

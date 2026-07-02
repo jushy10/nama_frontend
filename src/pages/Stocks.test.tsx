@@ -375,8 +375,8 @@ describe('Stocks search', () => {
     // The forward P/E card walks today's multiple to the analyst-expected
     // ones: price ÷ the FY27 consensus EPS (209.97 / 8.97 = 23.41) and, by
     // quarter, price ÷ the rolling 12 months of EPS ending Q3 '27
-    // (209.97 / 4.00 = 52.49). Only two reported quarters here, so there's no
-    // adjusted-TTM Current P/E — its tile shows an em dash.
+    // (209.97 / 4.00 = 52.49). Only two reported quarters here, so there's
+    // no TTM Current P/E — its tile shows an em dash.
     expect(
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()

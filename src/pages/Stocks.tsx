@@ -275,7 +275,6 @@ export default function Stocks() {
                 )}
                 upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                 annual={annualQuery.data ?? null}
-                growth={stock.growth}
               />
             )}
 
