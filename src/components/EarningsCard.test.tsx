@@ -146,25 +146,11 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText('-$0.15').length).toBeGreaterThan(0)
   })
 
-  it('shows adjusted EPS (summed from the quarters) and GAAP-labelled margins', () => {
+  it('shows the GAAP growth and margin tiles', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
           ...base,
-          // Four quarters so the adjusted TTM EPS (their sum) can be computed.
-          quarters: [
-            ...base.quarters,
-            {
-              period: '2025-05-29',
-              fiscal_year: 2026,
-              fiscal_quarter: 1,
-              actual: 0.55,
-              estimate: 0.5,
-              surprise: 0.05,
-              surprise_percent: 10,
-              beat: true,
-            },
-          ],
           metrics: {
             eps_growth_yoy: 29.0, // GAAP growth — shown, labelled GAAP via footnote
             revenue_growth_yoy: 12.8,
@@ -176,13 +162,8 @@ describe('EarningsCard', () => {
       />,
     )
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
-    // EPS (TTM) is the sum of the four ADJUSTED quarters (0.96+0.81+0.68+0.55),
-    // not the vendor's GAAP -0.63.
-    expect(screen.getByText('Adj. EPS (TTM)')).toBeInTheDocument()
-    expect(screen.getByText('$3.00')).toBeInTheDocument()
-    expect(screen.queryByText('-$0.63')).not.toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument() // GAAP margin
-    // EPS growth is back as a GAAP tile (signed), alongside revenue growth.
+    // GAAP EPS growth (signed), alongside revenue growth.
     expect(screen.getByText('EPS Gr. (YoY)')).toBeInTheDocument()
     expect(screen.getByText('+29.0%')).toBeInTheDocument()
     // A null metric renders an em dash rather than vanishing.
@@ -192,8 +173,9 @@ describe('EarningsCard', () => {
     expect(
       screen.getByText(/EPS growth, revenue growth and margins are GAAP/i),
     ).toBeInTheDocument()
-    // The old GAAP-EPS *level* and ROE/ROIC/Payout tiles are still gone.
+    // The EPS *level* tiles (GAAP and the adjusted TTM sum) are gone.
     expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
+    expect(screen.queryByText('Adj. EPS (TTM)')).not.toBeInTheDocument()
     expect(screen.queryByText('ROE')).not.toBeInTheDocument()
   })
 
