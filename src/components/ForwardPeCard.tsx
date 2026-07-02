@@ -37,29 +37,71 @@ function quarterLabel(q: QuarterlyEarningsQuarter): string {
 }
 
 /**
- * Today's price over the adjusted trailing-twelve-month EPS — the last four
- * reported quarters' actuals summed, the same (consensus) basis the forward
- * estimates are on, so every step of the Current → Fwd walk compares like
- * with like. nulls are skipped and the newest four actuals summed. null until
- * four actuals exist or when the TTM is a loss (a P/E over negative earnings
- * is meaningless).
+ * The quarterly walk's anchor: today's price over the trailing twelve months
+ * of EPS through the last reported quarter — the newest four reported
+ * actuals summed, labelled with that quarter ("Q1 '27"). The same rolling
+ * window and (consensus) basis the forward quarter steps use, so the
+ * quarterly walk compares like with like end to end. null until four actuals
+ * exist or when the TTM is a loss (a P/E over negative earnings is
+ * meaningless).
  */
-function currentTtmPe(
-  quarterly: QuarterlyEarnings | null,
-  price: number,
-): { pe: number; ttmEps: number } | null {
-  const actuals = (quarterly?.quarters ?? [])
-    .filter((q) => q.is_reported)
-    .map((q) => q.eps_actual)
-    .filter((v): v is number => v != null)
-  if (actuals.length < 4) return null
-  // Oldest → newest, so the newest four are at the tail.
-  const ttmEps = actuals.slice(-4).reduce((sum, v) => sum + v, 0)
-  if (ttmEps <= 0) return null
-  return { pe: price / ttmEps, ttmEps }
+interface QAnchor {
+  label: string
+  pe: number
+  ttmEps: number
 }
 
-/** One step of the Current → FY1 → FY2 walk: a fiscal year's forward P/E. */
+function trailingTtmPe(
+  quarterly: QuarterlyEarnings | null,
+  price: number,
+): QAnchor | null {
+  const reported = (quarterly?.quarters ?? []).filter(
+    (q) => q.is_reported && q.eps_actual != null,
+  )
+  if (reported.length < 4) return null
+  // Oldest → newest, so the newest four are at the tail.
+  const window = reported.slice(-4)
+  const ttmEps = window.reduce((sum, q) => sum + (q.eps_actual as number), 0)
+  if (ttmEps <= 0) return null
+  return { label: quarterLabel(window[3]), pe: price / ttmEps, ttmEps }
+}
+
+/**
+ * The walk's anchor: today's price over the last completed fiscal year's
+ * reported EPS — a full-year window like the forward consensus years, so
+ * every arrow in the walk is a symmetric twelve-month step. The annual
+ * endpoint's actual is reported diluted (GAAP) EPS while the forward years
+ * are analyst consensus; the caption beneath the walk owns up to that basis
+ * gap. `pe` is null when the year was a loss (a P/E over negative earnings
+ * is meaningless); the whole anchor is null when no reported year is served.
+ */
+interface FyAnchor {
+  label: string // "FY26", or "(last FY)" when the year is unlabelled
+  pe: number | null
+  eps: number
+}
+
+function lastReportedFyPe(
+  annual: AnnualEarnings | null,
+  price: number,
+): FyAnchor | null {
+  const reported = (annual?.years ?? []).filter(
+    (y) => y.is_reported && y.eps_actual != null,
+  )
+  const last = reported[reported.length - 1] // oldest → newest
+  if (!last) return null
+  const eps = last.eps_actual as number
+  return {
+    label:
+      last.fiscal_year != null
+        ? `FY${String(last.fiscal_year).slice(-2)}`
+        : '(last FY)',
+    pe: eps > 0 ? price / eps : null,
+    eps,
+  }
+}
+
+/** One step of the FY0 → FY1 → FY2 walk: a fiscal year's forward P/E. */
 interface FyStep {
   label: string // "FY27", or "(next FY)" for the snapshot fallback
   pe: number | null // null when the consensus EPS is a loss
@@ -104,6 +146,15 @@ interface PeBar {
   estimated: boolean
 }
 
+/** One step of the quarterly walk: the rolling forward P/E for an upcoming
+ *  quarter, with the twelve months of EPS that drive it. */
+interface QStep {
+  key: string
+  label: string
+  pe: number
+  ttmEps: number
+}
+
 /**
  * The rolling forward P/E for each upcoming quarter: today's price over the
  * twelve months of EPS ending at that quarter — reported actuals plus
@@ -111,31 +162,31 @@ interface PeBar {
  * its four-quarter window is incomplete (missing EPS, or not enough history)
  * or sums to a loss.
  */
-function rollingQuarterBars(
+function rollingQuarterSteps(
   quarterly: QuarterlyEarnings | null,
   price: number,
-): PeBar[] {
+): QStep[] {
   const qs = quarterly?.quarters ?? [] // oldest → newest
   const eps = qs.map((q) => (q.is_reported ? q.eps_actual : q.eps_estimate))
-  const bars: PeBar[] = []
+  const steps: QStep[] = []
   qs.forEach((q, i) => {
     if (q.is_reported || i < 3) return
     const window = eps.slice(i - 3, i + 1)
     if (window.some((v) => v == null)) return
     const ttm = window.reduce((sum: number, v) => sum + (v as number), 0)
     if (ttm <= 0) return
-    bars.push({
+    steps.push({
       key: q.period_end ?? String(i),
       label: quarterLabel(q),
       pe: price / ttm,
-      estimated: true,
+      ttmEps: ttm,
     })
   })
-  return bars
+  return steps
 }
 
 /**
- * A simple bar chart of P/E multiples, one column per period: the "Now" bar
+ * A simple bar chart of P/E multiples, one column per period: the anchor bar
  * solid, the estimate-driven ones in the same faint-accent-plus-dashed-outline
  * dress the earnings charts use for forecasts, with the multiple above each
  * bar and the period beneath. All bars share a zero baseline so the falling
@@ -274,8 +325,8 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
   )
 }
 
-/** One tile of the Current → Fwd walk: label, big multiple, and the EPS that
- *  drives it, plus (on forward steps) the change versus today's multiple. */
+/** One tile of the FY0 → Fwd walk: label, big multiple, and the EPS that
+ *  drives it, plus (on forward steps) the change versus the anchor multiple. */
 function PeStep({
   label,
   value,
@@ -352,15 +403,80 @@ function PeStep({
   )
 }
 
+/** The rendered content of one walk tile. */
+interface WalkTile {
+  label: string
+  value: string
+  hint?: string | null
+  delta?: { text: string; color: string } | null
+}
+
 /**
- * The forward P/E, given room to breathe: a Current P/E → FY1 → FY2 walk
- * (today's price over the last four reported quarters' EPS, then over each
- * forecast year's consensus EPS — the annual series carries two years of
- * estimates), the same walk drawn as a bar chart, and a by-quarter chart of
- * the rolling 12-month P/E as the EPS window rolls across the upcoming
- * quarters. Every multiple divides the SAME price by an EPS on the SAME
- * (consensus) basis, so a falling multiple is purely the expected earnings
- * growth. The card drops entirely when there's no forward consensus to show.
+ * An anchor → forward-steps walk of PeStep tiles. Reads left → right on
+ * desktop; on phones the tiles can't share a row, so it stacks top → bottom
+ * with the arrows turned to match (a wrapped row would orphan an arrow and
+ * stretch the tiles unevenly).
+ */
+function PeWalk({
+  anchor,
+  steps,
+}: {
+  anchor: WalkTile
+  steps: (WalkTile & { key: string })[]
+}) {
+  return (
+    <Stack
+      direction={{ xs: 'column', sm: 'row' }}
+      useFlexGap
+      spacing={1}
+      sx={{
+        mt: 1.5,
+        alignItems: { xs: 'stretch', sm: 'center' },
+        flexWrap: { xs: 'nowrap', sm: 'wrap' },
+      }}
+    >
+      <PeStep label={anchor.label} value={anchor.value} hint={anchor.hint} />
+      {steps.map((s) => (
+        <Fragment key={s.key}>
+          <Typography
+            aria-hidden
+            sx={{
+              color: 'text.secondary',
+              fontSize: '1.2rem',
+              lineHeight: 1,
+              alignSelf: 'center',
+              transform: { xs: 'rotate(90deg)', sm: 'none' },
+            }}
+          >
+            →
+          </Typography>
+          <PeStep
+            label={s.label}
+            value={s.value}
+            hint={s.hint}
+            delta={s.delta}
+          />
+        </Fragment>
+      ))}
+    </Stack>
+  )
+}
+
+/**
+ * The forward P/E as two anchored walks, each with its tiles, chart, and
+ * footnote:
+ *
+ * - **By fiscal year** — anchored on the last completed fiscal year (today's
+ *   price over its reported EPS), stepping across each forecast year's
+ *   consensus EPS. Symmetric full-fiscal-year windows.
+ * - **By quarter** — anchored on the trailing twelve months through the last
+ *   reported quarter, rolling the same window across the upcoming quarters as
+ *   reported actuals blend into consensus estimates.
+ *
+ * Every multiple divides the SAME price, so a falling multiple is the
+ * expected earnings growth (less any reported-vs-consensus basis gap on the
+ * fiscal-year anchor). The card drops entirely when there's no forward
+ * consensus to show.
  */
 export default function ForwardPeCard({
   price,
@@ -370,29 +486,36 @@ export default function ForwardPeCard({
 }: {
   /** Today's price, from the stock snapshot — every multiple uses it. */
   price: number
-  /** Feeds the Current P/E anchor (TTM of its reported quarters) and the
-   *  by-quarter rolling forward P/E chart. */
+  /** Feeds the by-quarter walk: its trailing-TTM anchor and the rolling
+   *  forward steps. */
   quarterly?: QuarterlyEarnings | null
+  /** Feeds the fiscal-year walk: its last-reported-year anchor and the
+   *  forward FY steps. */
   annual?: AnnualEarnings | null
   /** The snapshot's own forward P/E (price ÷ FY1 consensus): the fallback
    *  first step when the annual series isn't available. */
   forwardPe?: number | null
 }) {
-  const current = currentTtmPe(quarterly, price)
+  const fyAnchor = lastReportedFyPe(annual, price)
   const fySteps = fiscalYearSteps(annual, price, forwardPe)
-  const qBars = rollingQuarterBars(quarterly, price)
+  const qAnchor = trailingTtmPe(quarterly, price)
+  const qSteps = rollingQuarterSteps(quarterly, price)
   // No forward consensus anywhere → nothing to say; drop the card.
-  if (fySteps.length === 0 && qBars.length === 0) return null
+  if (fySteps.length === 0 && qSteps.length === 0) return null
 
-  // Both charts open on the same trailing anchor bar, when there is one.
-  const nowBar: PeBar[] = current
-    ? [{ key: 'now', label: 'Now', pe: current.pe, estimated: false }]
-    : []
-  const quarterBars: PeBar[] = [...nowBar, ...qBars]
-  // The fiscal-year walk as chart columns — only the years whose consensus
-  // yields a meaningful (positive-earnings) multiple.
+  // Each walk as chart columns, opening on its anchor — only periods whose
+  // EPS yields a meaningful (positive) multiple.
   const fyBars: PeBar[] = [
-    ...nowBar,
+    ...(fyAnchor?.pe != null
+      ? [
+          {
+            key: 'fy-anchor',
+            label: fyAnchor.label,
+            pe: fyAnchor.pe,
+            estimated: false,
+          },
+        ]
+      : []),
     ...fySteps
       .filter((s) => s.pe != null)
       .map((s, i) => ({
@@ -402,18 +525,41 @@ export default function ForwardPeCard({
         estimated: true,
       })),
   ]
+  const quarterBars: PeBar[] = [
+    ...(qAnchor
+      ? [
+          {
+            key: 'q-anchor',
+            label: qAnchor.label,
+            pe: qAnchor.pe,
+            estimated: false,
+          },
+        ]
+      : []),
+    ...qSteps.map((s) => ({
+      key: s.key,
+      label: s.label,
+      pe: s.pe,
+      estimated: true,
+    })),
+  ]
 
-  // The move from today's multiple, green when the multiple compresses
-  // (earnings expected to grow into the price), red when it expands.
-  const deltaVsNow = (pe: number | null) => {
-    if (pe == null || !current) return null
-    const pct = (pe / current.pe - 1) * 100
-    return {
-      text: `${fmtPct(pct)} vs now`,
-      color:
-        pct < 0 ? 'success.main' : pct > 0 ? 'error.main' : 'text.secondary',
+  // The move from a walk's anchor multiple, green when the multiple
+  // compresses (earnings expected to grow into the price), red when it
+  // expands.
+  const deltaVs =
+    (anchorPe: number | null | undefined, anchorLabel: string | undefined) =>
+    (pe: number | null) => {
+      if (pe == null || anchorPe == null || !anchorLabel) return null
+      const pct = (pe / anchorPe - 1) * 100
+      return {
+        text: `${fmtPct(pct)} vs ${anchorLabel}`,
+        color:
+          pct < 0 ? 'success.main' : pct > 0 ? 'error.main' : 'text.secondary',
+      }
     }
-  }
+  const fyDelta = deltaVs(fyAnchor?.pe, fyAnchor?.label)
+  const qDelta = deltaVs(qAnchor?.pe, qAnchor?.label)
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -427,77 +573,7 @@ export default function ForwardPeCard({
         </Typography>
 
         {fySteps.length > 0 && (
-          <>
-            {/* The walk reads left → right on desktop; on phones the three
-                tiles can't share a row, so it stacks top → bottom with the
-                arrows turned to match (a wrapped row would orphan an arrow
-                and stretch the tiles unevenly). */}
-            <Stack
-              direction={{ xs: 'column', sm: 'row' }}
-              useFlexGap
-              spacing={1}
-              sx={{
-                mt: 2.5,
-                alignItems: { xs: 'stretch', sm: 'center' },
-                flexWrap: { xs: 'nowrap', sm: 'wrap' },
-              }}
-            >
-              <PeStep
-                label="Current P/E"
-                value={current ? fmtMultiple(current.pe) : '—'}
-                hint={current ? `TTM EPS ${fmtEps(current.ttmEps)}` : null}
-              />
-              {fySteps.map((s, i) => (
-                <Fragment key={`${s.label}-${i}`}>
-                  <Typography
-                    aria-hidden
-                    sx={{
-                      color: 'text.secondary',
-                      fontSize: '1.2rem',
-                      lineHeight: 1,
-                      alignSelf: 'center',
-                      transform: { xs: 'rotate(90deg)', sm: 'none' },
-                    }}
-                  >
-                    →
-                  </Typography>
-                  <PeStep
-                    label={`Fwd P/E ${s.label}`}
-                    value={s.pe == null ? '—' : fmtMultiple(s.pe)}
-                    hint={
-                      s.epsEstimate == null
-                        ? null
-                        : `Est. EPS ${fmtEps(s.epsEstimate)}`
-                    }
-                    delta={deltaVsNow(s.pe)}
-                  />
-                </Fragment>
-              ))}
-            </Stack>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 1.5 }}
-            >
-              Current P/E is today&apos;s price over the last four reported
-              quarters&apos; EPS — the same basis the analyst estimates use, so
-              every step compares like with like. Each forward step divides the
-              same price by that fiscal year&apos;s consensus EPS.
-            </Typography>
-          </>
-        )}
-
-        {/* The walk again as columns — worth drawing only when there are at
-            least two bars to compare (a lone step already reads on its tile). */}
-        {fyBars.length >= 2 && (
-          <Box
-            sx={{
-              mt: 2.5,
-              pt: 2.5,
-              borderTop: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
+          <Box sx={{ mt: 2.5 }}>
             <Typography
               variant="caption"
               color="text.secondary"
@@ -505,19 +581,53 @@ export default function ForwardPeCard({
             >
               By fiscal year
             </Typography>
-            <Box sx={{ mt: 1 }}>
-              <PeBarChart
-                bars={fyBars}
-                ariaLabel="Forward price-to-earnings by fiscal year"
-              />
-            </Box>
+            <PeWalk
+              anchor={{
+                label: `P/E ${fyAnchor?.label ?? '(last FY)'}`,
+                value: fyAnchor?.pe != null ? fmtMultiple(fyAnchor.pe) : '—',
+                hint: fyAnchor ? `Reported EPS ${fmtEps(fyAnchor.eps)}` : null,
+              }}
+              steps={fySteps.map((s, i) => ({
+                key: `${s.label}-${i}`,
+                label: `Fwd P/E ${s.label}`,
+                value: s.pe == null ? '—' : fmtMultiple(s.pe),
+                hint:
+                  s.epsEstimate == null
+                    ? null
+                    : `Est. EPS ${fmtEps(s.epsEstimate)}`,
+                delta: fyDelta(s.pe),
+              }))}
+            />
+            {/* The walk again as columns — worth drawing only when there are
+                at least two bars to compare (a lone step already reads on its
+                tile). */}
+            {fyBars.length >= 2 && (
+              <Box sx={{ mt: 2 }}>
+                <PeBarChart
+                  bars={fyBars}
+                  ariaLabel="Forward price-to-earnings by fiscal year"
+                />
+              </Box>
+            )}
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1.5 }}
+            >
+              The anchor is today&apos;s price over the last completed fiscal
+              year&apos;s reported diluted EPS, so every step in the walk covers
+              a full fiscal year. Each forward step divides the same price by
+              that year&apos;s analyst-consensus EPS — a basis that can sit
+              above reported (GAAP) EPS for companies with large non-GAAP
+              adjustments.
+            </Typography>
           </Box>
         )}
 
-        {qBars.length > 0 && (
+        {qSteps.length > 0 && (
           <Box
             sx={
-              fySteps.length > 0 || fyBars.length >= 2
+              fySteps.length > 0
                 ? {
                     mt: 2.5,
                     pt: 2.5,
@@ -534,7 +644,21 @@ export default function ForwardPeCard({
             >
               By quarter
             </Typography>
-            <Box sx={{ mt: 1 }}>
+            <PeWalk
+              anchor={{
+                label: `P/E ${qAnchor?.label ?? '(TTM)'}`,
+                value: qAnchor ? fmtMultiple(qAnchor.pe) : '—',
+                hint: qAnchor ? `TTM EPS ${fmtEps(qAnchor.ttmEps)}` : null,
+              }}
+              steps={qSteps.map((s) => ({
+                key: s.key,
+                label: `Fwd P/E ${s.label}`,
+                value: fmtMultiple(s.pe),
+                hint: `Est. TTM EPS ${fmtEps(s.ttmEps)}`,
+                delta: qDelta(s.pe),
+              }))}
+            />
+            <Box sx={{ mt: 2 }}>
               <PeBarChart
                 bars={quarterBars}
                 ariaLabel="Forward price-to-earnings by quarter"
@@ -545,8 +669,9 @@ export default function ForwardPeCard({
               color="text.secondary"
               sx={{ display: 'block', mt: 1 }}
             >
-              Each bar divides today&apos;s price by the twelve months of EPS
-              ending that quarter — reported actuals plus analyst estimates as
+              Each step divides today&apos;s price by the twelve months of EPS
+              ending that quarter — the anchor through the last reported
+              quarter, then reported actuals blending into analyst estimates as
               the window rolls forward. A falling multiple means earnings are
               expected to grow into the price.
             </Typography>

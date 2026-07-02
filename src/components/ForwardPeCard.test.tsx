@@ -121,7 +121,7 @@ const annualSample: AnnualEarnings = {
 }
 
 describe('ForwardPeCard', () => {
-  it('walks Current P/E → FY1 → FY2 at today’s price', () => {
+  it('walks the last fiscal year’s P/E → FY1 → FY2 at today’s price', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
@@ -134,11 +134,13 @@ describe('ForwardPeCard', () => {
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()
 
-    // Current: 200 ÷ 3.34 (TTM — the last four reported actuals summed). The
-    // multiple shows on the tile and again on the charts' "Now" bars.
-    expect(screen.getByText('Current P/E')).toBeInTheDocument()
-    expect(screen.getAllByText('59.88').length).toBeGreaterThan(0)
-    expect(screen.getByText('TTM EPS $3.34')).toBeInTheDocument()
+    // Anchor: 200 ÷ 3.10 — the last completed fiscal year's reported EPS. The
+    // multiple shows on the tile and again on the fiscal-year chart's anchor
+    // bar, labelled with the year.
+    expect(screen.getByText('P/E FY26')).toBeInTheDocument()
+    expect(screen.getAllByText('64.52').length).toBeGreaterThan(0)
+    expect(screen.getByText('Reported EPS $3.10')).toBeInTheDocument()
+    expect(screen.getByText('FY26')).toBeInTheDocument()
 
     // FY1: 200 ÷ 4.00 and FY2: 200 ÷ 5.00, labelled with their fiscal years.
     // Each multiple shows on its tile and again on the fiscal-year chart.
@@ -149,7 +151,7 @@ describe('ForwardPeCard', () => {
     expect(screen.getAllByText('40.00').length).toBeGreaterThan(0)
     expect(screen.getByText('Est. EPS $5.00')).toBeInTheDocument()
 
-    // The walk is also drawn as columns: Now + one bar per forecast year.
+    // The walk is also drawn as columns: FY26 + one bar per forecast year.
     expect(screen.getByText('By fiscal year')).toBeInTheDocument()
     expect(
       screen.getByRole('img', { name: /by fiscal year/i }),
@@ -157,15 +159,13 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('FY27')).toBeInTheDocument()
     expect(screen.getByText('FY28')).toBeInTheDocument()
 
-    // Each forward step carries its move versus today's multiple
-    // (50/59.88 − 1 = −16.5%; 40/59.88 − 1 = −33.2%).
-    expect(screen.getByText('-16.5% vs now')).toBeInTheDocument()
-    expect(screen.getByText('-33.2% vs now')).toBeInTheDocument()
+    // Each forward step carries its move versus the anchor multiple
+    // (50/64.52 − 1 = −22.5%; 40/64.52 − 1 = −38.0%).
+    expect(screen.getByText('-22.5% vs FY26')).toBeInTheDocument()
+    expect(screen.getByText('-38.0% vs FY26')).toBeInTheDocument()
 
     // The bases are spelled out beneath the walk.
-    expect(
-      screen.getByText(/same basis the analyst estimates use/i),
-    ).toBeInTheDocument()
+    expect(screen.getByText(/last completed fiscal year/i)).toBeInTheDocument()
   })
 
   it('tints a compressing multiple green and an expanding one red', () => {
@@ -176,6 +176,7 @@ describe('ForwardPeCard', () => {
         annual={{
           ...annualSample,
           years: [
+            year({ fiscal_year: 2026, eps_actual: 3.1, is_reported: true }),
             // A consensus low enough that the forward multiple expands.
             year({ fiscal_year: 2027, eps_estimate: 2.0 }),
             year({ fiscal_year: 2028, eps_estimate: 5.0 }),
@@ -186,13 +187,13 @@ describe('ForwardPeCard', () => {
     // Dark theme (the test default) palette: success.main / error.main.
     const green = 'rgb(52, 211, 153)'
     const red = 'rgb(248, 113, 113)'
-    // FY27: 100/59.88 − 1 = +67% (expands, red); FY28: −33.2% (compresses,
+    // FY27: 100/64.52 − 1 = +55% (expands, red); FY28: −38.0% (compresses,
     // green).
-    expect(screen.getByText('+67.0% vs now')).toHaveStyle({ color: red })
-    expect(screen.getByText('-33.2% vs now')).toHaveStyle({ color: green })
+    expect(screen.getByText('+55.0% vs FY26')).toHaveStyle({ color: red })
+    expect(screen.getByText('-38.0% vs FY26')).toHaveStyle({ color: green })
   })
 
-  it('charts the rolling 12-month P/E for each upcoming quarter', () => {
+  it('walks and charts the rolling 12-month P/E for each upcoming quarter', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
@@ -204,15 +205,29 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('By quarter')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /by quarter/i })).toBeInTheDocument()
 
-    // The trailing anchor bar (it opens the fiscal-year chart too)…
-    expect(screen.getAllByText('Now').length).toBeGreaterThan(0)
-    // …then each upcoming quarter's rolling window: Q2'27 ends on
-    // 0.81+0.89+0.96+1.05 = 3.71 → 53.91; Q3'27 on 0.89+0.96+1.05+1.18
+    // The anchor is the trailing twelve months through the last reported
+    // quarter: 200 ÷ 3.34 (the last four reported actuals summed), labelled
+    // Q1 '27 on both the tile and the chart's opening bar. "Now" is gone.
+    expect(screen.getByText("P/E Q1 '27")).toBeInTheDocument()
+    expect(screen.getAllByText('59.88').length).toBeGreaterThan(0)
+    expect(screen.getByText('TTM EPS $3.34')).toBeInTheDocument()
+    expect(screen.getByText("Q1 '27")).toBeInTheDocument()
+    expect(screen.queryByText('Now')).not.toBeInTheDocument()
+
+    // …then each upcoming quarter's rolling window as tile + bar: Q2'27 ends
+    // on 0.81+0.89+0.96+1.05 = 3.71 → 53.91; Q3'27 on 0.89+0.96+1.05+1.18
     // = 4.08 → 49.02.
-    expect(screen.getByText("Q2 '27")).toBeInTheDocument()
-    expect(screen.getByText('53.91')).toBeInTheDocument()
-    expect(screen.getByText("Q3 '27")).toBeInTheDocument()
-    expect(screen.getByText('49.02')).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q2 '27")).toBeInTheDocument()
+    expect(screen.getAllByText('53.91').length).toBeGreaterThan(0)
+    expect(screen.getByText('Est. TTM EPS $3.71')).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q3 '27")).toBeInTheDocument()
+    expect(screen.getAllByText('49.02').length).toBeGreaterThan(0)
+    expect(screen.getByText('Est. TTM EPS $4.08')).toBeInTheDocument()
+
+    // Each forward step carries its move versus the quarter anchor
+    // (3.34/3.71 − 1 = −10.0%; 3.34/4.08 − 1 = −18.1%).
+    expect(screen.getByText("-10.0% vs Q1 '27")).toBeInTheDocument()
+    expect(screen.getByText("-18.1% vs Q1 '27")).toBeInTheDocument()
   })
 
   it('skips a quarter whose rolling window is incomplete', () => {
@@ -234,20 +249,29 @@ describe('ForwardPeCard', () => {
     )
     expect(screen.queryByText("Q2 '27")).not.toBeInTheDocument()
     expect(screen.getByText("Q3 '27")).toBeInTheDocument()
-    // Only three usable actuals remain, so there's no TTM Current P/E either:
-    // no "Now" anchor, and the Current tile shows an em dash.
-    expect(screen.queryByText('Now')).not.toBeInTheDocument()
+    // Only three usable actuals remain, so the quarter walk loses its
+    // trailing-TTM anchor — the tile renders unlabelled with an em dash —
+    // while the fiscal-year anchor (from the annual series) is unaffected.
+    expect(screen.getByText('P/E (TTM)')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
+    expect(screen.getByText('P/E FY26')).toBeInTheDocument()
+    expect(screen.getAllByText('64.52').length).toBeGreaterThan(0)
   })
 
   it('falls back to the snapshot forward P/E when the annual series is missing', () => {
     renderWithProviders(<ForwardPeCard price={200} forwardPe={38.5} />)
     expect(screen.getByText('Fwd P/E (next FY)')).toBeInTheDocument()
     expect(screen.getByText('38.50')).toBeInTheDocument()
-    // No quarterly series → no rolling chart; and a single step with no
-    // "Now" anchor isn't worth a fiscal-year chart either.
+    // No annual series → no reported year to anchor on: the anchor tile
+    // renders unlabelled with an em dash.
+    expect(screen.getByText('P/E (last FY)')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    // No quarterly series → no quarter section at all; and a lone forward
+    // step with no anchor isn't worth a fiscal-year chart.
     expect(screen.queryByText('By quarter')).not.toBeInTheDocument()
-    expect(screen.queryByText('By fiscal year')).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: /by fiscal year/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows an em dash for a fiscal year whose consensus is a loss', () => {
