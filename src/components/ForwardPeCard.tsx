@@ -290,8 +290,10 @@ function PeStep({
   return (
     <Box
       sx={{
-        flex: '1 1 120px',
-        maxWidth: 220,
+        // A flexible column on desktop; full-width rows when the walk stacks
+        // vertically on phones (flex-basis would set *height* there).
+        flex: { xs: '0 0 auto', sm: '1 1 120px' },
+        maxWidth: { xs: 'none', sm: 220 },
         px: 1.75,
         py: 1.25,
         borderRadius: 1.5,
@@ -426,11 +428,19 @@ export default function ForwardPeCard({
 
         {fySteps.length > 0 && (
           <>
+            {/* The walk reads left → right on desktop; on phones the three
+                tiles can't share a row, so it stacks top → bottom with the
+                arrows turned to match (a wrapped row would orphan an arrow
+                and stretch the tiles unevenly). */}
             <Stack
-              direction="row"
+              direction={{ xs: 'column', sm: 'row' }}
               useFlexGap
               spacing={1}
-              sx={{ mt: 2.5, alignItems: 'center', flexWrap: 'wrap' }}
+              sx={{
+                mt: 2.5,
+                alignItems: { xs: 'stretch', sm: 'center' },
+                flexWrap: { xs: 'nowrap', sm: 'wrap' },
+              }}
             >
               <PeStep
                 label="Current P/E"
@@ -445,6 +455,8 @@ export default function ForwardPeCard({
                       color: 'text.secondary',
                       fontSize: '1.2rem',
                       lineHeight: 1,
+                      alignSelf: 'center',
+                      transform: { xs: 'rotate(90deg)', sm: 'none' },
                     }}
                   >
                     →
