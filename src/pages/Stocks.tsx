@@ -36,6 +36,7 @@ import RangeReturn from '@/components/RangeReturn'
 import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
+import ForwardPeCard from '@/components/ForwardPeCard'
 
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
@@ -275,9 +276,19 @@ export default function Stocks() {
                 upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                 annual={annualQuery.data ?? null}
                 growth={stock.growth}
-                forwardPe={stock.forward_pe}
               />
             )}
+
+            {/* Forward P/E, walked from today's multiple across the two
+                forecast years and the upcoming quarters. Self-hides until a
+                forward consensus (annual estimates, upcoming quarters, or the
+                snapshot's forward P/E) is available. */}
+            <ForwardPeCard
+              price={stock.price}
+              quarterly={quarterlyQuery.data ?? null}
+              annual={annualQuery.data ?? null}
+              forwardPe={stock.forward_pe}
+            />
           </Stack>
         )}
       </Box>

@@ -357,6 +357,13 @@ describe('Stocks search', () => {
     expect(screen.getAllByText("Q3 '27").length).toBeGreaterThan(0)
     expect(screen.getAllByText('$1.18').length).toBeGreaterThan(0)
     expect(screen.getAllByText(/\$95\.4B/).length).toBeGreaterThan(0)
+    // Upcoming columns carry the sequential (QoQ) growth their consensus
+    // implies: Q2'27E over the reported Q1'27 (1.05/0.96 → +9.4%), Q3'27E
+    // chained over Q2'27's own consensus (1.18/1.05 → +12.4%), and Q3'27E
+    // revenue over Q2'27E's estimate (95.4B/89B → +7.2%).
+    expect(screen.getByText('+9.4%')).toBeInTheDocument()
+    expect(screen.getByText('+12.4%')).toBeInTheDocument()
+    expect(screen.getByText('+7.2%')).toBeInTheDocument()
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
@@ -364,6 +371,19 @@ describe('Stocks search', () => {
       expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),
     )
+
+    // The forward P/E card walks today's multiple to the analyst-expected
+    // ones: price ÷ the FY27 consensus EPS (209.97 / 8.97 = 23.41) and, by
+    // quarter, price ÷ the rolling 12 months of EPS ending Q3 '27
+    // (209.97 / 4.00 = 52.49). Only two reported quarters here, so there's no
+    // adjusted-TTM Current P/E — its tile shows an em dash.
+    expect(
+      screen.getByRole('heading', { name: 'Forward P/E' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
+    expect(screen.getByText('23.41')).toBeInTheDocument()
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.getByText('52.49')).toBeInTheDocument()
 
     // The annual series loads too, surfacing a Quarterly/Annual toggle on the
     // card; switching shows the fiscal years — reported EPS/revenue plus the
