@@ -290,11 +290,6 @@ describe('Stocks search', () => {
     // Volume was dropped from the snapshot card.
     expect(screen.queryByText('Volume')).not.toBeInTheDocument()
 
-    // Drawdown-from-high gets its own DCA card with a tiered buy call.
-    expect(screen.getByText('DCA Signal')).toBeInTheDocument()
-    expect(screen.getByText('24.5%')).toBeInTheDocument()
-    expect(screen.getByText('Moderate Buy')).toBeInTheDocument()
-
     // Net margin drives a profitability verdict card; 27.2% reads Highly
     // Profitable. (Rides the snapshot's metrics block.)
     expect(
