@@ -30,6 +30,26 @@ const sample = {
     '1y': 40.1,
   },
   drawdown_from_high: -24.5,
+  metrics: {
+    pe: 34.6,
+    peg: 1.19,
+    pb: 34.0,
+    ps: 9.4,
+    gross_margin: 47.9,
+    operating_margin: 32.6,
+    net_margin: 27.2,
+    current_ratio: 1.07,
+    debt_to_equity: 0.8,
+    beta: 1.1,
+    week_52_high: 317.4,
+    week_52_low: 199.26,
+  },
+  growth: {
+    revenue_yoy: 12.8,
+    eps_yoy: 29.0,
+    forward_revenue_growth: 16.6,
+    forward_eps_growth: 15.2,
+  },
 }
 
 const candlesSample = {
@@ -76,58 +96,9 @@ const rsiSample = {
   ],
 }
 
-const earningsSample = {
-  symbol: 'NVDA',
-  count: 4,
-  beats: 3,
-  scored: 4,
-  beat_rate: 75.0,
-  metrics: {
-    eps: 8.27,
-    eps_growth_yoy: 29.0,
-    revenue_growth_yoy: 12.8,
-    gross_margin: 47.9,
-    operating_margin: 32.6,
-    net_margin: 27.2,
-    roe: 146.7,
-    roic: null,
-    payout_ratio: 12.7,
-  },
-  next_report: {
-    report_date: '2026-07-30',
-    fiscal_year: 2027,
-    fiscal_quarter: 2,
-    eps_estimate: 1.05,
-    revenue_estimate: 89_000_000_000,
-    session: 'amc',
-  },
-  quarters: [
-    {
-      period: '2026-05-28',
-      fiscal_year: 2027,
-      fiscal_quarter: 1,
-      actual: 0.96,
-      estimate: 0.92,
-      surprise: 0.04,
-      surprise_percent: 4.3,
-      beat: true,
-    },
-    {
-      period: '2025-11-20',
-      fiscal_year: 2026,
-      fiscal_quarter: 3,
-      actual: 0.81,
-      estimate: 0.75,
-      surprise: 0.06,
-      surprise_percent: 8.0,
-      beat: true,
-    },
-  ],
-}
-
-// The consolidated quarterly series (oldest → newest): the two reported quarters
-// mirror `earningsSample.quarters`, plus two upcoming quarters carrying the
-// forward EPS/revenue consensus. Drives the beat charts + next-report chip.
+// The consolidated quarterly series (oldest → newest): two reported quarters
+// plus two upcoming ones carrying the forward EPS/revenue consensus. Drives
+// the beat charts + the next-report chip.
 const quarterlyEarningsSample = {
   symbol: 'NVDA',
   count: 4,
@@ -257,7 +228,6 @@ function stubFetch(
   stock: unknown,
   candles: unknown,
   rsi: unknown = rsiSample,
-  earnings: unknown = earningsSample,
   recommendations: unknown = recommendationsSample,
   quarterly: unknown = quarterlyEarningsSample,
   annual: unknown = annualEarningsSample,
@@ -266,21 +236,17 @@ function stubFetch(
     'fetch',
     vi.fn((url: string | URL) => {
       const u = String(url)
-      // `/earnings/quarterly` and `/earnings/annual` must be matched before the
-      // `/earnings` history, since both also contain that substring.
       const body = u.includes('/recommendations')
         ? recommendations
         : u.includes('/earnings/quarterly')
           ? quarterly
           : u.includes('/earnings/annual')
             ? annual
-            : u.includes('/earnings')
-              ? earnings
-              : u.includes('/rsi')
-                ? rsi
-                : u.includes('/candles')
-                  ? candles
-                  : stock
+            : u.includes('/rsi')
+              ? rsi
+              : u.includes('/candles')
+                ? candles
+                : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -330,7 +296,7 @@ describe('Stocks search', () => {
     expect(screen.getByText('Moderate Buy')).toBeInTheDocument()
 
     // Net margin drives a profitability verdict card; 27.2% reads Highly
-    // Profitable. (Rides the earnings query, so await its heading.)
+    // Profitable. (Rides the snapshot's metrics block.)
     expect(
       await screen.findByRole('heading', { name: 'Profitability' }),
     ).toBeInTheDocument()

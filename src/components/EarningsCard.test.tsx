@@ -105,11 +105,7 @@ const estimatesSample = {
   fiscal_year: 2027,
   period_end: '2027-01-31',
   eps_avg: 5.2,
-  eps_low: 4.8,
-  eps_high: 5.6,
   revenue_avg: 250_000_000_000,
-  num_analysts_eps: 42,
-  num_analysts_revenue: 40,
   eps_avg_fy2: 6.4,
   fiscal_year_fy2: 2028,
 }
@@ -179,15 +175,11 @@ describe('EarningsCard', () => {
             },
           ],
           metrics: {
-            eps: -0.63, // vendor's GAAP TTM EPS — deliberately NOT surfaced
             eps_growth_yoy: 29.0, // GAAP growth — shown, labelled GAAP via footnote
             revenue_growth_yoy: 12.8,
             gross_margin: null, // vendor-uncovered -> em dash
             operating_margin: 32.6,
             net_margin: 27.2,
-            roe: 146.7,
-            roic: null,
-            payout_ratio: 12.7,
           },
         }}
       />,
@@ -229,6 +221,9 @@ describe('EarningsCard', () => {
             peg: 1.85,
             pb: 38.2, // still in the payload, but no longer surfaced
             ps: 22.4,
+            gross_margin: 47.9, // in the payload; surfaced by the metric tiles
+            operating_margin: 32.6,
+            net_margin: 27.2,
             current_ratio: null, // vendor-uncovered -> em dash
             debt_to_equity: 0.42,
             beta: 1.75,
@@ -273,6 +268,9 @@ describe('EarningsCard', () => {
             peg: 2.6, // pricey for the growth -> red
             pb: null,
             ps: 1.2, // modest top-line multiple -> green
+            gross_margin: null,
+            operating_margin: null,
+            net_margin: null,
             current_ratio: 0.7, // can't cover near-term bills -> red
             debt_to_equity: 0.4, // light leverage -> green
             beta: 1.9, // swings hard vs. the market -> red
@@ -555,8 +553,6 @@ describe('EarningsCard', () => {
     // FY1 / FY2 consensus estimates, prefixed by the fiscal year.
     expect(screen.getByText('FY27 EPS est.')).toBeInTheDocument()
     expect(screen.getByText('$5.20')).toBeInTheDocument()
-    expect(screen.getByText(/\$4\.80.*\$5\.60/)).toBeInTheDocument() // low–high
-    expect(screen.getByText('42 analysts')).toBeInTheDocument()
     expect(screen.getByText('FY28 EPS est.')).toBeInTheDocument()
     expect(screen.getByText('$6.40')).toBeInTheDocument()
   })
