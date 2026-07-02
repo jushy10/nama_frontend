@@ -831,21 +831,12 @@ function StatTile({
   )
 }
 
-/** A grid of trailing metrics beside the beat history: the GAAP growth figures
- *  (EPS & revenue YoY) and the margin stack, from the vendor. The basis is
- *  spelled out below the grid since the per-quarter bars above are on the
- *  adjusted (consensus) basis. Uncovered values show an em dash. */
+/** A grid of trailing metrics beside the beat history: the GAAP margin stack,
+ *  from the vendor. The basis is spelled out below the grid since the
+ *  per-quarter bars above are on the adjusted (consensus) basis. Uncovered
+ *  values show an em dash. */
 function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
-  // A year-over-year growth tile: signed and coloured green/red, em dash when
-  // the vendor doesn't cover it. Both growth figures are GAAP (see footnote).
-  const growthTile = (label: string, v: number | null) => ({
-    label,
-    text: v == null ? '—' : fmtPct(v),
-    color: v == null ? 'text.primary' : v >= 0 ? 'success.main' : 'error.main',
-  })
   const tiles: { label: string; text: string; color: string }[] = [
-    growthTile('EPS Gr. (YoY)', metrics.eps_growth_yoy),
-    growthTile('Rev. Gr. (YoY)', metrics.revenue_growth_yoy),
     {
       label: 'Gross Margin',
       text:
@@ -900,7 +891,7 @@ function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
         color="text.secondary"
         sx={{ display: 'block', mt: 1.5 }}
       >
-        EPS growth, revenue growth and margins are GAAP.
+        Margins are GAAP.
       </Typography>
     </Box>
   )

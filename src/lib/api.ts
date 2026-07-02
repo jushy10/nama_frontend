@@ -556,15 +556,12 @@ export interface EarningsSurprise {
 }
 
 /**
- * Trailing earnings/profitability read for the earnings card's metric tiles:
- * year-over-year EPS/revenue growth plus the margin stack, all percent. A
- * view-model assembled from the stock snapshot (`growth` + the margins on
- * `metrics`) — see `quarterlyToEarningsHistory`; any leg the vendor doesn't
- * cover is null.
+ * Trailing profitability read for the earnings card's metric tiles: the
+ * margin stack, all percent. A view-model assembled from the stock snapshot's
+ * `metrics` block — see `quarterlyToEarningsHistory`; any leg the vendor
+ * doesn't cover is null.
  */
 export interface EarningsMetrics {
-  eps_growth_yoy: number | null
-  revenue_growth_yoy: number | null
   gross_margin: number | null
   operating_margin: number | null
   net_margin: number | null
@@ -761,21 +758,18 @@ export function quarterlyUpcoming(
 }
 
 /**
- * The trailing growth + margin tiles, assembled from the stock snapshot: the
- * YoY growth legs ride on `growth` and the margin stack on `metrics` — the
- * same Finnhub figures the retired `/earnings` endpoint used to relay. Null
- * when the snapshot carries neither block, so the tiles simply drop.
+ * The trailing margin tiles, assembled from the stock snapshot's `metrics`
+ * block — the same Finnhub figures the retired `/earnings` endpoint used to
+ * relay. Null when the snapshot doesn't carry the block, so the tiles simply
+ * drop.
  */
 function stockToEarningsMetrics(stock?: Stock | null): EarningsMetrics | null {
-  const growth = stock?.growth ?? null
   const metrics = stock?.metrics ?? null
-  if (!growth && !metrics) return null
+  if (!metrics) return null
   return {
-    eps_growth_yoy: growth?.eps_yoy ?? null,
-    revenue_growth_yoy: growth?.revenue_yoy ?? null,
-    gross_margin: metrics?.gross_margin ?? null,
-    operating_margin: metrics?.operating_margin ?? null,
-    net_margin: metrics?.net_margin ?? null,
+    gross_margin: metrics.gross_margin ?? null,
+    operating_margin: metrics.operating_margin ?? null,
+    net_margin: metrics.net_margin ?? null,
   }
 }
 

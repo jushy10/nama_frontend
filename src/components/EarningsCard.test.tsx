@@ -139,14 +139,12 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText('-$0.15').length).toBeGreaterThan(0)
   })
 
-  it('shows the GAAP growth and margin tiles', () => {
+  it('shows the GAAP margin tiles', () => {
     renderWithProviders(
       <EarningsCard
         earnings={{
           ...base,
           metrics: {
-            eps_growth_yoy: 29.0, // GAAP growth — shown, labelled GAAP via footnote
-            revenue_growth_yoy: 12.8,
             gross_margin: null, // vendor-uncovered -> em dash
             operating_margin: 32.6,
             net_margin: 27.2,
@@ -156,17 +154,15 @@ describe('EarningsCard', () => {
     )
     expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
     expect(screen.getByText('27.2%')).toBeInTheDocument() // GAAP margin
-    // GAAP EPS growth (signed), alongside revenue growth.
-    expect(screen.getByText('EPS Gr. (YoY)')).toBeInTheDocument()
-    expect(screen.getByText('+29.0%')).toBeInTheDocument()
     // A null metric renders an em dash rather than vanishing.
     expect(screen.getByText('Gross Margin')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     // The basis is spelled out so the card doesn't read as contradictory.
-    expect(
-      screen.getByText(/EPS growth, revenue growth and margins are GAAP/i),
-    ).toBeInTheDocument()
-    // The EPS *level* tiles (GAAP and the adjusted TTM sum) are gone.
+    expect(screen.getByText(/margins are GAAP/i)).toBeInTheDocument()
+    // The YoY growth tiles are gone, as are the EPS *level* tiles (GAAP and
+    // the adjusted TTM sum).
+    expect(screen.queryByText('EPS Gr. (YoY)')).not.toBeInTheDocument()
+    expect(screen.queryByText(/Rev\. Gr\. \(YoY\)/)).not.toBeInTheDocument()
     expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
     expect(screen.queryByText('Adj. EPS (TTM)')).not.toBeInTheDocument()
     expect(screen.queryByText('ROE')).not.toBeInTheDocument()
