@@ -675,18 +675,6 @@ function LegendItem({
   )
 }
 
-/** Adjusted (non-GAAP) trailing-twelve-month EPS: the sum of the last four
- *  quarters' reported EPS, on the same (consensus) basis as the beat history —
- *  so it agrees with the per-quarter bars rather than the GAAP figure a vendor
- *  reports. null until a full four quarters of actuals are available. */
-function adjustedTtmEps(quarters: EarningsSurprise[]): number | null {
-  const actuals = quarters
-    .map((q) => q.actual)
-    .filter((v): v is number => v != null)
-  if (actuals.length < 4) return null
-  return actuals.slice(0, 4).reduce((sum, v) => sum + v, 0)
-}
-
 /** One label/value tile in a metrics grid: a soft card with an uppercase label
  *  above a bold, tabular-aligned value. An optional `hint` adds a one-line
  *  plain-language explainer beneath the value (used by the valuation grid).
@@ -756,19 +744,11 @@ function StatTile({
   )
 }
 
-/** A grid of trailing metrics beside the beat history. The EPS *level* is the
- *  *adjusted* (non-GAAP) trailing figure, summed from the quarters so it shares
- *  their basis; the growth figures (EPS & revenue YoY) and margins are GAAP, from
- *  the vendor. The differing bases are spelled out below the grid so the card
- *  doesn't read as self-contradictory (e.g. an adjusted EPS level beside a GAAP
- *  EPS-growth figure). Uncovered values show an em dash. */
-function MetricTiles({
-  metrics,
-  epsTtm,
-}: {
-  metrics: EarningsMetrics
-  epsTtm: number | null
-}) {
+/** A grid of trailing metrics beside the beat history: the GAAP growth figures
+ *  (EPS & revenue YoY) and the margin stack, from the vendor. The basis is
+ *  spelled out below the grid since the per-quarter bars above are on the
+ *  adjusted (consensus) basis. Uncovered values show an em dash. */
+function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
   // A year-over-year growth tile: signed and coloured green/red, em dash when
   // the vendor doesn't cover it. Both growth figures are GAAP (see footnote).
   const growthTile = (label: string, v: number | null) => ({
@@ -777,14 +757,6 @@ function MetricTiles({
     color: v == null ? 'text.primary' : v >= 0 ? 'success.main' : 'error.main',
   })
   const tiles: { label: string; text: string; color: string }[] = [
-    {
-      label: 'Adj. EPS (TTM)',
-      text: epsTtm == null ? '—' : fmtEps(epsTtm),
-      color: 'text.primary',
-    },
-    // GAAP, from the vendor — an *adjusted* growth would need the prior-year
-    // TTM, but the API only serves four quarters, so it's the one growth basis
-    // available. The footnote spells out that it isn't on the adjusted-EPS basis.
     growthTile('EPS Gr. (YoY)', metrics.eps_growth_yoy),
     growthTile('Rev. Gr. (YoY)', metrics.revenue_growth_yoy),
     {
@@ -841,8 +813,7 @@ function MetricTiles({
         color="text.secondary"
         sx={{ display: 'block', mt: 1.5 }}
       >
-        Adj. EPS (TTM) is non-GAAP, summed from the quarters above; EPS growth,
-        revenue growth and margins are GAAP.
+        EPS growth, revenue growth and margins are GAAP.
       </Typography>
     </Box>
   )
@@ -1078,8 +1049,6 @@ export default function EarningsCard({
 }) {
   const theme = useTheme()
   const { quarters } = earnings
-  // Always summed from the quarterly history, whichever view is showing.
-  const epsTtm = adjustedTtmEps(quarters)
   // The scheduled next report, if any — the header chip shows its date alone.
   const nextRpt = earnings.next_report
 
@@ -1282,9 +1251,7 @@ export default function EarningsCard({
           </>
         )}
 
-        {earnings.metrics && (
-          <MetricTiles metrics={earnings.metrics} epsTtm={epsTtm} />
-        )}
+        {earnings.metrics && <MetricTiles metrics={earnings.metrics} />}
         {earnings.valuation && (
           <ValuationTiles valuation={earnings.valuation} />
         )}
