@@ -275,7 +275,6 @@ export default function Stocks() {
                 )}
                 upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                 annual={annualQuery.data ?? null}
-                growth={stock.growth}
               />
             )}
 
@@ -285,6 +284,7 @@ export default function Stocks() {
                 snapshot's forward P/E) is available. */}
             <ForwardPeCard
               price={stock.price}
+              trailingPe={stock.metrics?.pe ?? null}
               quarterly={quarterlyQuery.data ?? null}
               annual={annualQuery.data ?? null}
               forwardPe={stock.forward_pe}

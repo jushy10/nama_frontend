@@ -125,6 +125,7 @@ describe('ForwardPeCard', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
+        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={annualSample}
       />,
@@ -134,11 +135,11 @@ describe('ForwardPeCard', () => {
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()
 
-    // Current: 200 ÷ 3.34 (adjusted TTM, the last four reported actuals).
-    // The multiple shows on the tile and again on the chart's "Now" bar.
+    // Current: the snapshot's actual trailing P/E, passed straight through.
+    // The multiple shows on the tile and again on the charts' "Now" bars.
     expect(screen.getByText('Current P/E')).toBeInTheDocument()
     expect(screen.getAllByText('59.88').length).toBeGreaterThan(0)
-    expect(screen.getByText('Adj. TTM EPS $3.34')).toBeInTheDocument()
+    expect(screen.getByText('Price ÷ trailing 12-mo EPS')).toBeInTheDocument()
 
     // FY1: 200 ÷ 4.00 and FY2: 200 ÷ 5.00, labelled with their fiscal years.
     // Each multiple shows on its tile and again on the fiscal-year chart.
@@ -158,25 +159,24 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('FY28')).toBeInTheDocument()
 
     // Each forward step carries its move versus today's multiple
-    // (3.34/4 − 1 = −16.5%; 3.34/5 − 1 = −33.2%).
+    // (50/59.88 − 1 = −16.5%; 40/59.88 − 1 = −33.2%).
     expect(screen.getByText('-16.5% vs now')).toBeInTheDocument()
     expect(screen.getByText('-33.2% vs now')).toBeInTheDocument()
 
-    // The basis is spelled out so it doesn't contradict the valuation grid.
-    expect(
-      screen.getByText(/same non-GAAP basis as the analyst consensus/i),
-    ).toBeInTheDocument()
+    // The bases are spelled out beneath the walk.
+    expect(screen.getByText(/standard trailing multiple/i)).toBeInTheDocument()
   })
 
   it('tints a compressing multiple green and an expanding one red', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
+        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={{
           ...annualSample,
           years: [
-            // A consensus BELOW the TTM EPS → the forward multiple expands.
+            // A consensus low enough that the forward multiple expands.
             year({ fiscal_year: 2027, eps_estimate: 2.0 }),
             year({ fiscal_year: 2028, eps_estimate: 5.0 }),
           ],
@@ -186,7 +186,8 @@ describe('ForwardPeCard', () => {
     // Dark theme (the test default) palette: success.main / error.main.
     const green = 'rgb(52, 211, 153)'
     const red = 'rgb(248, 113, 113)'
-    // FY27: 3.34/2 − 1 = +67% (expands, red); FY28: −33.2% (compresses, green).
+    // FY27: 100/59.88 − 1 = +67% (expands, red); FY28: −33.2% (compresses,
+    // green).
     expect(screen.getByText('+67.0% vs now')).toHaveStyle({ color: red })
     expect(screen.getByText('-33.2% vs now')).toHaveStyle({ color: green })
   })
@@ -195,6 +196,7 @@ describe('ForwardPeCard', () => {
     renderWithProviders(
       <ForwardPeCard
         price={200}
+        trailingPe={59.88}
         quarterly={quarterlySample}
         annual={annualSample}
       />,
@@ -233,7 +235,8 @@ describe('ForwardPeCard', () => {
     )
     expect(screen.queryByText("Q2 '27")).not.toBeInTheDocument()
     expect(screen.getByText("Q3 '27")).toBeInTheDocument()
-    // Only three usable actuals now, so there's no Current P/E either.
+    // With no trailing P/E passed, there's no "Now" anchor and the Current
+    // tile shows an em dash.
     expect(screen.queryByText('Now')).not.toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
   })

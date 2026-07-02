@@ -22,7 +22,6 @@ import type {
   EarningsHistory,
   EarningsMetrics,
   EarningsSurprise,
-  GrowthMetrics,
   KeyMetrics,
   NextEarnings,
   ValuationGrade,
@@ -933,12 +932,8 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
     value: number | null
     hint: string
   }[] = [
-    {
-      label: 'P/E',
-      ratio: 'pe',
-      value: valuation.pe,
-      hint: 'What you pay per $1 of yearly profit',
-    },
+    // The plain P/E isn't tiled here — it anchors the ForwardPeCard, which
+    // walks it against the forward multiples.
     {
       label: 'PEG',
       ratio: 'peg',
@@ -1007,88 +1002,6 @@ function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
   )
 }
 
-/** Tint a forward growth rate green for expected expansion, red for a contraction,
- *  default when absent — the same up/down reading as the performance strip. */
-const growthColor = (n: number | null): string =>
-  n == null ? 'text.primary' : n >= 0 ? 'success.main' : 'error.main'
-
-/** The forward-looking complement to the trailing metrics + valuation grids:
- *  the analyst-expected growth for next year. Rides on the *stock snapshot*
- *  (not the earnings endpoint), so the page threads it in as an optional prop
- *  and the whole section drops when the estimates vendor didn't cover the
- *  symbol. Forward growth is the plain FY1→FY2 percentage change — what next
- *  year's consensus implies versus this year's — not a multi-year rate. (The
- *  forward P/E itself gets a fuller treatment on its own ForwardPeCard.) */
-function ForwardTiles({ growth }: { growth: GrowthMetrics | null }) {
-  const fwdRev = growth?.forward_revenue_growth ?? null
-  const fwdEps = growth?.forward_eps_growth ?? null
-
-  const tiles: {
-    label: string
-    raw: number | null
-    fmt: (n: number) => string
-    color?: string
-    hint?: string
-  }[] = [
-    {
-      label: 'Rev Gr. (next yr)',
-      raw: fwdRev,
-      fmt: fmtPct,
-      color: growthColor(fwdRev),
-      hint: 'Expected sales growth, this year → next',
-    },
-    {
-      label: 'EPS Gr. (next yr)',
-      raw: fwdEps,
-      fmt: fmtPct,
-      color: growthColor(fwdEps),
-      hint: 'Expected EPS growth, this year → next',
-    },
-  ]
-  // Nothing covered → drop the section rather than show a grid of em dashes.
-  if (tiles.every((t) => t.raw == null)) return null
-  return (
-    <Box
-      sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
-      >
-        Forward estimates
-      </Typography>
-      <Box
-        sx={{
-          mt: 1.5,
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-          rowGap: 2,
-          columnGap: 2,
-        }}
-      >
-        {tiles.map((t) => (
-          <StatTile
-            key={t.label}
-            label={t.label}
-            value={orDash(t.raw, t.fmt)}
-            color={t.color}
-            hint={t.hint}
-          />
-        ))}
-      </Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', mt: 1.5 }}
-      >
-        Analyst consensus; growth is the expected change from this year to next
-        (FY1 → FY2), not a multi-year rate.
-      </Typography>
-    </Box>
-  )
-}
-
 /** Small uppercase heading that names each chart when both EPS and revenue show. */
 const chartLabelSx: SxProps<Theme> = {
   display: 'block',
@@ -1103,7 +1016,6 @@ export default function EarningsCard({
   earnings,
   upcoming = null,
   annual = null,
-  growth = null,
 }: {
   earnings: EarningsHistory
   // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
@@ -1113,13 +1025,9 @@ export default function EarningsCard({
   upcoming?: NextEarnings[] | null
   // The annual earnings series. When present, a Quarterly/Annual toggle lets the
   // EPS & revenue charts switch to fiscal years — reported years as bars,
-  // upcoming (estimated) years as forecast columns. The trailing/valuation/
-  // forward tiles are period-independent and stay put.
+  // upcoming (estimated) years as forecast columns. The trailing/valuation
+  // tiles are period-independent and stay put.
   annual?: AnnualEarnings | null
-  // Forward-looking enrichment off the stock snapshot (a different endpoint than
-  // the earnings history), threaded in by the page; the forward section drops
-  // when none of it is present.
-  growth?: GrowthMetrics | null
 }) {
   const theme = useTheme()
   const { quarters } = earnings
@@ -1361,7 +1269,6 @@ export default function EarningsCard({
         {earnings.valuation && (
           <ValuationTiles valuation={earnings.valuation} />
         )}
-        <ForwardTiles growth={growth} />
       </CardContent>
     </Card>
   )
