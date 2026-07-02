@@ -1,8 +1,8 @@
 name: Build & Deploy Frontend
 run-name: Build & deploy frontend · ${{ github.ref_name }}
 
-# PRs           -> build only (validate the bundle compiles).
 # Merge to main -> build, sync the bundle to S3, invalidate CloudFront.
+# PRs are covered by ci.yml; this workflow never runs on pull requests.
 #
 # The S3 bucket + CloudFront distribution are created by the backend repo's
 # Terraform (module "frontend" -> static-site-cloudfront). They're resolved at
@@ -12,7 +12,6 @@ run-name: Build & deploy frontend · ${{ github.ref_name }}
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch: {}
 
 concurrency:
@@ -25,27 +24,9 @@ env:
   VITE_API_URL: https://api.namainsights.com
 
 jobs:
-  # On pull requests: just prove the bundle builds. No AWS credentials, no upload.
-  validate:
-    name: Validate build
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - name: Build
-        run: npm run build
-
   # On merge to main (or a manual run): build and publish.
   deploy:
     name: Build & deploy
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
