@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clampToRegularHours,
+  getCandles,
+  lastSessionOnly,
   optionsLevel,
   optionsSentiment,
   optionsSignal,
@@ -213,5 +215,120 @@ describe('optionsSignal', () => {
 
   it('returns null when there is no ratio to judge', () => {
     expect(optionsSignal(null)).toBeNull()
+  })
+})
+
+// A midday-ET intraday bar on the given UTC day/hour — inside the 9:30–4:00
+// session in July (EDT), so the regular-hours clamp keeps it.
+const sessionBar = (day: number, hourUtc: number): Candle => {
+  const time = Date.UTC(2026, 6, day, hourUtc) / 1000
+  return {
+    time,
+    timestamp: new Date(time * 1000).toISOString(),
+    open: 1,
+    high: 2,
+    low: 1,
+    close: 2,
+    volume: 100,
+    direction: 'up',
+  }
+}
+
+const intradaySeries = (candles: Candle[]): CandleSeries => ({
+  symbol: 'SPY',
+  timeframe: '5Min',
+  count: candles.length,
+  candles,
+})
+
+describe('lastSessionOnly', () => {
+  it('keeps only the final UTC day of bars', () => {
+    const s = intradaySeries([
+      sessionBar(1, 15),
+      sessionBar(1, 16),
+      sessionBar(2, 15),
+      sessionBar(2, 16),
+    ])
+    const sliced = lastSessionOnly(s)
+    expect(sliced.candles.map((c) => c.time)).toEqual([
+      s.candles[2].time,
+      s.candles[3].time,
+    ])
+    expect(sliced.count).toBe(2)
+  })
+
+  it('passes an empty series through untouched', () => {
+    const s = intradaySeries([])
+    expect(lastSessionOnly(s)).toBe(s)
+  })
+})
+
+describe('getCandles 1D fallback', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  /** 404s `range=1D` requests, answers `start=` requests with `series`. */
+  function stubClosedMarket(series: CandleSeries | null) {
+    const mock = vi.fn((url: string | URL) => {
+      const closed = String(url).includes('range=1D')
+      const ok = !closed && series != null
+      return Promise.resolve({
+        ok,
+        status: ok ? 200 : 404,
+        json: () =>
+          Promise.resolve(
+            ok ? series : { detail: "No stock data found for symbol 'SPY'." },
+          ),
+      })
+    })
+    vi.stubGlobal('fetch', mock)
+    return mock
+  }
+
+  it('falls back to the most recent session when 1D 404s', async () => {
+    const mock = stubClosedMarket(
+      intradaySeries([
+        sessionBar(1, 15),
+        sessionBar(1, 16),
+        sessionBar(2, 15),
+        sessionBar(2, 16),
+      ]),
+    )
+
+    const series = await getCandles('SPY', { range: '1D' })
+
+    // The retry asks for a trailing window via `start`, not a range.
+    const retryUrl = String(mock.mock.calls[1][0])
+    expect(retryUrl).toContain('/stocks/SPY/candles')
+    expect(retryUrl).toContain('timeframe=5Min')
+    expect(retryUrl).toContain('start=')
+    expect(retryUrl).not.toContain('range=')
+
+    // Only the last session's bars survive.
+    expect(series.count).toBe(2)
+    expect(series.candles.map((c) => c.timestamp)).toEqual([
+      '2026-07-02T15:00:00.000Z',
+      '2026-07-02T16:00:00.000Z',
+    ])
+  })
+
+  it('surfaces the API error when the fallback also has nothing', async () => {
+    stubClosedMarket(null)
+    await expect(getCandles('SPY', { range: '1D' })).rejects.toThrow(
+      /No stock data found/,
+    )
+  })
+
+  it('does not fall back for non-1D ranges', async () => {
+    const mock = stubClosedMarket(intradaySeries([sessionBar(1, 15)]))
+    // Make every request 404 so a 6M failure is observable.
+    mock.mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ detail: 'nope' }),
+      }),
+    )
+    await expect(getCandles('SPY', { range: '6M' })).rejects.toThrow('nope')
+    expect(mock).toHaveBeenCalledTimes(1)
   })
 })
