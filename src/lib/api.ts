@@ -268,6 +268,53 @@ export function profitabilityVerdict(
   return 'Unprofitable'
 }
 
+/**
+ * The options-market read on a stock — four derived figures, not a chain.
+ * `implied_volatility` is the annualized at-the-money IV at the ~1-month expiry
+ * (percent); `expected_move_percent` is the swing priced in by
+ * `expected_move_by` (the ATM straddle over spot); `insurance_cost_percent` is
+ * what a quarter of downside cover costs until `insurance_expires` (an ATM put
+ * over spot); `put_call_ratio` is which way today's bets lean — above 1
+ * protective, below 1 optimistic. Every field is independently null when its
+ * contracts are too thin to price.
+ */
+export interface OptionsMetrics {
+  implied_volatility: number | null
+  expected_move_percent: number | null
+  expected_move_by: string | null
+  insurance_cost_percent: number | null
+  insurance_expires: string | null
+  put_call_ratio: number | null
+}
+
+/**
+ * Which way today's options flow leans, from the put/call ratio: `optimistic`
+ * (calls dominate — upside bets), `protective` (puts dominate — downside
+ * cover), or `balanced` in the narrow band around parity.
+ */
+export type OptionsSentiment = 'optimistic' | 'balanced' | 'protective'
+
+/**
+ * Half-width of the "balanced" band around a put/call ratio of 1. A ratio
+ * within ±0.05 of parity is too close to call either way, so it reads as
+ * balanced rather than flipping label on noise.
+ */
+export const PCR_BALANCED_MARGIN = 0.05
+
+/**
+ * Map a put/call ratio to a sentiment lean. Below the balanced band calls
+ * dominate (optimistic); above it puts dominate (protective). Returns null
+ * when there's no ratio to judge.
+ */
+export function optionsSentiment(
+  putCallRatio: number | null,
+): OptionsSentiment | null {
+  if (putCallRatio == null) return null
+  if (putCallRatio < 1 - PCR_BALANCED_MARGIN) return 'optimistic'
+  if (putCallRatio > 1 + PCR_BALANCED_MARGIN) return 'protective'
+  return 'balanced'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
@@ -761,6 +808,35 @@ export interface AnalystRecommendations {
   direction: RecommendationDirection | null
   latest: RecommendationTrend | null
   trends: RecommendationTrend[]
+}
+
+/**
+ * The slice of the ticker-card response (`/stocks/ticker/{ticker}`) this client
+ * reads. The card also carries the quote, dividend, performance and metrics
+ * blocks, but those are served elsewhere already — only the options block is
+ * fetched from here.
+ */
+interface TickerCardOptionsSlice {
+  ticker: string
+  options_metrics?: OptionsMetrics | null
+}
+
+/**
+ * Fetch the options-market metrics for a ticker, via the ticker-card endpoint's
+ * opt-in `options_metrics` block. Resolves to null when the symbol has no
+ * priceable options (the API serves the block as null rather than erroring).
+ */
+export async function getOptionsMetrics(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<OptionsMetrics | null> {
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}?include=options_metrics`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as TickerCardOptionsSlice
+  return data?.options_metrics ?? null
 }
 
 /** Fetch analyst recommendation trends for a ticker (newest snapshot first). */

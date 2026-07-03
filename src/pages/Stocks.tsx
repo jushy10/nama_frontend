@@ -20,6 +20,7 @@ import {
   useCandles,
   useEarnings,
   useFiveYearReturn,
+  useOptionsMetrics,
   useRecommendations,
   useRsi,
   useStock,
@@ -28,6 +29,7 @@ import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import DcaCard from '@/components/DcaCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
+import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
 import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
@@ -64,6 +66,7 @@ export default function Stocks() {
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   const earningsQuery = useEarnings(loadedSymbol, 8)
+  const optionsQuery = useOptionsMetrics(loadedSymbol)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -183,6 +186,11 @@ export default function Stocks() {
                 netMargin={earningsQuery.data.metrics.net_margin}
               />
             )}
+
+            {/* Options-market read (IV, expected move, insurance, put/call);
+                pops in once it resolves. `data` is null for symbols with no
+                priceable options, which quietly hides the card. */}
+            {optionsQuery.data && <OptionsCard metrics={optionsQuery.data} />}
 
             {recommendationsQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>

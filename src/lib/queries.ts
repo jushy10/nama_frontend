@@ -16,6 +16,7 @@ import {
   ApiError,
   getCandles,
   getEarnings,
+  getOptionsMetrics,
   getRecommendations,
   getRsi,
   getScreener,
@@ -26,6 +27,7 @@ import {
   type CandleSeries,
   type ChartRange,
   type EarningsHistory,
+  type OptionsMetrics,
   type RsiSeries,
   type ScreenerResult,
   type Sector,
@@ -150,6 +152,21 @@ export function useEarnings(
   return useQuery({
     queryKey: ['earnings', symbol, limit],
     queryFn: ({ signal }) => getEarnings(symbol as string, { limit, signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * Options-market metrics for a ticker (IV, expected move, insurance cost,
+ * put/call ratio). `data` is null when the symbol has no priceable options.
+ * Idle until `symbol` is set.
+ */
+export function useOptionsMetrics(
+  symbol: string | null | undefined,
+): UseQueryResult<OptionsMetrics | null> {
+  return useQuery({
+    queryKey: ['options', symbol],
+    queryFn: ({ signal }) => getOptionsMetrics(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }
