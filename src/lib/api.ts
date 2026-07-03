@@ -317,6 +317,58 @@ export function optionsSentiment(
   return 'balanced'
 }
 
+/**
+ * Where an options figure sits on its scale — `low`, the unremarkable `mid`,
+ * or `high`. Drives the traffic-light colouring on the options card: low reads
+ * green (calm / small / cheap), mid amber, high red (wild / big / pricey).
+ */
+export type OptionsLevel = 'low' | 'mid' | 'high'
+
+/** The options-card figures that get a low/mid/high read (the put/call ratio
+ *  is judged separately, by `optionsSentiment`). */
+export type OptionsGauge =
+  | 'implied_volatility'
+  | 'expected_move'
+  | 'insurance_cost'
+
+/**
+ * Low/high cut-offs per options gauge: below `lowBelow` is `low`, above
+ * `highAbove` is `high`, between (edges inclusive) is `mid`. Broad large-cap,
+ * roughly-one-month rules of thumb — NOT symbol-aware (a sleepy utility and a
+ * meme stock live on very different scales), so the card frames the colour as
+ * a rough guide, not advice.
+ *
+ * - implied_volatility: under 20% annualized is a calm large-cap, over 40%
+ *   prices in real turbulence.
+ * - expected_move: an under-4% swing priced into ~a month is small; over 8%
+ *   is a big month by blue-chip standards.
+ * - insurance_cost: an ATM put under 3% of spot for the quarter is cheap
+ *   cover; over 6% the market charges real money for protection.
+ */
+export const OPTIONS_LEVEL_BANDS: Record<
+  OptionsGauge,
+  { lowBelow: number; highAbove: number }
+> = {
+  implied_volatility: { lowBelow: 20, highAbove: 40 },
+  expected_move: { lowBelow: 4, highAbove: 8 },
+  insurance_cost: { lowBelow: 3, highAbove: 6 },
+}
+
+/**
+ * Grade one options figure against its gauge's bands (see
+ * OPTIONS_LEVEL_BANDS). Returns null when there's no figure to judge.
+ */
+export function optionsLevel(
+  gauge: OptionsGauge,
+  n: number | null,
+): OptionsLevel | null {
+  if (n == null) return null
+  const { lowBelow, highAbove } = OPTIONS_LEVEL_BANDS[gauge]
+  if (n < lowBelow) return 'low'
+  if (n > highAbove) return 'high'
+  return 'mid'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',

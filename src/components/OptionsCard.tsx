@@ -1,40 +1,65 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import {
+  optionsLevel,
   optionsSentiment,
+  type OptionsLevel,
   type OptionsMetrics,
   type OptionsSentiment,
 } from '@/lib/api'
 
-// Amber for the too-close-to-call "Balanced" lean — matches the DCA/RSI/
-// Profitability cards' neutral middle call.
-const BALANCED_COLOR = '#fbbf24' // amber-400
+// Amber for every unremarkable middle read — matches the RSI/Profitability/PEG
+// cards' neutral call.
+const MID_COLOR = '#fbbf24' // amber-400
 
-// Per-lean chip label, colour and plain-language blurb. Calls dominating reads
-// green (upside bets), puts dominating red (downside cover), parity amber.
+// Traffic-light colour per low/mid/high read: low is the easy green end
+// (calm / small / cheap), high the red end (wild / big / pricey).
+const LEVEL_COLOR: Record<OptionsLevel, string> = {
+  low: 'success.main',
+  mid: MID_COLOR,
+  high: 'error.main',
+}
+
+// One-word calls per gauge, in low → mid → high order, so each figure reads
+// at a glance: the word carries the meaning, the colour carries the judgement.
+const LEVEL_WORDS: Record<
+  'implied_volatility' | 'expected_move' | 'insurance_cost',
+  Record<OptionsLevel, string>
+> = {
+  implied_volatility: { low: 'Calm', mid: 'Normal', high: 'Wild' },
+  expected_move: { low: 'Small', mid: 'Medium', high: 'Big' },
+  insurance_cost: { low: 'Cheap', mid: 'Fair', high: 'Pricey' },
+}
+
+// Per-lean chip label, colour, one-word tile call, and plain-language blurb.
+// Calls dominating reads green (upside bets), puts dominating red (downside
+// cover), parity amber.
 const SENTIMENT: Record<
   OptionsSentiment,
-  { label: string; color: string; blurb: string }
+  { label: string; color: string; word: string; blurb: string }
 > = {
   optimistic: {
     label: 'Optimistic',
     color: 'success.main',
+    word: 'Betting up',
     blurb:
-      "Today's flow leans toward calls — traders are positioning for " +
-      'upside rather than paying for protection.',
+      'Most traders are betting the price goes up — few are paying for ' +
+      'protection against a fall.',
   },
   balanced: {
     label: 'Balanced',
-    color: BALANCED_COLOR,
+    color: MID_COLOR,
+    word: 'Split',
     blurb:
-      "Today's puts and calls are trading in roughly equal measure — no " +
-      'clear lean either way.',
+      'Up bets and down bets are about even — traders have no clear lean ' +
+      'either way.',
   },
   protective: {
     label: 'Protective',
     color: 'error.main',
+    word: 'Betting down',
     blurb:
-      "Today's flow leans toward puts — traders are paying up for " +
-      'downside cover rather than betting on upside.',
+      'Most traders are protecting against a fall rather than betting the ' +
+      'price goes up.',
   },
 }
 
@@ -60,17 +85,24 @@ const fmtDate = (iso: string) =>
     year: 'numeric',
   })
 
-/** One headline figure with its label above and context line below. */
+/**
+ * One figure told three ways: a plain-question label ("How jumpy?"), the
+ * number and its one-word call coloured by the same read, then a short plain
+ * sentence (with the technical name tucked in) for anyone who wants the
+ * grown-up term.
+ */
 function Stat({
   label,
   value,
-  sub,
+  word,
   color,
+  sub,
 }: {
   label: string
   value: string
-  sub: string
+  word: string | null
   color?: string
+  sub: string
 }) {
   return (
     <Box>
@@ -85,18 +117,28 @@ function Stat({
       >
         {label}
       </Typography>
-      <Typography
-        variant="h5"
-        sx={{
-          mt: 0.5,
-          fontWeight: 700,
-          color,
-          fontVariantNumeric: 'tabular-nums',
-          lineHeight: 1.1,
-        }}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mt: 0.5, alignItems: 'baseline' }}
       >
-        {value}
-      </Typography>
+        <Typography
+          variant="h5"
+          sx={{
+            fontWeight: 700,
+            color,
+            fontVariantNumeric: 'tabular-nums',
+            lineHeight: 1.1,
+          }}
+        >
+          {value}
+        </Typography>
+        {word && (
+          <Typography variant="body2" sx={{ fontWeight: 700, color }}>
+            {word}
+          </Typography>
+        )}
+      </Stack>
       <Typography
         variant="caption"
         sx={{ color: 'text.secondary', display: 'block', mt: 0.25 }}
@@ -118,6 +160,9 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
   } = metrics
   const sentiment = optionsSentiment(pcr)
   const meta = sentiment ? SENTIMENT[sentiment] : null
+  const ivLevel = optionsLevel('implied_volatility', iv)
+  const moveLevel = optionsLevel('expected_move', move)
+  const insuranceLevel = optionsLevel('insurance_cost', insurance)
   const empty = iv == null && move == null && insurance == null && pcr == null
 
   return (
@@ -133,7 +178,8 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
               Options Market
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              What option traders are pricing in
+              What option traders are pricing in — green is the calm/cheap end,
+              red the wild/pricey end
             </Typography>
           </Box>
 
@@ -190,29 +236,42 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
               }}
             >
               <Stat
-                label="Implied volatility"
+                label="How jumpy?"
                 value={iv == null ? '—' : fmtPct(iv)}
-                sub="annualized, ~1-month at-the-money"
+                word={ivLevel && LEVEL_WORDS.implied_volatility[ivLevel]}
+                color={ivLevel ? LEVEL_COLOR[ivLevel] : undefined}
+                sub="how much the price is expected to bounce around (implied volatility)"
               />
               <Stat
-                label="Expected move"
+                label="Possible swing"
                 value={move == null ? '—' : fmtMove(move)}
-                sub={moveBy ? `by ${fmtDate(moveBy)}` : 'priced by the market'}
-              />
-              <Stat
-                label="Downside insurance"
-                value={insurance == null ? '—' : fmtPct(insurance)}
+                word={moveLevel && LEVEL_WORDS.expected_move[moveLevel]}
+                color={moveLevel ? LEVEL_COLOR[moveLevel] : undefined}
                 sub={
-                  insuranceBy
-                    ? `to hedge until ${fmtDate(insuranceBy)}`
-                    : 'cost of an at-the-money put'
+                  moveBy
+                    ? `up or down by ${fmtDate(moveBy)} (expected move)`
+                    : 'up or down, priced by the market (expected move)'
                 }
               />
               <Stat
-                label="Put/Call ratio"
+                label="Cost to protect"
+                value={insurance == null ? '—' : fmtPct(insurance)}
+                word={
+                  insuranceLevel && LEVEL_WORDS.insurance_cost[insuranceLevel]
+                }
+                color={insuranceLevel ? LEVEL_COLOR[insuranceLevel] : undefined}
+                sub={
+                  insuranceBy
+                    ? `to insure your shares until ${fmtDate(insuranceBy)} (put option)`
+                    : 'to insure your shares against a fall (put option)'
+                }
+              />
+              <Stat
+                label="Up or down bets?"
                 value={pcr == null ? '—' : fmtRatio(pcr)}
-                sub="today's put vs call volume"
+                word={meta?.word ?? null}
                 color={meta?.color}
+                sub="down bets traded per up bet today (put/call ratio)"
               />
             </Box>
 
