@@ -1,46 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampToRegularHours,
-  gradeValuation,
+  pegVerdict,
   profitabilityVerdict,
   rangeReturnPct,
   type Candle,
   type CandleSeries,
 } from '@/lib/api'
 
-describe('gradeValuation', () => {
-  it('grades P/E: cheap-to-reasonable good, elevated fair, rich or loss-making a caution', () => {
-    expect(gradeValuation('pe', 12)).toBe('good')
-    expect(gradeValuation('pe', 24.9)).toBe('good')
-    expect(gradeValuation('pe', 25)).toBe('fair')
-    expect(gradeValuation('pe', 40)).toBe('fair')
-    expect(gradeValuation('pe', 41)).toBe('caution')
-    expect(gradeValuation('pe', 0)).toBe('caution') // breakeven
-    expect(gradeValuation('pe', -5)).toBe('caution') // losses
+describe('pegVerdict', () => {
+  it('mirrors the under-1 / over-2 PEG bands, edges inclusive of the middle', () => {
+    expect(pegVerdict(0.27)).toBe('Cheap for Its Growth')
+    expect(pegVerdict(0.99)).toBe('Cheap for Its Growth')
+    expect(pegVerdict(1)).toBe('Fairly Priced')
+    expect(pegVerdict(2)).toBe('Fairly Priced')
+    expect(pegVerdict(2.01)).toBe('Pricey for Its Growth')
   })
 
-  it('grades PEG on the under-1 / over-2 rule', () => {
-    expect(gradeValuation('peg', 0.8)).toBe('good')
-    expect(gradeValuation('peg', 1)).toBe('fair')
-    expect(gradeValuation('peg', 2)).toBe('fair')
-    expect(gradeValuation('peg', 2.1)).toBe('caution')
-    expect(gradeValuation('peg', 0)).toBe('caution')
-  })
-
-  it('grades current ratio: below 1 a caution, 1–1.5 fair, 1.5+ good', () => {
-    expect(gradeValuation('current_ratio', 0.9)).toBe('caution')
-    expect(gradeValuation('current_ratio', 1)).toBe('fair')
-    expect(gradeValuation('current_ratio', 1.49)).toBe('fair')
-    expect(gradeValuation('current_ratio', 1.5)).toBe('good')
-  })
-
-  it('grades debt/equity: light good, moderate fair, heavy or negative a caution', () => {
-    expect(gradeValuation('debt_to_equity', 0.5)).toBe('good')
-    expect(gradeValuation('debt_to_equity', 1)).toBe('good')
-    expect(gradeValuation('debt_to_equity', 1.5)).toBe('fair')
-    expect(gradeValuation('debt_to_equity', 2)).toBe('fair')
-    expect(gradeValuation('debt_to_equity', 2.1)).toBe('caution')
-    expect(gradeValuation('debt_to_equity', -0.3)).toBe('caution') // negative equity
+  it('labels a non-positive ratio Not Meaningful and passes null through', () => {
+    expect(pegVerdict(0)).toBe('Not Meaningful')
+    expect(pegVerdict(-1.2)).toBe('Not Meaningful')
+    expect(pegVerdict(null)).toBeNull()
   })
 })
 

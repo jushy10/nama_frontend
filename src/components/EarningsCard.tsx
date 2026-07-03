@@ -16,16 +16,12 @@ import {
   useTheme,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
-import { annualReported, annualUpcoming, gradeValuation } from '@/lib/api'
+import { annualReported, annualUpcoming } from '@/lib/api'
 import type {
   AnnualEarnings,
   EarningsHistory,
-  EarningsMetrics,
   EarningsSurprise,
-  KeyMetrics,
   NextEarnings,
-  ValuationGrade,
-  ValuationRatio,
 } from '@/lib/api'
 
 // The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
@@ -43,10 +39,6 @@ const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
 /** Compact signed percent ("+33%") for the growth row on narrow (phone) slots. */
 const fmtPctShort = (n: number) =>
   `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(0)}%`
-const fmtPlainPct = (n: number) => `${n.toFixed(1)}%`
-/** A valuation multiple or ratio (P/E, PEG, current ratio, D/E) —
- *  two decimals, no unit. */
-const fmtMultiple = (n: number) => n.toFixed(2)
 
 /** Muted fill for the "estimate" bar — faint enough to sit behind the actual,
  *  and legible on both the dark and light canvas. Shared with the legend. */
@@ -762,237 +754,6 @@ function LegendItem({
   )
 }
 
-/** One label/value tile in a metrics grid: a soft card with an uppercase label
- *  above a bold, tabular-aligned value. An optional `hint` adds a one-line
- *  plain-language explainer beneath the value (used by the valuation grid).
- *  Shared by the trailing-metrics and valuation grids so the two read
- *  identically. */
-function StatTile({
-  label,
-  value,
-  color = 'text.primary',
-  hint,
-}: {
-  label: string
-  value: string
-  color?: string
-  hint?: string
-}) {
-  return (
-    <Box
-      sx={{
-        px: 1.5,
-        py: 1.25,
-        borderRadius: 1.5,
-        bgcolor: 'action.hover',
-        border: '1px solid',
-        borderColor: 'divider',
-      }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{
-          display: 'block',
-          textTransform: 'uppercase',
-          letterSpacing: '0.03em',
-          fontSize: '0.65rem',
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography
-        sx={{
-          mt: 0.25,
-          fontWeight: 700,
-          fontSize: '1.05rem',
-          fontVariantNumeric: 'tabular-nums',
-          color,
-          lineHeight: 1.25,
-        }}
-      >
-        {value}
-      </Typography>
-      {hint && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            display: 'block',
-            mt: 0.5,
-            fontSize: '0.68rem',
-            lineHeight: 1.35,
-          }}
-        >
-          {hint}
-        </Typography>
-      )}
-    </Box>
-  )
-}
-
-/** A grid of trailing metrics beside the beat history: the GAAP margin stack,
- *  from the vendor. The basis is spelled out below the grid since the
- *  per-quarter bars above are on the adjusted (consensus) basis. Uncovered
- *  values show an em dash. */
-function MetricTiles({ metrics }: { metrics: EarningsMetrics }) {
-  const tiles: { label: string; text: string; color: string }[] = [
-    {
-      label: 'Gross Margin',
-      text:
-        metrics.gross_margin == null ? '—' : fmtPlainPct(metrics.gross_margin),
-      color: 'text.primary',
-    },
-    {
-      label: 'Op. Margin',
-      text:
-        metrics.operating_margin == null
-          ? '—'
-          : fmtPlainPct(metrics.operating_margin),
-      color: 'text.primary',
-    },
-    {
-      label: 'Net Margin',
-      text: metrics.net_margin == null ? '—' : fmtPlainPct(metrics.net_margin),
-      color: 'text.primary',
-    },
-  ]
-  return (
-    <Box
-      sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
-      >
-        Trailing metrics
-      </Typography>
-      <Box
-        sx={{
-          mt: 1.5,
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-          rowGap: 2,
-          columnGap: 2,
-        }}
-      >
-        {tiles.map((t) => (
-          <StatTile
-            key={t.label}
-            label={t.label}
-            value={t.text}
-            color={t.color}
-          />
-        ))}
-      </Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', mt: 1.5 }}
-      >
-        Margins are GAAP.
-      </Typography>
-    </Box>
-  )
-}
-
-/** Maps a ratio's grade to its tile colour: green for a favourable reading, red
- *  for one worth a closer look, and the default text colour for the unremarkable
- *  middle — so only the notable extremes draw the eye. */
-const GRADE_COLOR: Record<ValuationGrade, string> = {
-  good: 'success.main',
-  fair: 'text.primary',
-  caution: 'error.main',
-}
-
-/** A grid of point-in-time valuation and health ratios (P/E, PEG, current
- *  ratio, debt/equity) — a subset of the KeyMetrics the stock snapshot
- *  carries, surfaced beside the trailing earnings so the "is it priced well?"
- *  read sits next to "how's it growing?". Each tile carries a one-line
- *  plain-language explainer of what it shows, and its value is tinted green/red
- *  by a coarse rule of thumb (see {@link gradeValuation}) so a favourable or
- *  stretched reading stands out at a glance. All trailing; uncovered values show
- *  an em dash (in the default colour), and an all-empty block is dropped rather
- *  than rendered as a wall of dashes. (P/B and the 52-week range are part of
- *  KeyMetrics but aren't surfaced here.) */
-function ValuationTiles({ valuation }: { valuation: KeyMetrics }) {
-  const tiles: {
-    label: string
-    ratio: ValuationRatio
-    value: number | null
-    hint: string
-  }[] = [
-    // The plain P/E isn't tiled here — it anchors the ForwardPeCard, which
-    // walks it against the forward multiples.
-    {
-      label: 'PEG',
-      ratio: 'peg',
-      value: valuation.peg,
-      hint: 'P/E adjusted for growth; under 1 looks cheap',
-    },
-    {
-      label: 'Current Ratio',
-      ratio: 'current_ratio',
-      value: valuation.current_ratio,
-      hint: 'Short-term assets vs. bills due; above 1 is healthy',
-    },
-    {
-      label: 'Debt / Equity',
-      ratio: 'debt_to_equity',
-      value: valuation.debt_to_equity,
-      hint: 'Debt vs. shareholder money; lower is safer',
-    },
-  ]
-  // Nothing covered → drop the section rather than show a grid of em dashes.
-  if (tiles.every((t) => t.value == null)) return null
-  return (
-    <Box
-      sx={{ mt: 2.5, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' }}
-    >
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}
-      >
-        Valuation
-      </Typography>
-      <Box
-        sx={{
-          mt: 1.5,
-          display: 'grid',
-          gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(3, 1fr)' },
-          rowGap: 2,
-          columnGap: 2,
-        }}
-      >
-        {tiles.map((t) => (
-          <StatTile
-            key={t.label}
-            label={t.label}
-            value={orDash(t.value, fmtMultiple)}
-            color={
-              t.value == null
-                ? 'text.primary'
-                : GRADE_COLOR[gradeValuation(t.ratio, t.value)]
-            }
-            hint={t.hint}
-          />
-        ))}
-      </Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', mt: 1.5 }}
-      >
-        Green is favourable, red worth a closer look — a rough guide that varies
-        by sector. Trailing ratios (no forward estimates); PEG is P/E over
-        trailing EPS growth.
-      </Typography>
-    </Box>
-  )
-}
-
 /** Small uppercase heading that names each chart when both EPS and revenue show. */
 const chartLabelSx: SxProps<Theme> = {
   display: 'block',
@@ -1016,8 +777,7 @@ export default function EarningsCard({
   upcoming?: NextEarnings[] | null
   // The annual earnings series. When present, a Quarterly/Annual toggle lets the
   // EPS & revenue charts switch to fiscal years — reported years as bars,
-  // upcoming (estimated) years as forecast columns. The trailing/valuation
-  // tiles are period-independent and stay put.
+  // upcoming (estimated) years as forecast columns.
   annual?: AnnualEarnings | null
 }) {
   const theme = useTheme()
@@ -1254,11 +1014,6 @@ export default function EarningsCard({
               </Typography>
             )}
           </>
-        )}
-
-        {earnings.metrics && <MetricTiles metrics={earnings.metrics} />}
-        {earnings.valuation && (
-          <ValuationTiles valuation={earnings.valuation} />
         )}
       </CardContent>
     </Card>
