@@ -314,15 +314,17 @@ export default function Stocks() {
                 />
               )}
 
-              {/* Forward P/E, walked from today's multiple across the two
-                  forecast years and the upcoming quarters. Self-hides until a
-                  forward consensus (annual estimates, upcoming quarters, or the
-                  snapshot's forward P/E) is available. */}
+              {/* Forward P/E, walked from the last reported period through
+                  today's trailing multiple across the two forecast years and
+                  the upcoming quarters. Self-hides until a forward consensus
+                  (annual estimates, upcoming quarters, or the snapshot's
+                  forward P/E) is available. */}
               <ForwardPeCard
                 price={stock.price}
                 quarterly={quarterlyQuery.data ?? null}
                 annual={annualQuery.data ?? null}
                 forwardPe={stock.forward_pe}
+                trailingPe={stock.metrics?.pe ?? null}
               />
             </Box>
           </Stack>

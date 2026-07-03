@@ -394,6 +394,10 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
     expect(screen.getAllByText('42.85').length).toBeGreaterThan(0)
+    // The snapshot's trailing multiple (metrics.pe 34.6) threads in as the
+    // Current P/E tile on both walks.
+    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
+    expect(screen.getAllByText('34.60').length).toBeGreaterThan(0)
     expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
     // The FY27 multiple shows on its tile and again on the fiscal-year chart.
     expect(screen.getAllByText('23.41').length).toBeGreaterThan(0)
