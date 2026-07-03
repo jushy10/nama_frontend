@@ -2,9 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import QuoteGrid from '@/components/QuoteGrid'
 
-/** Minimal snapshot — only the fields the tiles read. */
-function quote(symbol: string, price: number, change: number, pct: number) {
-  return { symbol, name: symbol, price, change, change_percent: pct }
+/** Minimal ticker card — only the fields the tiles read. */
+function quote(ticker: string, price: number, change: number, pct: number) {
+  return { ticker, name: ticker, price, change, change_percent: pct }
 }
 
 const BY_SYMBOL: Record<string, ReturnType<typeof quote>> = {
@@ -12,12 +12,12 @@ const BY_SYMBOL: Record<string, ReturnType<typeof quote>> = {
   SPY: quote('SPY', 731.88, -1.74, -0.24),
 }
 
-/** Answers each /stocks/SYMBOL request from BY_SYMBOL; 404s the rest. */
+/** Answers each /stocks/ticker/SYMBOL request from BY_SYMBOL; 404s the rest. */
 function stubFetch() {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL) => {
-      const symbol = String(url).split('/stocks/')[1]?.split(/[/?]/)[0] ?? ''
+      const symbol = String(url).match(/\/stocks\/ticker\/([^/?]+)/)?.[1] ?? ''
       const data = BY_SYMBOL[symbol]
       return Promise.resolve({
         ok: data != null,

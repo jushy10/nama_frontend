@@ -2,11 +2,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import MarketIndices from '@/components/MarketIndices'
 
-/** Minimal snapshot — only the fields the index tiles read. */
-function quote(symbol: string, price: number, change: number, pct: number) {
+/** Minimal ticker card — only the fields the index tiles read. */
+function quote(ticker: string, price: number, change: number, pct: number) {
   return {
-    symbol,
-    name: symbol,
+    ticker,
+    name: ticker,
     price,
     change,
     change_percent: pct,
@@ -42,12 +42,13 @@ function candleSeries(symbol: string) {
 }
 
 /**
- * Answers /stocks/SYMBOL/candles with a small series and /stocks/SYMBOL from
- * BY_SYMBOL; 404s the rest.
+ * Answers /stocks/SYMBOL/candles with a small series and /stocks/ticker/SYMBOL
+ * from BY_SYMBOL; 404s the rest.
  */
 function stubFetch() {
   const mock = vi.fn((url: string | URL) => {
-    const symbol = String(url).split('/stocks/')[1]?.split(/[/?]/)[0] ?? ''
+    const symbol =
+      String(url).match(/\/stocks\/(?:ticker\/)?([^/?]+)/)?.[1] ?? ''
     const data = String(url).includes('/candles')
       ? candleSeries(symbol)
       : BY_SYMBOL[symbol]

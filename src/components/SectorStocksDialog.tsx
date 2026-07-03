@@ -14,8 +14,8 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { stockLogoUrl, type Sector, type Stock } from '@/lib/api'
-import { useStocks } from '@/lib/queries'
+import { stockLogoUrl, type Sector, type TickerCard } from '@/lib/api'
+import { useTickerCards } from '@/lib/queries'
 
 /**
  * Top constituents per S&P sector, by index weight (heaviest first). The backend
@@ -51,7 +51,7 @@ const moveColor = (n: number | null | undefined) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
 
 /** One holding row: logo + symbol/name on the left, price + day move on the right. */
-function HoldingRow({ stock }: { stock: Stock }) {
+function HoldingRow({ stock }: { stock: TickerCard }) {
   const up = (stock.change_percent ?? 0) >= 0
   return (
     <Stack
@@ -73,18 +73,18 @@ function HoldingRow({ stock }: { stock: Stock }) {
       >
         <Avatar
           variant="rounded"
-          src={stockLogoUrl(stock.symbol)}
-          alt={`${stock.symbol} logo`}
+          src={stockLogoUrl(stock.ticker)}
+          alt={`${stock.ticker} logo`}
           slotProps={{
             img: { loading: 'lazy', style: { objectFit: 'contain' } },
           }}
           sx={{ width: 32, height: 32, bgcolor: '#fff', color: '#111', p: 0.5 }}
         >
-          {stock.symbol.charAt(0)}
+          {stock.ticker.charAt(0)}
         </Avatar>
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-            {stock.symbol}
+            {stock.ticker}
           </Typography>
           {stock.name && (
             <Typography
@@ -146,12 +146,12 @@ export default function SectorStocksDialog({
 }) {
   // Curated constituents for the open sector; the query stays idle until the
   // dialog opens on a sector that has any. A failed ticker comes back null and
-  // is filtered out — getStocks never rejects the whole batch.
+  // is filtered out — getTickerCards never rejects the whole batch.
   const tickers = sector ? (SECTOR_CONSTITUENTS[sector.sector] ?? []) : []
-  const { data, isLoading, isError } = useStocks(tickers, {
+  const { data, isLoading, isError } = useTickerCards(tickers, {
     enabled: !!sector && tickers.length > 0,
   })
-  const stocks = (data ?? []).filter((s): s is Stock => s != null)
+  const stocks = (data ?? []).filter((s): s is TickerCard => s != null)
 
   return (
     <Dialog open={sector != null} onClose={onClose} fullWidth maxWidth="sm">
@@ -204,7 +204,7 @@ export default function SectorStocksDialog({
           ) : (
             <Stack spacing={1}>
               {stocks.map((s) => (
-                <HoldingRow key={s.symbol} stock={s} />
+                <HoldingRow key={s.ticker} stock={s} />
               ))}
             </Stack>
           ))}
