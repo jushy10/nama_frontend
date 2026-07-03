@@ -391,7 +391,7 @@ export default function Screener() {
     navigate(`/stocks?symbol=${encodeURIComponent(symbol)}`)
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
       <Stack
         direction="row"
         spacing={1}

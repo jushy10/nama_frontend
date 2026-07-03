@@ -10,66 +10,76 @@ export interface StockPerformance {
   '1y': number | null
 }
 
+/** Opt-in enrichment blocks the ticker-card endpoint can attach. */
+export type TickerCardInclude =
+  | 'dividend'
+  | 'performance'
+  | 'metrics'
+  | 'options_metrics'
+
 /**
- * Forward sell-side consensus estimates for the next fiscal year(s). `fiscal_year`
- * is FY1 — the nearest full fiscal year still being estimated — carrying its
- * consensus mean EPS/revenue (with the low–high EPS range and the analyst counts
- * behind them); `*_fy2` carry the year after. Best-effort: any field a vendor
- * doesn't cover is null.
+ * A ticker card's dividend block: percent yield plus the annual per-share
+ * payout in the quote currency. Either is null for a non-payer or an
+ * uncovered field.
  */
-export interface AnalystEstimates {
-  fiscal_year: number | null
-  period_end: string | null
-  eps_avg: number | null
-  eps_low: number | null
-  eps_high: number | null
-  revenue_avg: number | null
-  num_analysts_eps: number | null
-  num_analysts_revenue: number | null
-  eps_avg_fy2: number | null
-  fiscal_year_fy2: number | null
+export interface TickerDividend {
+  yield_percentage: number | null
+  per_share: number | null
 }
 
 /**
- * Revenue & earnings growth, all percent. `*_yoy` is the trailing one-year change
- * from reported figures (Finnhub TTM); `forward_*_growth` is the analyst-expected
- * one-year change next year — FY1 → FY2 (FMP estimates). Any leg may be null.
+ * A ticker card's valuation and profitability metrics. `peg` is the trailing
+ * PEG (trailing P/E over already-reported EPS growth) and `forward_peg` its
+ * forward cousin (forward P/E over the FY1→FY2 growth analysts expect) —
+ * either is null on losses, non-positive growth, or no stored consensus. The
+ * margins are trailing percentages; any field a vendor doesn't cover is null.
  */
-export interface GrowthMetrics {
-  revenue_yoy: number | null
-  eps_yoy: number | null
-  forward_revenue_growth: number | null
-  forward_eps_growth: number | null
+export interface TickerMetrics {
+  peg: number | null
+  forward_peg: number | null
+  gross_margin: number | null
+  operating_margin: number | null
+  net_margin: number | null
 }
 
-export interface Stock {
-  symbol: string
+/**
+ * A ticker card's options-market block — four derived figures, not a chain.
+ * `implied_volatility` is the annualized at-the-money IV at the ~1-month
+ * expiry (percent); `expected_move_percent` is the swing priced in by
+ * `expected_move_by` (the ATM straddle over spot); `insurance_cost_percent`
+ * is what a quarter of downside cover costs until `insurance_expires` (an ATM
+ * put over spot); `put_call_ratio` is which way today's bets lean — above 1
+ * protective, below 1 optimistic. Every field is independently null when its
+ * contracts are too thin to price.
+ */
+export interface OptionsMetrics {
+  implied_volatility: number | null
+  expected_move_percent: number | null
+  expected_move_by: string | null
+  insurance_cost_percent: number | null
+  insurance_expires: string | null
+  put_call_ratio: number | null
+}
+
+/**
+ * The per-ticker card from `/stocks/ticker/{ticker}` — the app's one stock
+ * snapshot: the live quote plus name, exchange, and market cap. The
+ * `dividend`/`performance`/`metrics`/`options_metrics` blocks arrive only when
+ * requested via `include` and are null otherwise (or when their source is
+ * down).
+ */
+export interface TickerCard {
+  ticker: string
   name: string | null
   exchange: string | null
   price: number
   change: number | null
   change_percent: number | null
-  open: number | null
-  high: number | null
-  low: number | null
-  previous_close: number | null
-  volume: number | null
-  bid: number | null
-  ask: number | null
-  spread: number | null
-  as_of: string | null
   market_cap: number | null
-  dividend_per_share: number | null
-  dividend_yield: number | null
+  dividend: TickerDividend | null
   performance: StockPerformance | null
-  /** Percent the price sits below its all-time high (≤ 0; 0 at a new high). */
-  drawdown_from_high: number | null
-  // Forward-looking enrichment (best-effort; null when the estimates vendor is
-  // unavailable or doesn't cover the symbol).
-  forward_pe: number | null // price ÷ FY1 consensus EPS
-  forward_ps: number | null // market cap ÷ FY1 consensus revenue
-  analyst_estimates: AnalystEstimates | null
-  growth: GrowthMetrics | null
+  metrics: TickerMetrics | null
+  options_metrics: OptionsMetrics | null
 }
 
 /**
@@ -139,6 +149,18 @@ export interface CandleSeries {
   candles: Candle[]
 }
 
+/**
+ * Percent move across a candle series, from the first bar's open to the last
+ * bar's close — the whole charted window, including the first bar's own move.
+ * `null` when the series is empty or has no usable base price.
+ */
+export function rangeReturnPct(candles: Candle[]): number | null {
+  const first = candles[0]
+  const last = candles[candles.length - 1]
+  if (!first || !last || !first.open) return null
+  return ((last.close - first.open) / first.open) * 100
+}
+
 /** Where the latest RSI sits relative to the overbought/oversold thresholds. */
 export type RsiSignal = 'oversold' | 'overbought' | 'neutral'
 
@@ -194,34 +216,6 @@ export function rsiVerdict(rsi: RsiSeries): RsiAction | null {
   return 'Hold'
 }
 
-/** A dollar-cost-averaging call, escalating with how deep the dip runs. */
-export type DcaAction = 'Strong Buy' | 'Moderate Buy' | 'Buy' | 'Hold'
-
-/**
- * Buy tiers keyed by drawdown depth (percent below the all-time high). Deeper
- * falls read as stronger entries: a 10% dip is a Buy, 20% a Moderate Buy, 30%+
- * a Strong Buy. Ordered deepest-first so a linear scan returns the right call.
- */
-export const DCA_TIERS: { action: DcaAction; depth: number }[] = [
-  { action: 'Strong Buy', depth: 30 },
-  { action: 'Moderate Buy', depth: 20 },
-  { action: 'Buy', depth: 10 },
-]
-
-/**
- * Map a drawdown-from-high (a percent ≤ 0) to a DCA call. Returns null when
- * there's no drawdown to judge; a shallow dip (under the smallest tier) is a
- * Hold — too near the high to call it a discount.
- */
-export function dcaVerdict(drawdownFromHigh: number | null): DcaAction | null {
-  if (drawdownFromHigh == null) return null
-  const depth = -drawdownFromHigh
-  for (const tier of DCA_TIERS) {
-    if (depth >= tier.depth) return tier.action
-  }
-  return 'Hold'
-}
-
 /**
  * A bottom-line profitability call from trailing net margin: is the company
  * actually making money, and how comfortably. Net margin is THE profit read —
@@ -266,6 +260,156 @@ export function profitabilityVerdict(
   }
   /* c8 ignore next — any margin > 0 clears the 0 floor above */
   return 'Unprofitable'
+}
+
+/**
+ * A plain-language call on the PEG ratio — is the P/E multiple justified by
+ * the earnings growth behind it? The bands follow Lynch's read: under 1 the
+ * growth outruns the multiple, 1–2 is the unremarkable middle, above 2 the
+ * price has run well ahead. `Not Meaningful` covers a non-positive ratio
+ * (losses or shrinking EPS) — the backend normally nulls those, but a served
+ * value still gets a sane label. Deliberately a broad, NOT sector-aware rule
+ * of thumb, so the card frames it as a rough guide, not advice.
+ */
+export type PegVerdict =
+  | 'Cheap for Its Growth'
+  | 'Fairly Priced'
+  | 'Pricey for Its Growth'
+  | 'Not Meaningful'
+
+/**
+ * Map a trailing PEG ratio to its verdict. Returns null when there's no ratio
+ * to judge (the backend nulls PEG on losses or non-positive EPS growth).
+ */
+export function pegVerdict(peg: number | null): PegVerdict | null {
+  if (peg == null) return null
+  if (peg <= 0) return 'Not Meaningful'
+  if (peg < 1) return 'Cheap for Its Growth'
+  if (peg <= 2) return 'Fairly Priced'
+  return 'Pricey for Its Growth'
+}
+
+/**
+ * Which way today's options flow leans, from the put/call ratio: `optimistic`
+ * (calls dominate — upside bets), `protective` (puts dominate — downside
+ * cover), or `balanced` in the narrow band around parity.
+ */
+export type OptionsSentiment = 'optimistic' | 'balanced' | 'protective'
+
+/**
+ * Half-width of the "balanced" band around a put/call ratio of 1. A ratio
+ * within ±0.05 of parity is too close to call either way, so it reads as
+ * balanced rather than flipping label on noise.
+ */
+export const PCR_BALANCED_MARGIN = 0.05
+
+/**
+ * Map a put/call ratio to a sentiment lean. Below the balanced band calls
+ * dominate (optimistic); above it puts dominate (protective). Returns null
+ * when there's no ratio to judge.
+ */
+export function optionsSentiment(
+  putCallRatio: number | null,
+): OptionsSentiment | null {
+  if (putCallRatio == null) return null
+  if (putCallRatio < 1 - PCR_BALANCED_MARGIN) return 'optimistic'
+  if (putCallRatio > 1 + PCR_BALANCED_MARGIN) return 'protective'
+  return 'balanced'
+}
+
+/**
+ * Where an options figure sits on its scale — `low`, the unremarkable `mid`,
+ * or `high`. Drives the traffic-light colouring on the options card: low reads
+ * green (calm / small / cheap), mid amber, high red (wild / big / pricey).
+ */
+export type OptionsLevel = 'low' | 'mid' | 'high'
+
+/** The options-card figures that get a low/mid/high read (the put/call ratio
+ *  is judged separately, by `optionsSentiment`). */
+export type OptionsGauge =
+  | 'implied_volatility'
+  | 'expected_move'
+  | 'insurance_cost'
+
+/**
+ * Low/high cut-offs per options gauge: below `lowBelow` is `low`, above
+ * `highAbove` is `high`, between (edges inclusive) is `mid`. Broad large-cap,
+ * roughly-one-month rules of thumb — NOT symbol-aware (a sleepy utility and a
+ * meme stock live on very different scales), so the card frames the colour as
+ * a rough guide, not advice.
+ *
+ * - implied_volatility: under 20% annualized is a calm large-cap, over 40%
+ *   prices in real turbulence.
+ * - expected_move: an under-4% swing priced into ~a month is small; over 8%
+ *   is a big month by blue-chip standards.
+ * - insurance_cost: an ATM put under 3% of spot for the quarter is cheap
+ *   cover; over 6% the market charges real money for protection.
+ */
+export const OPTIONS_LEVEL_BANDS: Record<
+  OptionsGauge,
+  { lowBelow: number; highAbove: number }
+> = {
+  implied_volatility: { lowBelow: 20, highAbove: 40 },
+  expected_move: { lowBelow: 4, highAbove: 8 },
+  insurance_cost: { lowBelow: 3, highAbove: 6 },
+}
+
+/**
+ * Grade one options figure against its gauge's bands (see
+ * OPTIONS_LEVEL_BANDS). Returns null when there's no figure to judge.
+ */
+export function optionsLevel(
+  gauge: OptionsGauge,
+  n: number | null,
+): OptionsLevel | null {
+  if (n == null) return null
+  const { lowBelow, highAbove } = OPTIONS_LEVEL_BANDS[gauge]
+  if (n < lowBelow) return 'low'
+  if (n > highAbove) return 'high'
+  return 'mid'
+}
+
+/**
+ * A five-step long/short call read off the options flow, most to least
+ * bullish. Deliberately the "Go / Lean" vocabulary rather than RSI's
+ * Buy/Sell so the two cards never read as the same signal — this one follows
+ * where option traders' money is going today, nothing about price levels.
+ */
+export type OptionsSignal =
+  | 'Go Long'
+  | 'Lean Long'
+  | 'Neutral'
+  | 'Lean Short'
+  | 'Go Short'
+
+/**
+ * Put/call cut-offs for the strong calls, either side of the balanced band
+ * (PCR_BALANCED_MARGIN). Below 0.7 calls outnumber puts ~3:2 or better — a
+ * decisive bullish tilt in today's flow — and the mirror ratio above 1.4
+ * (1/0.7) is a decisively protective book. Between a strong edge and the
+ * balanced band the flow leans without conviction, so the call softens to
+ * "Lean". Follow-the-flow rules of thumb, NOT contrarian and NOT symbol-aware
+ * — the card frames it as a rough guide, not advice.
+ */
+export const PCR_STRONG_LONG = 0.7
+export const PCR_STRONG_SHORT = 1.4
+
+/**
+ * Map a put/call ratio to a long/short call. Follows the flow: heavy call
+ * buying reads long, heavy put buying short, the balanced band around parity
+ * neutral, with the strong edges reserved for a decisive tilt (the cut-off
+ * values themselves count as the softer "Lean"). Returns null when there's no
+ * ratio to judge.
+ */
+export function optionsSignal(
+  putCallRatio: number | null,
+): OptionsSignal | null {
+  if (putCallRatio == null) return null
+  if (putCallRatio < PCR_STRONG_LONG) return 'Go Long'
+  if (putCallRatio < 1 - PCR_BALANCED_MARGIN) return 'Lean Long'
+  if (putCallRatio <= 1 + PCR_BALANCED_MARGIN) return 'Neutral'
+  if (putCallRatio <= PCR_STRONG_SHORT) return 'Lean Short'
+  return 'Go Short'
 }
 
 /** How far back a chart reaches. Doubles as the API `range` query value. */
@@ -353,28 +497,38 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, detail)
 }
 
-/** Fetch a single stock snapshot by ticker symbol. */
-export async function getStock(
-  symbol: string,
-  opts: { signal?: AbortSignal } = {},
-): Promise<Stock> {
-  const res = await fetch(`${API_BASE}/stocks/${encodeURIComponent(symbol)}`, {
-    signal: opts.signal,
-  })
+/**
+ * Fetch the quote card for one ticker (`/stocks/ticker/{ticker}`). Pass
+ * `include` to attach the opt-in blocks — an unrequested block comes back
+ * null and costs the backend no upstream call.
+ */
+export async function getTickerCard(
+  ticker: string,
+  opts: { include?: TickerCardInclude[]; signal?: AbortSignal } = {},
+): Promise<TickerCard> {
+  const include = opts.include?.length
+    ? `?include=${opts.include.join(',')}`
+    : ''
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(ticker)}${include}`,
+    { signal: opts.signal },
+  )
   if (!res.ok) throw await toApiError(res)
-  return (await res.json()) as Stock
+  return (await res.json()) as TickerCard
 }
 
 /**
- * Fetch several snapshots concurrently, preserving the order of `symbols`. A
- * symbol that fails (bad ticker, network blip) resolves to `null` instead of
+ * Fetch several ticker cards concurrently, preserving the order of `tickers`.
+ * A ticker that fails (bad symbol, network blip) resolves to `null` instead of
  * rejecting the whole batch, so one dud never blanks the rest of the row.
  */
-export async function getStocks(
-  symbols: string[],
-  opts: { signal?: AbortSignal } = {},
-): Promise<(Stock | null)[]> {
-  return Promise.all(symbols.map((s) => getStock(s, opts).catch(() => null)))
+export async function getTickerCards(
+  tickers: string[],
+  opts: { include?: TickerCardInclude[]; signal?: AbortSignal } = {},
+): Promise<(TickerCard | null)[]> {
+  return Promise.all(
+    tickers.map((t) => getTickerCard(t, opts).catch(() => null)),
+  )
 }
 
 /** Fetch the day's snapshot for every tracked market sector. */
@@ -472,6 +626,42 @@ export async function getScreener(
   return data
 }
 
+/** True for minute/hour bars — the granularities where extended-hours windows appear. */
+const isIntradayTimeframe = (timeframe: string) => /Min|Hour/.test(timeframe)
+
+// One reusable ET wall-clock formatter (construction is the expensive part).
+// h23 keeps midnight as "00"; the IANA zone tracks EST/EDT automatically.
+const ET_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hourCycle: 'h23',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
+// The regular NYSE/Nasdaq session, in minutes-of-day ET.
+const RTH_OPEN = 9 * 60 + 30 // 9:30 AM
+const RTH_CLOSE = 16 * 60 // 4:00 PM
+
+/**
+ * Drop extended-hours bars from an intraday series; non-intraday series pass
+ * through untouched. The API's bars come from Alpaca's IEX feed, which only
+ * prints a bar for a window that saw an IEX trade — outside the regular
+ * session that's sparse and ends at a different time per symbol (the 4 PM
+ * closing auction never trades on IEX), so overlaid charts would trail off
+ * raggedly. Clamping to the 9:30–4:00 ET session makes every intraday line
+ * start and stop together. A bar's `time` marks its window's start, so the
+ * session's last 5-minute bar is the 3:55 PM one.
+ */
+export function clampToRegularHours(series: CandleSeries): CandleSeries {
+  if (!isIntradayTimeframe(series.timeframe)) return series
+  const candles = series.candles.filter((c) => {
+    const [h, m] = ET_CLOCK.format(new Date(c.time * 1000)).split(':')
+    const minute = Number(h) * 60 + Number(m)
+    return minute >= RTH_OPEN && minute < RTH_CLOSE
+  })
+  return { ...series, candles, count: candles.length }
+}
+
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
 export async function getCandles(
   symbol: string,
@@ -501,7 +691,7 @@ export async function getCandles(
   if (!Array.isArray(data?.candles)) {
     throw new ApiError(res.status, 'Malformed candle response')
   }
-  return data
+  return clampToRegularHours(data)
 }
 
 /**
@@ -556,106 +746,6 @@ export interface EarningsSurprise {
 }
 
 /**
- * Trailing earnings/profitability snapshot served alongside the beat history:
- * trailing EPS, year-over-year EPS/revenue growth, the margin stack, the
- * returns (ROE/ROIC) and the dividend payout ratio. All percentages except
- * `eps`; any field a vendor doesn't cover is null. (Valuation/market ratios —
- * P/E, PEG, beta, the 52-week range — ride alongside as `valuation`, the same
- * block the stock snapshot carries on its `metrics`.)
- */
-export interface EarningsMetrics {
-  eps: number | null
-  eps_growth_yoy: number | null
-  revenue_growth_yoy: number | null
-  gross_margin: number | null
-  operating_margin: number | null
-  net_margin: number | null
-  roe: number | null
-  roic: number | null
-  payout_ratio: number | null
-}
-
-/**
- * Point-in-time valuation, financial-health and market ratios — the "is it
- * priced well?" read that complements the trailing earnings. `pe`/`pb`/`ps` are
- * valuation multiples and `peg` the trailing P/E over EPS growth (null on losses
- * or non-positive growth); `current_ratio` and `debt_to_equity` gauge
- * balance-sheet health; `beta` is volatility vs. the market (1.0 = moves with
- * it); `week_52_high`/`week_52_low` bound the trailing year's price range. All
- * trailing (no forward estimates); any field a vendor doesn't cover is null.
- */
-export interface KeyMetrics {
-  pe: number | null
-  peg: number | null
-  pb: number | null
-  ps: number | null
-  current_ratio: number | null
-  debt_to_equity: number | null
-  beta: number | null
-  week_52_high: number | null
-  week_52_low: number | null
-}
-
-/**
- * A coarse "how does this reading look?" grade for one valuation/health ratio,
- * driving the colour it's shown in: `good` (green), `caution` (red), or `fair`
- * (the unremarkable middle, left the default text colour so only the notable
- * extremes draw the eye). Deliberately broad rules of thumb for a large-cap
- * read — NOT sector-aware (a utility's leverage or a bank's balance sheet read
- * very differently), so the card frames the colour as a rough guide, not advice.
- */
-export type ValuationGrade = 'good' | 'fair' | 'caution'
-
-/** The KeyMetrics ratios the earnings card grades and colours. */
-export type ValuationRatio =
-  | 'pe'
-  | 'peg'
-  | 'ps'
-  | 'current_ratio'
-  | 'debt_to_equity'
-  | 'beta'
-
-/**
- * Grade one valuation ratio for at-a-glance colouring. The valuation multiples
- * (P/E, PEG, P/S) read cheaper the lower they are — and a non-positive P/E means
- * the company isn't profitable, a caution in itself; the health ratios reward a
- * comfortable liquidity cushion and conservative leverage; beta is a volatility
- * read, where calmer-than-the-market is the "good" end. Each branch documents
- * its bands; anything between the good and caution edges is `fair`.
- */
-export function gradeValuation(
-  ratio: ValuationRatio,
-  n: number,
-): ValuationGrade {
-  switch (ratio) {
-    case 'pe':
-      // A loss (≤0) or a rich multiple is a caution; cheap-to-reasonable is good.
-      if (n <= 0 || n > 40) return 'caution'
-      return n < 25 ? 'good' : 'fair'
-    case 'peg':
-      // Lynch's read: under 1 is cheap for the growth, over 2 pricey for it.
-      if (n <= 0 || n > 2) return 'caution'
-      return n < 1 ? 'good' : 'fair'
-    case 'ps':
-      // Under ~2× sales is modest; above ~6× is a rich top-line multiple.
-      if (n <= 0 || n > 6) return 'caution'
-      return n < 2 ? 'good' : 'fair'
-    case 'current_ratio':
-      // Below 1 can't cover near-term bills; a comfortable cushion is healthy.
-      if (n < 1) return 'caution'
-      return n >= 1.5 ? 'good' : 'fair'
-    case 'debt_to_equity':
-      // Negative equity or heavy leverage is risky; a light balance sheet is good.
-      if (n < 0 || n > 2) return 'caution'
-      return n <= 1 ? 'good' : 'fair'
-    case 'beta':
-      // Risk read: roughly market or calmer is good, a wild swinger a caution.
-      if (n > 1.5) return 'caution'
-      return n <= 1.1 ? 'good' : 'fair'
-  }
-}
-
-/**
  * The next scheduled earnings report and the consensus going into it — the
  * forward complement to the past-only beat history. `report_date` is the
  * expected announcement date (ISO); `session` is when in the trading day it's
@@ -672,14 +762,13 @@ export interface NextEarnings {
 }
 
 /**
- * Recent quarterly earnings surprises (newest first) plus a beat summary.
- * `beat_rate` is the percent of *scored* quarters (those with both an actual
- * and an estimate) that met or beat — the "beats consistently?" read; `scored`
- * is how many of `count` quarters could be scored, `beats` how many of those
- * cleared the bar. `metrics` is an optional trailing earnings snapshot,
- * `valuation` the point-in-time valuation/health/market ratios, and
- * `next_report` the next scheduled report's consensus (all best-effort; absent
- * on older API builds, null when the vendor has no data).
+ * The earnings card's view-model: recent quarterly earnings surprises (newest
+ * first) plus a beat summary. Assembled by `quarterlyToEarningsHistory` from
+ * `/earnings/quarterly` and the stock snapshot — no longer fetched from an
+ * endpoint of its own. `beat_rate` is the percent of *scored* quarters (those
+ * with both an actual and an estimate) that met or beat; `scored` is how many
+ * of `count` quarters could be scored, `beats` how many of those cleared the
+ * bar. `next_report` is the next scheduled report's consensus.
  */
 export interface EarningsHistory {
   symbol: string
@@ -688,32 +777,235 @@ export interface EarningsHistory {
   scored: number
   beat_rate: number | null
   quarters: EarningsSurprise[]
-  metrics?: EarningsMetrics | null
-  valuation?: KeyMetrics | null
   next_report?: NextEarnings | null
 }
 
 /**
- * Fetch recent quarterly earnings (actual EPS vs. consensus estimate) for a
- * ticker, newest first. `limit` is how many quarters to pull back, clamped by
- * the API to 1–40 (default 4).
+ * One quarter from the consolidated quarterly-earnings series — reported and
+ * upcoming quarters in a single list. A reported quarter (`is_reported`) carries
+ * the actual EPS/revenue and the surprise vs. the consensus going in; an
+ * upcoming one carries the forward estimates (`eps_estimate`/`revenue_estimate`)
+ * with actuals null. `period_end` is the fiscal period's last day, `report_date`
+ * the (expected) announcement date; `beat` is the met-or-beat flag, null until
+ * the quarter reports. Unlike the older beat history, this DOES serve a forward
+ * `revenue_estimate` for the scheduled quarters.
  */
-export async function getEarnings(
+export interface QuarterlyEarningsQuarter {
+  fiscal_year: number | null
+  fiscal_quarter: number | null
+  period_end: string | null
+  report_date: string | null
+  eps_actual: number | null
+  eps_estimate: number | null
+  eps_surprise: number | null
+  eps_surprise_percent: number | null
+  revenue_estimate: number | null
+  revenue_actual: number | null
+  beat: boolean | null
+  is_reported: boolean
+}
+
+/**
+ * The consolidated quarterly earnings series for a ticker, oldest → newest:
+ * reported quarters followed by the upcoming scheduled ones, split by
+ * `reported_count`/`upcoming_count` (summing to `count`). The successor to the
+ * `/earnings` beat history — richer, since it carries every scheduled quarter
+ * (not just the next one) and a forward revenue estimate for each.
+ */
+export interface QuarterlyEarnings {
+  symbol: string
+  count: number
+  reported_count: number
+  upcoming_count: number
+  quarters: QuarterlyEarningsQuarter[]
+}
+
+/**
+ * Fetch the consolidated quarterly earnings series (reported + upcoming) for a
+ * ticker. Oldest → newest, so consumers that read newest-first reverse it.
+ */
+export async function getQuarterlyEarnings(
   symbol: string,
-  opts: { limit?: number; signal?: AbortSignal } = {},
-): Promise<EarningsHistory> {
-  const qs = new URLSearchParams()
-  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  opts: { signal?: AbortSignal } = {},
+): Promise<QuarterlyEarnings> {
   const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings?${qs}`,
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings/quarterly`,
     { signal: opts.signal },
   )
   if (!res.ok) throw await toApiError(res)
-  const data = (await res.json()) as EarningsHistory
+  const data = (await res.json()) as QuarterlyEarnings
   if (!Array.isArray(data?.quarters)) {
-    throw new ApiError(res.status, 'Malformed earnings response')
+    throw new ApiError(res.status, 'Malformed quarterly earnings response')
   }
   return data
+}
+
+/**
+ * Every upcoming (scheduled, not-yet-reported) quarter from the series, mapped
+ * to the `NextEarnings` shape the earnings card draws its forward "expected"
+ * columns from — oldest → newest, so they append to the right of the reported
+ * bars in order. The trading `session` (before/after close) came from the
+ * retired `/earnings` endpoint's calendar and is no longer sourced, so it's
+ * always null (the chip simply shows the date alone).
+ */
+export function quarterlyUpcoming(
+  quarterly: QuarterlyEarnings,
+): NextEarnings[] {
+  return quarterly.quarters
+    .filter((q) => !q.is_reported)
+    .map((q) => ({
+      report_date: q.report_date,
+      fiscal_year: q.fiscal_year,
+      fiscal_quarter: q.fiscal_quarter,
+      eps_estimate: q.eps_estimate,
+      revenue_estimate: q.revenue_estimate,
+      session: null,
+    }))
+}
+
+/**
+ * Adapt the quarterly series into the `EarningsHistory` shape the earnings
+ * card renders, so the EPS/revenue charts and the next-report chip all run off
+ * `/earnings/quarterly`. Reported quarters become the (newest-first)
+ * `quarters` history and the beat summary is scored from their `beat` flags;
+ * the first upcoming quarter becomes `next_report`.
+ */
+export function quarterlyToEarningsHistory(
+  quarterly: QuarterlyEarnings,
+): EarningsHistory {
+  const reported = quarterly.quarters.filter((q) => q.is_reported)
+  // The card reads newest-first; the endpoint serves oldest-first.
+  const quarters: EarningsSurprise[] = reported
+    .slice()
+    .reverse()
+    .map((q) => ({
+      period: q.period_end,
+      fiscal_year: q.fiscal_year,
+      fiscal_quarter: q.fiscal_quarter,
+      actual: q.eps_actual,
+      estimate: q.eps_estimate,
+      surprise: q.eps_surprise,
+      surprise_percent: q.eps_surprise_percent,
+      beat: q.beat,
+      revenue_actual: q.revenue_actual,
+    }))
+  const scoreable = reported.filter((q) => q.beat != null)
+  const beats = scoreable.filter((q) => q.beat).length
+  // The chip names the single *next* report — the first upcoming quarter; the
+  // charts draw every upcoming quarter via the card's `upcoming` prop.
+  const next_report: NextEarnings | null =
+    quarterlyUpcoming(quarterly)[0] ?? null
+  return {
+    symbol: quarterly.symbol,
+    count: quarterly.reported_count,
+    beats,
+    scored: scoreable.length,
+    beat_rate: scoreable.length
+      ? Math.round((beats / scoreable.length) * 1000) / 10
+      : null,
+    quarters,
+    next_report,
+  }
+}
+
+/**
+ * One fiscal year from the annual earnings series — reported and upcoming years
+ * in a single list, the yearly counterpart of `QuarterlyEarningsQuarter`. A
+ * reported year (`is_reported`) carries the actual EPS, revenue and net income;
+ * an upcoming one carries the forward consensus (`eps_estimate`/
+ * `revenue_estimate`) with actuals null. The API serves no consensus for years
+ * already reported, so there's no surprise or beat to score. `period_end` is
+ * the fiscal year's last day — which can sit in the next calendar year (NVDA's
+ * FY2026 ended January 2026).
+ *
+ * `eps_actual` is GAAP diluted EPS while `eps_estimate` is analyst consensus —
+ * an adjusted basis that can sit well above GAAP. A reported year may also
+ * carry `eps_actual_consensus`, the year's actual on that same consensus basis
+ * (best-effort — null when the backend couldn't assemble it), so an actual can
+ * be compared with the forward estimates without mixing bases.
+ */
+export interface AnnualEarningsYear {
+  fiscal_year: number | null
+  period_end: string | null
+  eps_actual: number | null
+  eps_estimate: number | null
+  revenue_actual: number | null
+  revenue_estimate: number | null
+  net_income: number | null
+  eps_actual_consensus: number | null
+  is_reported: boolean
+}
+
+/**
+ * The annual earnings series for a ticker, oldest → newest: reported fiscal
+ * years followed by the upcoming estimated ones, split by
+ * `reported_count`/`upcoming_count` (summing to `count`).
+ */
+export interface AnnualEarnings {
+  symbol: string
+  count: number
+  reported_count: number
+  upcoming_count: number
+  years: AnnualEarningsYear[]
+}
+
+/** Fetch the annual earnings series (reported + upcoming fiscal years). */
+export async function getAnnualEarnings(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<AnnualEarnings> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings/annual`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AnnualEarnings
+  if (!Array.isArray(data?.years)) {
+    throw new ApiError(res.status, 'Malformed annual earnings response')
+  }
+  return data
+}
+
+/**
+ * Reported fiscal years mapped to the per-quarter shape the earnings card's
+ * charts consume, newest-first (the order the card reads). A null
+ * `fiscal_quarter` is what labels a row "FY26" rather than "Q2 '26"; with no
+ * consensus served for reported years there's no surprise or beat to carry.
+ */
+export function annualReported(annual: AnnualEarnings): EarningsSurprise[] {
+  return annual.years
+    .filter((y) => y.is_reported)
+    .reverse()
+    .map((y) => ({
+      period: y.period_end,
+      fiscal_year: y.fiscal_year,
+      fiscal_quarter: null,
+      actual: y.eps_actual,
+      estimate: y.eps_estimate,
+      surprise: null,
+      surprise_percent: null,
+      beat: null,
+      revenue_actual: y.revenue_actual,
+    }))
+}
+
+/**
+ * Upcoming (estimated, not-yet-reported) fiscal years mapped to the
+ * `NextEarnings` shape the card's forecast columns read, oldest → newest.
+ * Annual rows carry no announcement date or session — only the fiscal year the
+ * consensus is for.
+ */
+export function annualUpcoming(annual: AnnualEarnings): NextEarnings[] {
+  return annual.years
+    .filter((y) => !y.is_reported)
+    .map((y) => ({
+      report_date: null,
+      fiscal_year: y.fiscal_year,
+      fiscal_quarter: null,
+      eps_estimate: y.eps_estimate,
+      revenue_estimate: y.revenue_estimate,
+      session: null,
+    }))
 }
 
 /**

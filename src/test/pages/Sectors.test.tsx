@@ -72,7 +72,7 @@ function stubFetch(payload: unknown) {
   )
 }
 
-/** Routes `/sectors` to the sample and `/stocks/{symbol}` to a per-ticker stub. */
+/** Routes `/sectors` to the sample and `/stocks/ticker/{ticker}` to a per-ticker stub. */
 function stubRoutedFetch(
   sectors: unknown,
   stockBySymbol: Record<string, unknown>,
@@ -81,10 +81,10 @@ function stubRoutedFetch(
     'fetch',
     vi.fn((url: string) => {
       const u = String(url)
-      const m = u.match(/\/stocks\/([^/?]+)/)
+      const m = u.match(/\/stocks\/ticker\/([^/?]+)/)
       const payload = m
         ? (stockBySymbol[decodeURIComponent(m[1])] ?? {
-            symbol: decodeURIComponent(m[1]),
+            ticker: decodeURIComponent(m[1]),
             name: null,
             price: 0,
             change: null,
@@ -164,7 +164,7 @@ describe('Sectors page', () => {
   it('opens the holdings dialog with the sector top stocks on click', async () => {
     stubRoutedFetch(sectorsSample, {
       AAPL: {
-        symbol: 'AAPL',
+        ticker: 'AAPL',
         name: 'Apple Inc.',
         price: 200.5,
         change: 2.1,

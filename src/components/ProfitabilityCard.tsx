@@ -1,7 +1,7 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import { profitabilityVerdict, type ProfitabilityVerdict } from '@/lib/api'
 
-// Amber for the cautionary "Marginally Profitable" — matches the DCA/RSI cards'
+// Amber for the cautionary "Marginally Profitable" — matches the RSI card's
 // neutral middle call.
 const THIN_COLOR = '#fbbf24' // amber-400
 
