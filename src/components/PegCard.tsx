@@ -173,20 +173,11 @@ function Gauge({ peg, color }: { peg: number; color: string }) {
 
 /**
  * A growth-adjusted valuation verdict from the trailing PEG ratio (trailing
- * P/E ÷ trailing EPS growth, both off the stock snapshot). `pe` and
- * `epsGrowth` are the ratio's two inputs, shown beside the figure so the
- * number explains itself; when PEG is null they also let the empty state say
- * *why* (no growth to price against vs. simply not covered).
+ * P/E ÷ trailing EPS growth), off the ticker card's metrics block. The card
+ * gets the served ratio only — its inputs aren't served alongside it — so the
+ * figure carries a generic "what this is" line rather than the ratio math.
  */
-export default function PegCard({
-  peg,
-  pe,
-  epsGrowth,
-}: {
-  peg: number | null
-  pe: number | null
-  epsGrowth: number | null
-}) {
+export default function PegCard({ peg }: { peg: number | null }) {
   const verdict = pegVerdict(peg)
   const meta = verdict ? VERDICT[verdict] : null
 
@@ -244,11 +235,8 @@ export default function PegCard({
 
         {peg == null ? (
           <Typography color="text.secondary" sx={{ mt: 2 }}>
-            {epsGrowth != null && epsGrowth <= 0
-              ? 'EPS fell over the past year, so there is no growth to ' +
-                'price the multiple against.'
-              : 'No PEG data — the ratio needs positive trailing earnings ' +
-                'and EPS growth.'}
+            No PEG data — the ratio needs positive trailing earnings and EPS
+            growth.
           </Typography>
         ) : (
           <>
@@ -269,9 +257,7 @@ export default function PegCard({
                 {fmtPeg(peg)}
               </Typography>
               <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
-                {pe != null && epsGrowth != null
-                  ? `${pe.toFixed(1)} P/E ÷ ${epsGrowth.toFixed(1)}% EPS growth`
-                  : 'P/E per point of EPS growth'}
+                P/E per point of EPS growth
               </Typography>
             </Stack>
 

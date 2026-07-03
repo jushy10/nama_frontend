@@ -2,25 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import Stocks from '@/pages/Stocks'
 
+// The ticker card (/stocks/ticker/{ticker}) with every opt-in block attached
+// — the page's one snapshot request.
 const sample = {
-  symbol: 'NVDA',
+  ticker: 'NVDA',
   name: 'NVIDIA Corporation Common Stock',
   exchange: 'NASDAQ',
   price: 209.97,
   change: 5.27,
   change_percent: 2.57,
-  open: 207.4,
-  high: 211.385,
-  low: 206.5,
-  previous_close: 204.7,
-  volume: 4026083,
-  bid: 210.0,
-  ask: 231.8,
-  spread: 21.8,
-  as_of: '2026-06-18T20:45:23.729548Z',
   market_cap: 3_210_000_000_000,
-  dividend_per_share: 0.04,
-  dividend_yield: 0.02,
+  dividend: { yield_percentage: 0.02, per_share: 0.04 },
   performance: {
     '1w': 3.1,
     '1m': -1.2,
@@ -29,26 +21,12 @@ const sample = {
     ytd: 22.3,
     '1y': 40.1,
   },
-  drawdown_from_high: -24.5,
   metrics: {
-    pe: 34.6,
     peg: 1.19,
-    pb: 34.0,
-    ps: 9.4,
+    forward_peg: 1.42,
     gross_margin: 47.9,
     operating_margin: 32.6,
     net_margin: 27.2,
-    current_ratio: 1.07,
-    debt_to_equity: 0.8,
-    beta: 1.1,
-    week_52_high: 317.4,
-    week_52_low: 199.26,
-  },
-  growth: {
-    revenue_yoy: 12.8,
-    eps_yoy: 29.0,
-    forward_revenue_growth: 16.6,
-    forward_eps_growth: 15.2,
   },
 }
 
@@ -273,9 +251,12 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'NVDA' }),
     ).toBeInTheDocument()
     expect(screen.getByText('$209.97')).toBeInTheDocument()
-    // The symbol is normalized to upper-case before the request.
+    // The symbol is normalized to upper-case before the request, which goes to
+    // the ticker-card endpoint with every opt-in block attached.
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/NVDA'),
+      expect.stringContaining(
+        '/stocks/ticker/NVDA?include=dividend,performance,metrics',
+      ),
       expect.anything(),
     )
 
@@ -294,21 +275,22 @@ describe('Stocks search', () => {
     expect(screen.queryByText('Volume')).not.toBeInTheDocument()
 
     // Net margin drives a profitability verdict card; 27.2% reads Highly
-    // Profitable. (Rides the snapshot's metrics block.)
+    // Profitable. (Rides the ticker card's metrics block.)
     expect(
       await screen.findByRole('heading', { name: 'Profitability' }),
     ).toBeInTheDocument()
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
 
-    // The PEG card rides beside it: 1.19 (34.6 P/E ÷ 29.0% trailing EPS
-    // growth) sits in the 1–2 middle, so it reads Fairly Priced.
+    // The PEG card rides beside it: 1.19 sits in the 1–2 middle, so it reads
+    // Fairly Priced. The endpoint serves the ratio without its inputs, so the
+    // figure carries the generic label.
     expect(
       screen.getByRole('heading', { name: 'PEG Ratio' }),
     ).toBeInTheDocument()
     expect(screen.getByText('1.19')).toBeInTheDocument()
     expect(screen.getByText('Fairly Priced')).toBeInTheDocument()
-    expect(screen.getByText('34.6 P/E ÷ 29.0% EPS growth')).toBeInTheDocument()
+    expect(screen.getByText('P/E per point of EPS growth')).toBeInTheDocument()
 
     // The candlestick chart loads from the candles endpoint, and the header
     // carries the range's move: first open (200) → last close (209.97).
@@ -394,10 +376,9 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
     expect(screen.getAllByText('42.85').length).toBeGreaterThan(0)
-    // The snapshot's trailing multiple (metrics.pe 34.6) threads in as the
-    // Current P/E tile on both walks.
-    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
-    expect(screen.getAllByText('34.60').length).toBeGreaterThan(0)
+    // The ticker card carries no trailing multiple, so no Current P/E tile
+    // threads into the walks.
+    expect(screen.queryByText('Current P/E')).not.toBeInTheDocument()
     expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
     // The FY27 multiple shows on its tile and again on the fiscal-year chart.
     expect(screen.getAllByText('23.41').length).toBeGreaterThan(0)
@@ -428,7 +409,7 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'NVDA' }),
     ).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/NVDA'),
+      expect.stringContaining('/stocks/ticker/NVDA'),
       expect.anything(),
     )
   })

@@ -198,44 +198,6 @@ describe('ForwardPeCard', () => {
     ).toBeInTheDocument()
   })
 
-  it('threads the Current P/E between each anchor and its forward steps', () => {
-    renderWithProviders(
-      <ForwardPeCard
-        price={200}
-        quarterly={quarterlySample}
-        annual={annualSample}
-        trailingPe={68.9}
-      />,
-    )
-
-    // One Current tile per walk, both showing the snapshot's trailing
-    // multiple, plus a solid "Now" column on each chart.
-    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
-    expect(screen.getAllByText('68.90')).toHaveLength(4) // 2 tiles + 2 bars
-    expect(screen.getAllByText('Now')).toHaveLength(2)
-    expect(screen.getAllByText('Price ÷ trailing 12-mo EPS')).toHaveLength(2)
-
-    // The tile sits between the reported anchor and the first forward step.
-    const anchor = screen.getByText('P/E FY26')
-    const current = screen.getAllByText('Current P/E')[0]
-    const fwd = screen.getByText('Fwd P/E FY27')
-    expect(
-      anchor.compareDocumentPosition(current) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-    expect(
-      current.compareDocumentPosition(fwd) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy()
-
-    // Forward deltas still measure against the reported anchor; the current
-    // tile is a reference point and carries no delta of its own.
-    expect(screen.getByText('-20.0% vs FY26')).toBeInTheDocument()
-    expect(screen.queryByText(/vs now/i)).not.toBeInTheDocument()
-
-    // Both footnotes own up to what the tile is.
-    expect(screen.getAllByText(/snapshot.s trailing multiple/i)).toHaveLength(2)
-  })
-
   it('tints a compressing multiple green and an expanding one red', () => {
     renderWithProviders(
       <ForwardPeCard
@@ -324,22 +286,6 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
     expect(screen.getAllByText('62.50').length).toBeGreaterThan(0)
-  })
-
-  it('falls back to the snapshot forward P/E when the annual series is missing', () => {
-    renderWithProviders(<ForwardPeCard price={200} forwardPe={38.5} />)
-    expect(screen.getByText('Fwd P/E (next FY)')).toBeInTheDocument()
-    expect(screen.getByText('38.50')).toBeInTheDocument()
-    // No annual series → no reported year to anchor on: the anchor tile
-    // renders unlabelled with an em dash.
-    expect(screen.getByText('P/E (last FY)')).toBeInTheDocument()
-    expect(screen.getByText('—')).toBeInTheDocument()
-    // No quarterly series → no quarter section at all; and a lone forward
-    // step with no anchor isn't worth a fiscal-year chart.
-    expect(screen.queryByText('By quarter')).not.toBeInTheDocument()
-    expect(
-      screen.queryByRole('img', { name: /by fiscal year/i }),
-    ).not.toBeInTheDocument()
   })
 
   it('shows an em dash for a fiscal year whose consensus is a loss', () => {

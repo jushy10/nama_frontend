@@ -21,7 +21,7 @@ import {
   getRsi,
   getScreener,
   getSectors,
-  getStock,
+  getTickerCard,
   getTickerCards,
   type AnalystRecommendations,
   type AnnualEarnings,
@@ -31,9 +31,9 @@ import {
   type RsiSeries,
   type ScreenerResult,
   type Sector,
-  type Stock,
   type StockIndex,
   type TickerCard,
+  type TickerCardInclude,
 } from '@/lib/api'
 
 /**
@@ -47,14 +47,20 @@ export function errorMessage(
   return error instanceof ApiError ? error.message : fallback
 }
 
-/** Live snapshot for one ticker. Idle (no request) until `symbol` is set. */
-export function useStock(
-  symbol: string | null | undefined,
-): UseQueryResult<Stock> {
+/**
+ * The quote card for one ticker, with the requested opt-in blocks attached.
+ * Idle (no request) until `ticker` is set. The include list is part of the
+ * query key, so a card with different blocks is cached apart.
+ */
+export function useTickerCard(
+  ticker: string | null | undefined,
+  include: TickerCardInclude[] = [],
+): UseQueryResult<TickerCard> {
   return useQuery({
-    queryKey: ['stock', symbol],
-    queryFn: ({ signal }) => getStock(symbol as string, { signal }),
-    enabled: !!symbol,
+    queryKey: ['ticker-card', ticker, include],
+    queryFn: ({ signal }) =>
+      getTickerCard(ticker as string, { include, signal }),
+    enabled: !!ticker,
   })
 }
 

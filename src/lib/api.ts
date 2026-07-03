@@ -10,48 +10,6 @@ export interface StockPerformance {
   '1y': number | null
 }
 
-/**
- * Revenue & earnings growth, all percent. `*_yoy` is the trailing one-year change
- * from reported figures (Finnhub TTM); `forward_*_growth` is the analyst-expected
- * one-year change next year — FY1 → FY2 (Yahoo consensus). Any leg may be null.
- */
-export interface GrowthMetrics {
-  revenue_yoy: number | null
-  eps_yoy: number | null
-  forward_revenue_growth: number | null
-  forward_eps_growth: number | null
-}
-
-export interface Stock {
-  symbol: string
-  name: string | null
-  exchange: string | null
-  price: number
-  change: number | null
-  change_percent: number | null
-  open: number | null
-  high: number | null
-  low: number | null
-  previous_close: number | null
-  volume: number | null
-  bid: number | null
-  ask: number | null
-  spread: number | null
-  as_of: string | null
-  market_cap: number | null
-  dividend_per_share: number | null
-  dividend_yield: number | null
-  performance: StockPerformance | null
-  /** Trailing valuation/health/profitability ratios (see `KeyMetrics`). */
-  metrics: KeyMetrics | null
-  /** Percent the price sits below its all-time high (≤ 0; 0 at a new high). */
-  drawdown_from_high: number | null
-  // Forward-looking enrichment (best-effort; null when the estimates vendor is
-  // unavailable or doesn't cover the symbol).
-  forward_pe: number | null // price ÷ FY1 consensus EPS
-  growth: GrowthMetrics | null
-}
-
 /** Opt-in enrichment blocks the ticker-card endpoint can attach. */
 export type TickerCardInclude = 'dividend' | 'performance' | 'metrics'
 
@@ -66,24 +24,30 @@ export interface TickerDividend {
 }
 
 /**
- * A ticker card's derived metrics — currently just the forward PEG (forward
- * P/E over expected FY1→FY2 EPS growth). Null when no forward consensus is
- * stored or a leg is non-positive.
+ * A ticker card's valuation and profitability metrics. `peg` is the trailing
+ * PEG (trailing P/E over already-reported EPS growth) and `forward_peg` its
+ * forward cousin (forward P/E over the FY1→FY2 growth analysts expect) —
+ * either is null on losses, non-positive growth, or no stored consensus. The
+ * margins are trailing percentages; any field a vendor doesn't cover is null.
  */
 export interface TickerMetrics {
+  peg: number | null
   forward_peg: number | null
+  gross_margin: number | null
+  operating_margin: number | null
+  net_margin: number | null
 }
 
 /**
- * The lean per-ticker card from `/stocks/ticker/{ticker}`: the live quote plus
- * name and market cap. The `dividend`/`performance`/`metrics` blocks arrive
- * only when requested via `include` and are null otherwise (or when their
- * source is down). Views that need trailing ratios, growth, or OHLC detail
- * still use the full `Stock` snapshot.
+ * The per-ticker card from `/stocks/ticker/{ticker}` — the app's one stock
+ * snapshot: the live quote plus name, exchange, and market cap. The
+ * `dividend`/`performance`/`metrics` blocks arrive only when requested via
+ * `include` and are null otherwise (or when their source is down).
  */
 export interface TickerCard {
   ticker: string
   name: string | null
+  exchange: string | null
   price: number
   change: number | null
   change_percent: number | null
@@ -386,23 +350,7 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 /**
- * Fetch the full stock snapshot by ticker symbol — trailing ratios, growth,
- * OHLC, and the rest. Quote-level strips should prefer the lighter
- * `getTickerCard` instead.
- */
-export async function getStock(
-  symbol: string,
-  opts: { signal?: AbortSignal } = {},
-): Promise<Stock> {
-  const res = await fetch(`${API_BASE}/stocks/${encodeURIComponent(symbol)}`, {
-    signal: opts.signal,
-  })
-  if (!res.ok) throw await toApiError(res)
-  return (await res.json()) as Stock
-}
-
-/**
- * Fetch the lean quote card for one ticker (`/stocks/ticker/{ticker}`). Pass
+ * Fetch the quote card for one ticker (`/stocks/ticker/{ticker}`). Pass
  * `include` to attach the opt-in blocks — an unrequested block comes back
  * null and costs the backend no upstream call.
  */
@@ -647,30 +595,6 @@ export interface EarningsSurprise {
   // best-effort, so null when the filing isn't covered. There's no consensus
   // revenue *estimate* — that's licensed analyst data the API doesn't source.
   revenue_actual?: number | null
-}
-
-/**
- * Point-in-time valuation, financial-health and market ratios — the "is it
- * priced well?" read that complements the trailing earnings. `pe`/`pb` are
- * valuation multiples and `peg` the trailing P/E over EPS growth (null on losses
- * or non-positive growth); `current_ratio` and `debt_to_equity` gauge
- * balance-sheet health; `week_52_high`/`week_52_low` bound the trailing year's
- * price range. All trailing (no forward estimates); any field a vendor doesn't
- * cover is null.
- */
-export interface KeyMetrics {
-  pe: number | null
-  peg: number | null
-  pb: number | null
-  // Profitability margins (percent) — served on the snapshot so the stock page
-  // keeps them as the legacy /earnings endpoint is phased out.
-  gross_margin: number | null
-  operating_margin: number | null
-  net_margin: number | null
-  current_ratio: number | null
-  debt_to_equity: number | null
-  week_52_high: number | null
-  week_52_low: number | null
 }
 
 /**

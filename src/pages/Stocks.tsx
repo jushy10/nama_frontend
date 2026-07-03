@@ -16,6 +16,7 @@ import {
   quarterlyToEarningsHistory,
   quarterlyUpcoming,
   type ChartRange,
+  type TickerCardInclude,
 } from '@/lib/api'
 import {
   errorMessage,
@@ -25,7 +26,7 @@ import {
   useQuarterlyEarnings,
   useRecommendations,
   useRsi,
-  useStock,
+  useTickerCard,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
@@ -39,6 +40,15 @@ import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 import ForwardPeCard from '@/components/ForwardPeCard'
 
+// Every opt-in block the ticker-card endpoint serves: the snapshot card needs
+// the dividend, the Performance card the trailing returns, and the
+// Profitability/PEG cards the metrics.
+const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
+  'dividend',
+  'performance',
+  'metrics',
+]
+
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
   // links from elsewhere (e.g. the home-page screener) deep-link straight in.
@@ -51,15 +61,15 @@ export default function Stocks() {
   // ride the *loaded* symbol, so they only fire once a snapshot resolves and a
   // bad ticker never kicks off four more doomed requests. Each hook aborts its
   // in-flight request when the symbol/range moves on.
-  const stockQuery = useStock(urlSymbol || null)
-  const loadedSymbol = stockQuery.data?.symbol ?? null
+  const stockQuery = useTickerCard(urlSymbol || null, SNAPSHOT_BLOCKS)
+  const loadedSymbol = stockQuery.data?.ticker ?? null
   const candleQuery = useCandles(loadedSymbol, range)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   // The earnings card runs entirely off the consolidated quarterly endpoint;
-  // the profitability and PEG reads ride on the snapshot's `metrics`/`growth`
-  // blocks (the legacy /earnings call is gone).
+  // the profitability and PEG reads ride on the ticker card's `metrics` block
+  // (the legacy /earnings call is gone).
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
   // if it fails the toggle simply doesn't appear, so no error state is shown.
@@ -181,7 +191,7 @@ export default function Stocks() {
 
             {/* Profitability and PEG share one row on desktop: "is it making
                 money?" beside "is the price fair for the growth?". Both ride
-                the snapshot's metrics block, so they render with the rest;
+                the card's metrics block, so they render with the rest;
                 auto-fit lets either take the full row on narrow screens. */}
             {stock.metrics && (
               <Box
@@ -194,11 +204,7 @@ export default function Stocks() {
                 }}
               >
                 <ProfitabilityCard netMargin={stock.metrics.net_margin} />
-                <PegCard
-                  peg={stock.metrics.peg}
-                  pe={stock.metrics.pe}
-                  epsGrowth={stock.growth?.eps_yoy ?? null}
-                />
+                <PegCard peg={stock.metrics.peg} />
               </Box>
             )}
 
@@ -314,17 +320,14 @@ export default function Stocks() {
                 />
               )}
 
-              {/* Forward P/E, walked from the last reported period through
-                  today's trailing multiple across the two forecast years and
-                  the upcoming quarters. Self-hides until a forward consensus
-                  (annual estimates, upcoming quarters, or the snapshot's
-                  forward P/E) is available. */}
+              {/* Forward P/E, walked from the last reported period across the
+                  two forecast years and the upcoming quarters. Self-hides
+                  until a forward consensus (annual estimates or upcoming
+                  quarters) is available. */}
               <ForwardPeCard
                 price={stock.price}
                 quarterly={quarterlyQuery.data ?? null}
                 annual={annualQuery.data ?? null}
-                forwardPe={stock.forward_pe}
-                trailingPe={stock.metrics?.pe ?? null}
               />
             </Box>
           </Stack>
