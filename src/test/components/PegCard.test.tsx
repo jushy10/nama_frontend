@@ -3,14 +3,17 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import PegCard from '@/components/PegCard'
 
 describe('PegCard', () => {
-  it('calls a sub-1 PEG cheap and labels what the figure is', () => {
+  it('calls a sub-1 PEG cheap and labels the trailing reading', () => {
     renderWithProviders(<PegCard peg={0.77} />)
     expect(screen.getByText('0.77')).toBeInTheDocument()
-    expect(screen.getByText('P/E per point of EPS growth')).toBeInTheDocument()
+    expect(screen.getByText('Trailing')).toBeInTheDocument()
+    expect(
+      screen.getByText(/last year's reported EPS growth/i),
+    ).toBeInTheDocument()
     expect(screen.getByText('Cheap for Its Growth')).toBeInTheDocument()
     expect(screen.getByText(/price looks cheap/i)).toBeInTheDocument()
-    // The basis is disclosed: trailing reported growth, not forecasts.
-    expect(screen.getByText(/not\s+analyst forecasts/i)).toBeInTheDocument()
+    // The bases are disclosed: reported growth trailing, consensus forward.
+    expect(screen.getByText(/growth analysts expect/i)).toBeInTheDocument()
   })
 
   it('calls the 1–2 middle Fairly Priced', () => {
@@ -41,9 +44,55 @@ describe('PegCard', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows a plain fallback and no verdict when the ratio is not served', () => {
-    renderWithProviders(<PegCard peg={null} />)
+  it('shows a plain fallback and no verdict when neither ratio is served', () => {
+    renderWithProviders(<PegCard peg={null} forwardPeg={null} />)
     expect(screen.getByText(/no PEG data/i)).toBeInTheDocument()
     expect(screen.queryByText('Verdict')).not.toBeInTheDocument()
+  })
+
+  it('shows trailing and forward readings side by side with gauge markers', () => {
+    renderWithProviders(<PegCard peg={1.85} forwardPeg={1.1} />)
+    expect(screen.getByText('Trailing')).toBeInTheDocument()
+    expect(screen.getByText('1.85')).toBeInTheDocument()
+    expect(screen.getByText('Forward')).toBeInTheDocument()
+    expect(screen.getByText('1.10')).toBeInTheDocument()
+    // Both markers land on the gauge, labelled by basis.
+    expect(screen.getByText('TTM')).toBeInTheDocument()
+    expect(screen.getByText('FWD')).toBeInTheDocument()
+    // Forward < trailing → the expectations story is spelled out.
+    expect(screen.getByText(/forward reading is lower/i)).toBeInTheDocument()
+    // The verdict still grades the trailing ratio (1.85 → Fairly Priced).
+    expect(screen.getByText('Verdict')).toBeInTheDocument()
+    expect(screen.getByText('Fairly Priced')).toBeInTheDocument()
+  })
+
+  it('flags a forward reading above the trailing one as expected slowing', () => {
+    renderWithProviders(<PegCard peg={1.2} forwardPeg={2.4} />)
+    expect(screen.getByText(/forward reading is higher/i)).toBeInTheDocument()
+  })
+
+  it('shows an em dash and no FWD marker when only the trailing ratio is served', () => {
+    renderWithProviders(<PegCard peg={1.85} />)
+    expect(screen.getByText('1.85')).toBeInTheDocument()
+    expect(screen.getByText('—')).toBeInTheDocument()
+    expect(
+      screen.getByText(/needs a forward P\/E and expected EPS growth/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText('TTM')).toBeInTheDocument()
+    expect(screen.queryByText('FWD')).not.toBeInTheDocument()
+    // No comparison line without a second reading.
+    expect(screen.queryByText(/forward reading is/i)).not.toBeInTheDocument()
+  })
+
+  it('falls back to grading the forward ratio when trailing is not served', () => {
+    renderWithProviders(<PegCard peg={null} forwardPeg={0.8} />)
+    expect(screen.getByText('0.80')).toBeInTheDocument()
+    expect(screen.getByText('Fwd verdict')).toBeInTheDocument()
+    expect(screen.getByText('Cheap for Its Growth')).toBeInTheDocument()
+    expect(
+      screen.getByText(/needs a profitable, growing trailing year/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText('FWD')).toBeInTheDocument()
+    expect(screen.queryByText('TTM')).not.toBeInTheDocument()
   })
 })

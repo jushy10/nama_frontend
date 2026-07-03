@@ -214,7 +214,10 @@ export default function Stocks() {
                 }}
               >
                 <ProfitabilityCard netMargin={stock.metrics.net_margin} />
-                <PegCard peg={stock.metrics.peg} />
+                <PegCard
+                  peg={stock.metrics.peg}
+                  forwardPeg={stock.metrics.forward_peg}
+                />
               </Box>
             )}
 
