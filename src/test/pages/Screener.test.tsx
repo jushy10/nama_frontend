@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes, useSearchParams } from 'react-router-dom'
 import { renderWithProviders, screen } from '@/test/test-utils'
-import Screener from '@/components/Screener'
+import Screener from '@/pages/Screener'
 
 /** Minimal stand-in for the stocks page that echoes the ?symbol= it received. */
 function StockStub() {
@@ -63,24 +63,37 @@ describe('Screener', () => {
     stubFetch()
     renderWithProviders(<Screener />)
 
-    expect(await screen.findByText('NVDA')).toBeInTheDocument()
-    expect(screen.getByText('+2.41%')).toBeInTheDocument()
+    // NVDA shows twice: once in the top-gainer card, once as a table row.
+    expect(await screen.findAllByText('NVDA')).toHaveLength(2)
+    expect(screen.getAllByText('+2.41%')).toHaveLength(2)
     expect(screen.getByText(/500 of 503 names quoted/i)).toBeInTheDocument()
 
-    // Losers stay hidden until the toggle flips.
-    expect(screen.queryByText('INTC')).not.toBeInTheDocument()
+    // Losers stay out of the table until the toggle flips — INTC only
+    // appears in the top-loser spotlight card.
+    expect(screen.getAllByText('INTC')).toHaveLength(1)
+  })
+
+  it('spotlights the day’s top gainer and loser', async () => {
+    stubFetch()
+    renderWithProviders(<Screener />)
+
+    expect(await screen.findByText('INTC')).toBeInTheDocument()
+    expect(screen.getByText(/top gainer/i)).toBeInTheDocument()
+    expect(screen.getByText(/top loser/i)).toBeInTheDocument()
+    expect(screen.getByText('-5.63%')).toBeInTheDocument()
   })
 
   it('switches to losers without refetching', async () => {
     stubFetch()
     const { user } = renderWithProviders(<Screener />)
 
-    await screen.findByText('NVDA')
+    await screen.findAllByText('NVDA')
     await user.click(screen.getByRole('button', { name: /losers/i }))
 
-    expect(await screen.findByText('INTC')).toBeInTheDocument()
-    expect(screen.getByText('-5.63%')).toBeInTheDocument()
-    expect(screen.queryByText('NVDA')).not.toBeInTheDocument()
+    // INTC now shows in both the spotlight card and the table.
+    expect(await screen.findAllByText('INTC')).toHaveLength(2)
+    // NVDA drops back to just its top-gainer card.
+    expect(screen.getAllByText('NVDA')).toHaveLength(1)
   })
 
   it('navigates to the stock page when a row is clicked', async () => {
@@ -92,7 +105,10 @@ describe('Screener', () => {
       </Routes>,
     )
 
-    await user.click(await screen.findByText('NVDA'))
+    const [row] = await screen.findAllByRole('link', {
+      name: /view NVDA details/i,
+    })
+    await user.click(row)
 
     expect(await screen.findByText(/stock page: NVDA/i)).toBeInTheDocument()
   })
