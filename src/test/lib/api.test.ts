@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampToRegularHours,
+  optionsLevel,
   optionsSentiment,
   pegVerdict,
   profitabilityVerdict,
@@ -160,5 +161,30 @@ describe('optionsSentiment', () => {
 
   it('returns null when there is no ratio to judge', () => {
     expect(optionsSentiment(null)).toBeNull()
+  })
+})
+
+describe('optionsLevel', () => {
+  it('grades implied volatility: under 20 low, over 40 high, edges mid', () => {
+    expect(optionsLevel('implied_volatility', 14)).toBe('low')
+    expect(optionsLevel('implied_volatility', 20)).toBe('mid')
+    expect(optionsLevel('implied_volatility', 40)).toBe('mid')
+    expect(optionsLevel('implied_volatility', 40.1)).toBe('high')
+  })
+
+  it('grades the expected move on the 4/8 bands', () => {
+    expect(optionsLevel('expected_move', 2.5)).toBe('low')
+    expect(optionsLevel('expected_move', 6.4)).toBe('mid')
+    expect(optionsLevel('expected_move', 12)).toBe('high')
+  })
+
+  it('grades the insurance cost on the 3/6 bands', () => {
+    expect(optionsLevel('insurance_cost', 1.8)).toBe('low')
+    expect(optionsLevel('insurance_cost', 4.9)).toBe('mid')
+    expect(optionsLevel('insurance_cost', 7.5)).toBe('high')
+  })
+
+  it('returns null when there is no figure to judge', () => {
+    expect(optionsLevel('implied_volatility', null)).toBeNull()
   })
 })
