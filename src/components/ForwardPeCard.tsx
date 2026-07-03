@@ -42,12 +42,13 @@ function quarterLabel(q: QuarterlyEarningsQuarter): string {
  * actuals summed, labelled with that quarter ("Q1 '27"). The same rolling
  * window and (consensus) basis the forward quarter steps use, so the
  * quarterly walk compares like with like end to end. null until four actuals
- * exist or when the TTM is a loss (a P/E over negative earnings is
- * meaningless).
+ * exist; when the TTM is a loss the anchor keeps its label and EPS but `pe`
+ * is null (a P/E over negative earnings is meaningless — the tile shows a
+ * dash instead of vanishing).
  */
 interface QAnchor {
   label: string
-  pe: number
+  pe: number | null
   ttmEps: number
 }
 
@@ -62,8 +63,11 @@ function trailingTtmPe(
   // Oldest → newest, so the newest four are at the tail.
   const window = reported.slice(-4)
   const ttmEps = window.reduce((sum, q) => sum + (q.eps_actual as number), 0)
-  if (ttmEps <= 0) return null
-  return { label: quarterLabel(window[3]), pe: price / ttmEps, ttmEps }
+  return {
+    label: quarterLabel(window[3]),
+    pe: ttmEps > 0 ? price / ttmEps : null,
+    ttmEps,
+  }
 }
 
 /**
@@ -146,20 +150,22 @@ interface PeBar {
 }
 
 /** One step of the quarterly walk: the rolling forward P/E for an upcoming
- *  quarter, with the twelve months of EPS that drive it. */
+ *  quarter, with the twelve months of EPS that drive it. `pe` is null when
+ *  that window sums to a loss. */
 interface QStep {
   key: string
   label: string
-  pe: number
+  pe: number | null
   ttmEps: number
 }
 
 /**
  * The rolling forward P/E for each upcoming quarter: today's price over the
  * twelve months of EPS ending at that quarter — reported actuals plus
- * consensus estimates as the window rolls forward. A quarter is skipped when
- * its four-quarter window is incomplete (missing EPS, or not enough history)
- * or sums to a loss.
+ * consensus estimates as the window rolls forward. A quarter is skipped only
+ * when its four-quarter window is incomplete (missing EPS, or not enough
+ * history); a window that sums to a loss keeps its step with a null `pe`, so
+ * the tile shows the consensus with a dash rather than vanishing.
  */
 function rollingQuarterSteps(
   quarterly: QuarterlyEarnings | null,
@@ -173,11 +179,10 @@ function rollingQuarterSteps(
     const window = eps.slice(i - 3, i + 1)
     if (window.some((v) => v == null)) return
     const ttm = window.reduce((sum: number, v) => sum + (v as number), 0)
-    if (ttm <= 0) return
     steps.push({
       key: q.period_end ?? String(i),
       label: quarterLabel(q),
-      pe: price / ttm,
+      pe: ttm > 0 ? price / ttm : null,
       ttmEps: ttm,
     })
   })
@@ -524,7 +529,7 @@ export default function ForwardPeCard({
       })),
   ]
   const quarterBars: PeBar[] = [
-    ...(qAnchor
+    ...(qAnchor?.pe != null
       ? [
           {
             key: 'q-anchor',
@@ -534,12 +539,14 @@ export default function ForwardPeCard({
           },
         ]
       : []),
-    ...qSteps.map((s) => ({
-      key: s.key,
-      label: s.label,
-      pe: s.pe,
-      estimated: true,
-    })),
+    ...qSteps
+      .filter((s) => s.pe != null)
+      .map((s) => ({
+        key: s.key,
+        label: s.label,
+        pe: s.pe as number,
+        estimated: true,
+      })),
   ]
 
   // The move from a walk's anchor multiple, green when the multiple
@@ -663,25 +670,29 @@ export default function ForwardPeCard({
             <PeWalk
               anchor={{
                 label: `P/E ${qAnchor?.label ?? '(TTM)'}`,
-                value: qAnchor ? fmtMultiple(qAnchor.pe) : '—',
+                value: qAnchor?.pe != null ? fmtMultiple(qAnchor.pe) : '—',
                 hint: qAnchor ? `TTM EPS ${fmtEps(qAnchor.ttmEps)}` : null,
               }}
               steps={[
                 ...qSteps.map((s) => ({
                   key: s.key,
                   label: `Fwd P/E ${s.label}`,
-                  value: fmtMultiple(s.pe),
+                  value: s.pe == null ? '—' : fmtMultiple(s.pe),
                   hint: `Est. TTM EPS ${fmtEps(s.ttmEps)}`,
                   delta: qDelta(s.pe),
                 })),
               ]}
             />
-            <Box sx={{ mt: 2 }}>
-              <PeBarChart
-                bars={quarterBars}
-                ariaLabel="Forward price-to-earnings by quarter"
-              />
-            </Box>
+            {/* Loss windows chart no bar, so draw the columns only when at
+                least two multiples remain to compare. */}
+            {quarterBars.length >= 2 && (
+              <Box sx={{ mt: 2 }}>
+                <PeBarChart
+                  bars={quarterBars}
+                  ariaLabel="Forward price-to-earnings by quarter"
+                />
+              </Box>
+            )}
             <Typography
               variant="caption"
               color="text.secondary"

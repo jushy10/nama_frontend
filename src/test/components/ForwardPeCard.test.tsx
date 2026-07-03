@@ -277,8 +277,13 @@ describe('ForwardPeCard', () => {
         annual={annualSample}
       />,
     )
-    expect(screen.queryByText("Q2 '27")).not.toBeInTheDocument()
-    expect(screen.getByText("Q3 '27")).toBeInTheDocument()
+    expect(screen.queryByText("Fwd P/E Q2 '27")).not.toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q3 '27")).toBeInTheDocument()
+    // One usable multiple isn't a comparison — the by-quarter chart stays
+    // hidden and the walk's lone step reads on its tile.
+    expect(
+      screen.queryByRole('img', { name: /by quarter/i }),
+    ).not.toBeInTheDocument()
     // Only three usable actuals remain, so the quarter walk loses its
     // trailing-TTM anchor — the tile renders unlabelled with an em dash —
     // while the fiscal-year anchor (from the annual series) is unaffected.
@@ -286,6 +291,38 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
     expect(screen.getAllByText('62.50').length).toBeGreaterThan(0)
+  })
+
+  it('keeps a quarter whose rolling window is a loss, dashing its multiple', () => {
+    renderWithProviders(
+      <ForwardPeCard
+        price={200}
+        quarterly={{
+          ...quarterlySample,
+          // Every reported actual and upcoming consensus is a loss, so both
+          // the TTM anchor and each rolling window sum negative.
+          quarters: quarterlySample.quarters.map((qq) =>
+            qq.is_reported
+              ? { ...qq, eps_actual: -(qq.eps_actual as number) }
+              : { ...qq, eps_estimate: -(qq.eps_estimate as number) },
+          ),
+        }}
+      />,
+    )
+    // The section and its steps stay, each showing the consensus window with
+    // a dash instead of a negative multiple.
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.getByText("P/E Q1 '27")).toBeInTheDocument()
+    expect(screen.getByText('TTM EPS -$3.34')).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q2 '27")).toBeInTheDocument()
+    expect(screen.getByText('Est. TTM EPS -$3.71')).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q3 '27")).toBeInTheDocument()
+    expect(screen.getByText('Est. TTM EPS -$4.08')).toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBe(3)
+    // No positive multiple anywhere → no bar chart.
+    expect(
+      screen.queryByRole('img', { name: /by quarter/i }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows an em dash for a fiscal year whose consensus is a loss', () => {
