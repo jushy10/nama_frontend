@@ -301,6 +301,15 @@ describe('Stocks search', () => {
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
 
+    // The PEG card rides beside it: 1.19 (34.6 P/E ÷ 29.0% trailing EPS
+    // growth) sits in the 1–2 middle, so it reads Fairly Priced.
+    expect(
+      screen.getByRole('heading', { name: 'PEG Ratio' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('1.19')).toBeInTheDocument()
+    expect(screen.getByText('Fairly Priced')).toBeInTheDocument()
+    expect(screen.getByText('34.6 P/E ÷ 29.0% EPS growth')).toBeInTheDocument()
+
     // The candlestick chart loads from the candles endpoint, and the header
     // carries the range's move: first open (200) → last close (209.97).
     expect(
@@ -343,11 +352,10 @@ describe('Stocks search', () => {
     // $0.96 is the newest quarter's actual — shown both on the bar and in the
     // hover detail line, so match all occurrences.
     expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)
-    // Trailing earnings metrics relocated from the stock endpoint render as tiles.
-    expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
-    expect(screen.getByText('Net Margin')).toBeInTheDocument()
-    // 27.2% shows on this tile and as the profitability card's headline figure.
-    expect(screen.getAllByText('27.2%').length).toBeGreaterThan(0)
+    // The tile grids are gone from the earnings card — the margin read lives
+    // on the Profitability card and PEG on its own card.
+    expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
+    expect(screen.queryByText('Financial health')).not.toBeInTheDocument()
     // The next-earnings consensus plots forward "expected" bars on the EPS and
     // revenue charts, labelled with the forecast quarter (Q2 '27) and the
     // consensus value beneath — the report date is no longer drawn on the bars.

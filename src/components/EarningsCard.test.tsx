@@ -143,123 +143,15 @@ describe('EarningsCard', () => {
     expect(screen.getAllByText('-$0.15').length).toBeGreaterThan(0)
   })
 
-  it('shows the GAAP margin tiles', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={{
-          ...base,
-          metrics: {
-            gross_margin: null, // vendor-uncovered -> em dash
-            operating_margin: 32.6,
-            net_margin: 27.2,
-          },
-        }}
-      />,
-    )
-    expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
-    expect(screen.getByText('27.2%')).toBeInTheDocument() // GAAP margin
-    // A null metric renders an em dash rather than vanishing.
-    expect(screen.getByText('Gross Margin')).toBeInTheDocument()
-    expect(screen.getByText('—')).toBeInTheDocument()
-    // The basis is spelled out so the card doesn't read as contradictory.
-    expect(screen.getByText(/margins are GAAP/i)).toBeInTheDocument()
-    // The YoY growth tiles are gone, as are the EPS *level* tiles (GAAP and
-    // the adjusted TTM sum).
-    expect(screen.queryByText('EPS Gr. (YoY)')).not.toBeInTheDocument()
-    expect(screen.queryByText(/Rev\. Gr\. \(YoY\)/)).not.toBeInTheDocument()
-    expect(screen.queryByText('EPS (TTM)')).not.toBeInTheDocument()
-    expect(screen.queryByText('Adj. EPS (TTM)')).not.toBeInTheDocument()
-    expect(screen.queryByText('ROE')).not.toBeInTheDocument()
-  })
-
-  it('omits the trailing metrics block when metrics are absent', () => {
+  it('carries no metric or ratio tile grids — the card is charts only', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
+    // The margin stack moved behind the Profitability card and the health
+    // ratios were dropped; PEG and P/E anchor their own cards.
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
-  })
-
-  it('shows the valuation ratios with a plain explainer (and an em dash for an uncovered one)', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={{
-          ...base,
-          valuation: {
-            pe: 45.6,
-            peg: 1.85,
-            pb: 38.2, // still in the payload, but no longer surfaced
-            gross_margin: 47.9, // in the payload; surfaced by the metric tiles
-            operating_margin: 32.6,
-            net_margin: 27.2,
-            current_ratio: null, // vendor-uncovered -> em dash
-            debt_to_equity: 0.42,
-            week_52_high: 320.5, // still in the payload, but no longer surfaced
-            week_52_low: 210.0,
-          },
-        }}
-      />,
-    )
-    expect(screen.getByText('Valuation')).toBeInTheDocument()
-    expect(screen.getByText('PEG')).toBeInTheDocument()
-    expect(screen.getByText('1.85')).toBeInTheDocument()
-    // Each ratio carries a short plain-language explainer.
-    expect(
-      screen.getByText('P/E adjusted for growth; under 1 looks cheap'),
-    ).toBeInTheDocument()
-    // A null ratio renders an em dash rather than vanishing.
-    expect(screen.getByText('Current Ratio')).toBeInTheDocument()
-    expect(screen.getByText('—')).toBeInTheDocument()
-    // The plain P/E moved to the Forward P/E card; P/B, P/S, Beta and the
-    // 52-week range aren't part of the valuation grid either.
-    expect(screen.queryByText('P/E')).not.toBeInTheDocument()
-    expect(screen.queryByText('45.60')).not.toBeInTheDocument()
-    expect(screen.queryByText('P/B')).not.toBeInTheDocument()
-    expect(screen.queryByText('P/S')).not.toBeInTheDocument()
-    expect(screen.queryByText('Beta')).not.toBeInTheDocument()
-    expect(screen.queryByText('52W High')).not.toBeInTheDocument()
-    expect(screen.queryByText('52W Low')).not.toBeInTheDocument()
-    expect(screen.queryByText('$320.50')).not.toBeInTheDocument()
-    // The PEG basis is still spelled out, like the trailing-metrics footnote.
-    expect(
-      screen.getByText(/PEG is P\/E over trailing EPS growth/i),
-    ).toBeInTheDocument()
-  })
-
-  it('colours each valuation ratio green or red by how favourable it is', () => {
-    renderWithProviders(
-      <EarningsCard
-        earnings={{
-          ...base,
-          valuation: {
-            pe: 18, // cheap-to-reasonable -> green
-            peg: 2.6, // pricey for the growth -> red
-            pb: null,
-            gross_margin: null,
-            operating_margin: null,
-            net_margin: null,
-            current_ratio: 0.7, // can't cover near-term bills -> red
-            debt_to_equity: 0.4, // light leverage -> green
-            week_52_high: null,
-            week_52_low: null,
-          },
-        }}
-      />,
-    )
-    // Dark theme (the test default) palette: success.main / error.main.
-    const green = 'rgb(52, 211, 153)'
-    const red = 'rgb(248, 113, 113)'
-    expect(screen.getByText('0.40')).toHaveStyle({ color: green }) // Debt/Equity
-    expect(screen.getByText('2.60')).toHaveStyle({ color: red }) // PEG
-    expect(screen.getByText('0.70')).toHaveStyle({ color: red }) // Current ratio
-    // The P/E (18) isn't tiled here any more — it lives on the Forward P/E card.
-    expect(screen.queryByText('18.00')).not.toBeInTheDocument()
-    // The colour key is spelled out beneath the grid.
-    expect(
-      screen.getByText(/Green is favourable, red worth a closer look/i),
-    ).toBeInTheDocument()
-  })
-
-  it('omits the valuation block when valuation is absent', () => {
-    renderWithProviders(<EarningsCard earnings={base} />)
-    expect(screen.queryByText('Valuation')).not.toBeInTheDocument()
+    expect(screen.queryByText('Gross Margin')).not.toBeInTheDocument()
+    expect(screen.queryByText('Financial health')).not.toBeInTheDocument()
+    expect(screen.queryByText('Current Ratio')).not.toBeInTheDocument()
+    expect(screen.queryByText('Debt / Equity')).not.toBeInTheDocument()
   })
 
   it('plots a forward expected bar from the next scheduled report', () => {

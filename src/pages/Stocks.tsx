@@ -30,6 +30,7 @@ import {
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
+import PegCard from '@/components/PegCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
@@ -57,8 +58,8 @@ export default function Stocks() {
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   // The earnings card runs entirely off the consolidated quarterly endpoint;
-  // the trailing metrics, valuation tiles and profitability read ride on the
-  // snapshot's `metrics`/`growth` blocks (the legacy /earnings call is gone).
+  // the profitability and PEG reads ride on the snapshot's `metrics`/`growth`
+  // blocks (the legacy /earnings call is gone).
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
   // if it fails the toggle simply doesn't appear, so no error state is shown.
@@ -178,10 +179,27 @@ export default function Stocks() {
               </Stack>
             </Box>
 
-            {/* Bottom-line profitability from trailing net margin; rides the
-                snapshot's metrics block, so it renders with the rest. */}
+            {/* Profitability and PEG share one row on desktop: "is it making
+                money?" beside "is the price fair for the growth?". Both ride
+                the snapshot's metrics block, so they render with the rest;
+                auto-fit lets either take the full row on narrow screens. */}
             {stock.metrics && (
-              <ProfitabilityCard netMargin={stock.metrics.net_margin} />
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
+                  gap: 3,
+                  alignItems: 'stretch',
+                }}
+              >
+                <ProfitabilityCard netMargin={stock.metrics.net_margin} />
+                <PegCard
+                  peg={stock.metrics.peg}
+                  pe={stock.metrics.pe}
+                  epsGrowth={stock.growth?.eps_yoy ?? null}
+                />
+              </Box>
             )}
 
             {recommendationsQuery.isLoading && (
@@ -290,10 +308,7 @@ export default function Stocks() {
               )}
               {quarterlyQuery.data && (
                 <EarningsCard
-                  earnings={quarterlyToEarningsHistory(
-                    quarterlyQuery.data,
-                    stock,
-                  )}
+                  earnings={quarterlyToEarningsHistory(quarterlyQuery.data)}
                   upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                   annual={annualQuery.data ?? null}
                 />

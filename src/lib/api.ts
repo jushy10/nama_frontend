@@ -232,6 +232,33 @@ export function profitabilityVerdict(
   return 'Unprofitable'
 }
 
+/**
+ * A plain-language call on the PEG ratio — is the P/E multiple justified by
+ * the earnings growth behind it? The bands follow Lynch's read: under 1 the
+ * growth outruns the multiple, 1–2 is the unremarkable middle, above 2 the
+ * price has run well ahead. `Not Meaningful` covers a non-positive ratio
+ * (losses or shrinking EPS) — the backend normally nulls those, but a served
+ * value still gets a sane label. Deliberately a broad, NOT sector-aware rule
+ * of thumb, so the card frames it as a rough guide, not advice.
+ */
+export type PegVerdict =
+  | 'Cheap for Its Growth'
+  | 'Fairly Priced'
+  | 'Pricey for Its Growth'
+  | 'Not Meaningful'
+
+/**
+ * Map a trailing PEG ratio to its verdict. Returns null when there's no ratio
+ * to judge (the backend nulls PEG on losses or non-positive EPS growth).
+ */
+export function pegVerdict(peg: number | null): PegVerdict | null {
+  if (peg == null) return null
+  if (peg <= 0) return 'Not Meaningful'
+  if (peg < 1) return 'Cheap for Its Growth'
+  if (peg <= 2) return 'Fairly Priced'
+  return 'Pricey for Its Growth'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
@@ -556,18 +583,6 @@ export interface EarningsSurprise {
 }
 
 /**
- * Trailing profitability read for the earnings card's metric tiles: the
- * margin stack, all percent. A view-model assembled from the stock snapshot's
- * `metrics` block — see `quarterlyToEarningsHistory`; any leg the vendor
- * doesn't cover is null.
- */
-export interface EarningsMetrics {
-  gross_margin: number | null
-  operating_margin: number | null
-  net_margin: number | null
-}
-
-/**
  * Point-in-time valuation, financial-health and market ratios — the "is it
  * priced well?" read that complements the trailing earnings. `pe`/`pb` are
  * valuation multiples and `peg` the trailing P/E over EPS growth (null on losses
@@ -589,50 +604,6 @@ export interface KeyMetrics {
   debt_to_equity: number | null
   week_52_high: number | null
   week_52_low: number | null
-}
-
-/**
- * A coarse "how does this reading look?" grade for one valuation/health ratio,
- * driving the colour it's shown in: `good` (green), `caution` (red), or `fair`
- * (the unremarkable middle, left the default text colour so only the notable
- * extremes draw the eye). Deliberately broad rules of thumb for a large-cap
- * read — NOT sector-aware (a utility's leverage or a bank's balance sheet read
- * very differently), so the card frames the colour as a rough guide, not advice.
- */
-export type ValuationGrade = 'good' | 'fair' | 'caution'
-
-/** The KeyMetrics ratios the earnings card grades and colours. */
-export type ValuationRatio = 'pe' | 'peg' | 'current_ratio' | 'debt_to_equity'
-
-/**
- * Grade one valuation ratio for at-a-glance colouring. The valuation multiples
- * (P/E, PEG) read cheaper the lower they are — and a non-positive P/E means
- * the company isn't profitable, a caution in itself; the health ratios reward a
- * comfortable liquidity cushion and conservative leverage. Each branch documents
- * its bands; anything between the good and caution edges is `fair`.
- */
-export function gradeValuation(
-  ratio: ValuationRatio,
-  n: number,
-): ValuationGrade {
-  switch (ratio) {
-    case 'pe':
-      // A loss (≤0) or a rich multiple is a caution; cheap-to-reasonable is good.
-      if (n <= 0 || n > 40) return 'caution'
-      return n < 25 ? 'good' : 'fair'
-    case 'peg':
-      // Lynch's read: under 1 is cheap for the growth, over 2 pricey for it.
-      if (n <= 0 || n > 2) return 'caution'
-      return n < 1 ? 'good' : 'fair'
-    case 'current_ratio':
-      // Below 1 can't cover near-term bills; a comfortable cushion is healthy.
-      if (n < 1) return 'caution'
-      return n >= 1.5 ? 'good' : 'fair'
-    case 'debt_to_equity':
-      // Negative equity or heavy leverage is risky; a light balance sheet is good.
-      if (n < 0 || n > 2) return 'caution'
-      return n <= 1 ? 'good' : 'fair'
-  }
 }
 
 /**
@@ -658,9 +629,7 @@ export interface NextEarnings {
  * endpoint of its own. `beat_rate` is the percent of *scored* quarters (those
  * with both an actual and an estimate) that met or beat; `scored` is how many
  * of `count` quarters could be scored, `beats` how many of those cleared the
- * bar. `metrics` is the trailing growth/margin read, `valuation` the
- * point-in-time valuation/health/market ratios (both from the snapshot), and
- * `next_report` the next scheduled report's consensus.
+ * bar. `next_report` is the next scheduled report's consensus.
  */
 export interface EarningsHistory {
   symbol: string
@@ -669,8 +638,6 @@ export interface EarningsHistory {
   scored: number
   beat_rate: number | null
   quarters: EarningsSurprise[]
-  metrics?: EarningsMetrics | null
-  valuation?: KeyMetrics | null
   next_report?: NextEarnings | null
 }
 
@@ -758,34 +725,14 @@ export function quarterlyUpcoming(
 }
 
 /**
- * The trailing margin tiles, assembled from the stock snapshot's `metrics`
- * block — the same Finnhub figures the retired `/earnings` endpoint used to
- * relay. Null when the snapshot doesn't carry the block, so the tiles simply
- * drop.
- */
-function stockToEarningsMetrics(stock?: Stock | null): EarningsMetrics | null {
-  const metrics = stock?.metrics ?? null
-  if (!metrics) return null
-  return {
-    gross_margin: metrics.gross_margin ?? null,
-    operating_margin: metrics.operating_margin ?? null,
-    net_margin: metrics.net_margin ?? null,
-  }
-}
-
-/**
- * Adapt the quarterly series (+ the stock snapshot) into the `EarningsHistory`
- * shape the earnings card renders, so the EPS/revenue charts, the adjusted-TTM
- * tile and the next-report chip all run off `/earnings/quarterly`. Reported
- * quarters become the (newest-first) `quarters` history and the beat summary
- * is scored from their `beat` flags; the first upcoming quarter becomes
- * `next_report`; the trailing `metrics` and `valuation` ratios ride in from
- * the snapshot (`growth` + `metrics`). `stock` is optional: with none, the
- * charts still render and the trailing/valuation tiles simply drop.
+ * Adapt the quarterly series into the `EarningsHistory` shape the earnings
+ * card renders, so the EPS/revenue charts and the next-report chip all run off
+ * `/earnings/quarterly`. Reported quarters become the (newest-first)
+ * `quarters` history and the beat summary is scored from their `beat` flags;
+ * the first upcoming quarter becomes `next_report`.
  */
 export function quarterlyToEarningsHistory(
   quarterly: QuarterlyEarnings,
-  stock?: Stock | null,
 ): EarningsHistory {
   const reported = quarterly.quarters.filter((q) => q.is_reported)
   // The card reads newest-first; the endpoint serves oldest-first.
@@ -818,8 +765,6 @@ export function quarterlyToEarningsHistory(
       ? Math.round((beats / scoreable.length) * 1000) / 10
       : null,
     quarters,
-    metrics: stockToEarningsMetrics(stock),
-    valuation: stock?.metrics ?? null,
     next_report,
   }
 }
