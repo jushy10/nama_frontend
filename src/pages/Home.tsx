@@ -1,14 +1,8 @@
 import MarketIndices from '@/components/MarketIndices'
-import Screener from '@/components/Screener'
 
-/** Home dashboard: the day's index strip followed by the movers screener. */
+/** Home dashboard: the day's index strip. */
 function Home() {
-  return (
-    <>
-      <MarketIndices />
-      <Screener />
-    </>
-  )
+  return <MarketIndices />
 }
 
 export default Home

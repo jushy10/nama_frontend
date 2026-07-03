@@ -3,21 +3,19 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import Home from '@/pages/Home'
 
 describe('Home', () => {
-  it('renders the market indices and screener sections', () => {
+  it('renders the market indices', () => {
     renderWithProviders(<Home />)
 
     expect(
       screen.getByRole('heading', { name: /markets today/i }),
     ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: /^screener$/i }),
-    ).toBeInTheDocument()
   })
 
-  it('exposes the screener filters', () => {
+  it('no longer embeds the screener', () => {
     renderWithProviders(<Home />)
 
-    expect(screen.getByRole('button', { name: /gainers/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /losers/i })).toBeInTheDocument()
+    expect(
+      screen.queryByRole('heading', { name: /^screener$/i }),
+    ).not.toBeInTheDocument()
   })
 })

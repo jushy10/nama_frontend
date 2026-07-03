@@ -7,7 +7,17 @@ describe('App routing', () => {
     renderWithProviders(<App />)
 
     expect(
-      screen.getByRole('heading', { name: /^screener$/i }),
+      screen.getByRole('heading', { name: /markets today/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the screener page at /screener', async () => {
+    const { user } = renderWithProviders(<App />)
+
+    await user.click(screen.getByRole('link', { name: /^screener$/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /^screener$/i }),
     ).toBeInTheDocument()
   })
 })
