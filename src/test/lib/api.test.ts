@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clampToRegularHours,
+  optionsSentiment,
   pegVerdict,
   profitabilityVerdict,
   rangeReturnPct,
@@ -140,5 +141,24 @@ describe('profitabilityVerdict', () => {
 
   it('returns null when there is no margin to judge', () => {
     expect(profitabilityVerdict(null)).toBeNull()
+  })
+})
+
+describe('optionsSentiment', () => {
+  it('reads a call-heavy ratio as optimistic and a put-heavy one as protective', () => {
+    expect(optionsSentiment(0.24)).toBe('optimistic')
+    expect(optionsSentiment(0.94)).toBe('optimistic')
+    expect(optionsSentiment(1.06)).toBe('protective')
+    expect(optionsSentiment(1.8)).toBe('protective')
+  })
+
+  it('treats the narrow band around parity as balanced, edges inclusive', () => {
+    expect(optionsSentiment(0.95)).toBe('balanced')
+    expect(optionsSentiment(1)).toBe('balanced')
+    expect(optionsSentiment(1.05)).toBe('balanced')
+  })
+
+  it('returns null when there is no ratio to judge', () => {
+    expect(optionsSentiment(null)).toBeNull()
   })
 })

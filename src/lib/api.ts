@@ -11,7 +11,11 @@ export interface StockPerformance {
 }
 
 /** Opt-in enrichment blocks the ticker-card endpoint can attach. */
-export type TickerCardInclude = 'dividend' | 'performance' | 'metrics'
+export type TickerCardInclude =
+  | 'dividend'
+  | 'performance'
+  | 'metrics'
+  | 'options_metrics'
 
 /**
  * A ticker card's dividend block: percent yield plus the annual per-share
@@ -39,10 +43,30 @@ export interface TickerMetrics {
 }
 
 /**
+ * A ticker card's options-market block — four derived figures, not a chain.
+ * `implied_volatility` is the annualized at-the-money IV at the ~1-month
+ * expiry (percent); `expected_move_percent` is the swing priced in by
+ * `expected_move_by` (the ATM straddle over spot); `insurance_cost_percent`
+ * is what a quarter of downside cover costs until `insurance_expires` (an ATM
+ * put over spot); `put_call_ratio` is which way today's bets lean — above 1
+ * protective, below 1 optimistic. Every field is independently null when its
+ * contracts are too thin to price.
+ */
+export interface OptionsMetrics {
+  implied_volatility: number | null
+  expected_move_percent: number | null
+  expected_move_by: string | null
+  insurance_cost_percent: number | null
+  insurance_expires: string | null
+  put_call_ratio: number | null
+}
+
+/**
  * The per-ticker card from `/stocks/ticker/{ticker}` — the app's one stock
  * snapshot: the live quote plus name, exchange, and market cap. The
- * `dividend`/`performance`/`metrics` blocks arrive only when requested via
- * `include` and are null otherwise (or when their source is down).
+ * `dividend`/`performance`/`metrics`/`options_metrics` blocks arrive only when
+ * requested via `include` and are null otherwise (or when their source is
+ * down).
  */
 export interface TickerCard {
   ticker: string
@@ -55,6 +79,7 @@ export interface TickerCard {
   dividend: TickerDividend | null
   performance: StockPerformance | null
   metrics: TickerMetrics | null
+  options_metrics: OptionsMetrics | null
 }
 
 /**
@@ -262,6 +287,34 @@ export function pegVerdict(peg: number | null): PegVerdict | null {
   if (peg < 1) return 'Cheap for Its Growth'
   if (peg <= 2) return 'Fairly Priced'
   return 'Pricey for Its Growth'
+}
+
+/**
+ * Which way today's options flow leans, from the put/call ratio: `optimistic`
+ * (calls dominate — upside bets), `protective` (puts dominate — downside
+ * cover), or `balanced` in the narrow band around parity.
+ */
+export type OptionsSentiment = 'optimistic' | 'balanced' | 'protective'
+
+/**
+ * Half-width of the "balanced" band around a put/call ratio of 1. A ratio
+ * within ±0.05 of parity is too close to call either way, so it reads as
+ * balanced rather than flipping label on noise.
+ */
+export const PCR_BALANCED_MARGIN = 0.05
+
+/**
+ * Map a put/call ratio to a sentiment lean. Below the balanced band calls
+ * dominate (optimistic); above it puts dominate (protective). Returns null
+ * when there's no ratio to judge.
+ */
+export function optionsSentiment(
+  putCallRatio: number | null,
+): OptionsSentiment | null {
+  if (putCallRatio == null) return null
+  if (putCallRatio < 1 - PCR_BALANCED_MARGIN) return 'optimistic'
+  if (putCallRatio > 1 + PCR_BALANCED_MARGIN) return 'protective'
+  return 'balanced'
 }
 
 /** How far back a chart reaches. Doubles as the API `range` query value. */

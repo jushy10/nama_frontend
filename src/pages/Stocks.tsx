@@ -32,6 +32,7 @@ import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import PegCard from '@/components/PegCard'
+import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
@@ -48,6 +49,11 @@ const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
   'performance',
   'metrics',
 ]
+
+// The options block rides its own request: pricing it walks the option chain
+// upstream, so keeping it out of SNAPSHOT_BLOCKS means a slow (or absent)
+// chain never delays the snapshot — the card just pops in when it resolves.
+const OPTIONS_BLOCKS: TickerCardInclude[] = ['options_metrics']
 
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
@@ -74,6 +80,10 @@ export default function Stocks() {
   // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
   // if it fails the toggle simply doesn't appear, so no error state is shown.
   const annualQuery = useAnnualEarnings(loadedSymbol)
+  // The options-market read (IV, expected move, insurance, put/call), served
+  // from the same ticker-card endpoint but as its own request (see
+  // OPTIONS_BLOCKS). Best-effort: no options coverage just hides the card.
+  const optionsQuery = useTickerCard(loadedSymbol, OPTIONS_BLOCKS)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -206,6 +216,12 @@ export default function Stocks() {
                 <ProfitabilityCard netMargin={stock.metrics.net_margin} />
                 <PegCard peg={stock.metrics.peg} />
               </Box>
+            )}
+
+            {/* Options-market read; pops in once its own ticker-card request
+                resolves. A null block (no priceable options) hides the card. */}
+            {optionsQuery.data?.options_metrics && (
+              <OptionsCard metrics={optionsQuery.data.options_metrics} />
             )}
 
             {recommendationsQuery.isLoading && (
