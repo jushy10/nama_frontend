@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { stockLogoUrl, type Stock } from '@/lib/api'
+import { stockLogoUrl, type TickerCard } from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null
@@ -69,116 +69,10 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-/** Where the price sits in its 52-week range, as a 0–100 track position
- *  (clamped — a fresh high/low can sit just outside yesterday's range). */
-const rangePos = (price: number, low: number, high: number) =>
-  Math.max(0, Math.min(100, ((price - low) / (high - low)) * 100))
-
-/** The year's trading range as a slim track with the current price marked on
- *  it — neutral indigo rather than green/red, since neither end of the range
- *  is inherently good. The right-hand caption adds how far the price sits
- *  below its all-time high (a longer lens than the 52-week window). */
-function Week52Range({
-  price,
-  low,
-  high,
-  drawdown,
-}: {
-  price: number
-  low: number
-  high: number
-  drawdown: number | null
-}) {
-  const pct = rangePos(price, low, high)
-  return (
-    <Box sx={{ mt: 3 }}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
-      >
-        <Typography
-          variant="caption"
-          sx={{
-            color: 'text.secondary',
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          52-week range
-        </Typography>
-        {drawdown != null && (
-          <Typography variant="caption" color="text.secondary">
-            {drawdown <= -0.05
-              ? `${Math.abs(drawdown).toFixed(1)}% below all-time high`
-              : 'At its all-time high'}
-          </Typography>
-        )}
-      </Stack>
-      <Box
-        role="img"
-        aria-label={`52-week range ${fmtDollars(low)} to ${fmtDollars(high)}; currently ${fmtDollars(price)}`}
-        sx={{
-          position: 'relative',
-          mt: 1,
-          height: 6,
-          borderRadius: 3,
-          bgcolor: 'action.hover',
-        }}
-      >
-        {/* filled up to today's price */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            left: 0,
-            width: `${pct}%`,
-            borderRadius: 3,
-            bgcolor: 'primary.dark',
-            opacity: 0.55,
-          }}
-        />
-        {/* current-price marker */}
-        <Box
-          sx={{
-            position: 'absolute',
-            top: -3,
-            left: `${pct}%`,
-            transform: 'translateX(-50%)',
-            width: 3,
-            height: 12,
-            borderRadius: 1,
-            bgcolor: 'primary.light',
-            boxShadow: (theme) => `0 0 0 2px ${theme.palette.background.paper}`,
-          }}
-        />
-      </Box>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
-        <Typography
-          variant="caption"
-          sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-        >
-          {fmtDollars(low)}
-        </Typography>
-        <Typography
-          variant="caption"
-          sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-        >
-          {fmtDollars(high)}
-        </Typography>
-      </Stack>
-    </Box>
-  )
-}
-
-export default function StockCard({ stock }: { stock: Stock }) {
+export default function StockCard({ stock }: { stock: TickerCard }) {
   const up = (stock.change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
-  const asOf = stock.as_of ? new Date(stock.as_of).toLocaleString() : '—'
-  const low = stock.metrics?.week_52_low ?? null
-  const high = stock.metrics?.week_52_high ?? null
 
   return (
     <Card
@@ -207,8 +101,8 @@ export default function StockCard({ stock }: { stock: Stock }) {
           <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
             <Avatar
               variant="rounded"
-              src={stockLogoUrl(stock.symbol)}
-              alt={`${stock.symbol} logo`}
+              src={stockLogoUrl(stock.ticker)}
+              alt={`${stock.ticker} logo`}
               slotProps={{
                 img: { loading: 'lazy', style: { objectFit: 'contain' } },
               }}
@@ -220,7 +114,7 @@ export default function StockCard({ stock }: { stock: Stock }) {
                 p: 0.75,
               }}
             >
-              {stock.symbol.charAt(0)}
+              {stock.ticker.charAt(0)}
             </Avatar>
             <Box>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
@@ -229,7 +123,7 @@ export default function StockCard({ stock }: { stock: Stock }) {
                   component="h2"
                   sx={{ fontWeight: 700 }}
                 >
-                  {stock.symbol}
+                  {stock.ticker}
                 </Typography>
                 {stock.exchange && (
                   <Chip
@@ -297,45 +191,29 @@ export default function StockCard({ stock }: { stock: Stock }) {
           </Box>
         </Stack>
 
-        <Box>
-          {low != null && high != null && high > low && (
-            <Week52Range
-              price={stock.price}
-              low={low}
-              high={high}
-              drawdown={stock.drawdown_from_high}
-            />
-          )}
-
-          <Box
-            component="dl"
-            sx={{
-              mt: 3,
-              mb: 0,
-              display: 'grid',
-              gridTemplateColumns: {
-                xs: 'repeat(2, 1fr)',
-                sm: 'repeat(3, 1fr)',
-              },
-              gap: 1,
-            }}
-          >
-            <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
-            <Stat label="Div Yield" value={fmtYield(stock.dividend_yield)} />
-            <Stat
-              label="Div / Share"
-              value={fmtDollars(stock.dividend_per_share)}
-            />
-          </Box>
-        </Box>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: 'block', mt: 2, textAlign: 'right' }}
+        <Box
+          component="dl"
+          sx={{
+            mt: 3,
+            mb: 0,
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: 'repeat(2, 1fr)',
+              sm: 'repeat(3, 1fr)',
+            },
+            gap: 1,
+          }}
         >
-          As of {asOf}
-        </Typography>
+          <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
+          <Stat
+            label="Div Yield"
+            value={fmtYield(stock.dividend?.yield_percentage ?? null)}
+          />
+          <Stat
+            label="Div / Share"
+            value={fmtDollars(stock.dividend?.per_share ?? null)}
+          />
+        </Box>
       </CardContent>
     </Card>
   )
