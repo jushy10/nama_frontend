@@ -5,35 +5,23 @@ import {
   CardContent,
   CircularProgress,
   Stack,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
   useTheme,
 } from '@mui/material'
-import { type Candle, type ChartRange } from '@/lib/api'
+import { type ChartRange } from '@/lib/api'
 import { useManyCandles } from '@/lib/queries'
 import type { QuoteDef } from '@/components/QuoteGrid'
+import ChartRangeToggle from '@/components/ChartRangeToggle'
 import PerformanceComparisonChart, {
   type ComparisonSeries,
 } from '@/components/PerformanceComparisonChart'
-
-// Mirror the stock page's price-chart ranges (intraday first, YTD last) so the
-// two charts share one mental model. Intraday ranges make ρ a per-bar co-move;
-// the rebased overlay reads the same at any horizon.
-const RANGE_OPTIONS: ChartRange[] = [
-  '1D',
-  '5D',
-  '1M',
-  '3M',
-  '6M',
-  '1Y',
-  '5Y',
-  'YTD',
-]
+import RelativePerformanceBars, {
+  type RelRow,
+} from '@/components/RelativePerformanceBars'
 
 // Categorical hues for the member lines — distinct and legible on both canvases.
-// The benchmark index ETFs are coloured/dashed separately (see BENCH_DASH) so
-// they read as neutral references drawn on top of the members.
+// The benchmark index draws as a solid, thicker, high-contrast neutral line on
+// top of the members (see benchColors), so it reads as the reference.
 const LINE_COLORS = [
   '#60a5fa', // blue-400
   '#34d399', // emerald-400
@@ -44,64 +32,23 @@ const LINE_COLORS = [
   '#fb923c', // orange-400
 ]
 
-// Dash patterns per benchmark, by position — the primary (SPY) gets a bold
-// dash, the next (QQQ) a finer dotted line, so two neutral references stay
-// distinguishable beyond just their shade.
-const BENCH_DASH = ['6 3', '2 4']
-
-/** Close-to-close returns keyed by ISO timestamp, for correlation alignment. */
-function dailyReturns(candles: Candle[]): Map<string, number> {
-  const m = new Map<string, number>()
-  for (let i = 1; i < candles.length; i++) {
-    const prev = candles[i - 1].close
-    if (prev) m.set(candles[i].timestamp, candles[i].close / prev - 1)
-  }
-  return m
-}
-
-/** Pearson correlation of two equal-length samples; null when undefined. */
-function pearson(a: number[], b: number[]): number | null {
-  const n = a.length
-  if (n < 2) return null
-  let sa = 0
-  let sb = 0
-  for (let i = 0; i < n; i++) {
-    sa += a[i]
-    sb += b[i]
-  }
-  const ma = sa / n
-  const mb = sb / n
-  let num = 0
-  let da = 0
-  let db = 0
-  for (let i = 0; i < n; i++) {
-    const dx = a[i] - ma
-    const dy = b[i] - mb
-    num += dx * dy
-    da += dx * dx
-    db += dy * dy
-  }
-  const den = Math.sqrt(da * db)
-  return den ? num / den : null
-}
-
 interface Props {
   /** The member tickers to overlay (the Mag 7). */
   items: QuoteDef[]
   /**
-   * Benchmark index ETFs to overlay as references (e.g. SPY, QQQ). The first is
-   * the primary: every other line's ρ is measured against it.
+   * Benchmark index ETF(s) to overlay as references (e.g. QQQ for the
+   * Nasdaq-100). The first is the one members are measured against. Today
+   * there's one; the array keeps adding another cheap.
    */
   benchmarks: QuoteDef[]
 }
 
 /**
- * Overlays each Mag 7 member and the benchmark indices (S&P 500 via SPY,
- * Nasdaq-100 via QQQ) on one chart, every line rebased to 0% at the start of
- * the chosen range so paths are comparable across wildly different share
- * prices. Lines that track together are visibly correlated; each line also
- * carries ρ, the Pearson correlation of its daily returns to the primary
- * benchmark's, as a hard number beside the visual.
+ * Overlays each Mag 7 member and the Nasdaq-100 benchmark (via QQQ) on one
+ * chart, every line rebased to 0% at the start of the chosen range so paths are
+ * comparable across wildly different share prices. Below the chart, a
+ * diverging-bar breakdown shows how much each member beat or lagged QQQ over
+ * that same range.
  */
 export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const theme = useTheme()
@@ -118,17 +65,10 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const allFailed = !loading && results.every((r) => !r.data)
 
   const series = useMemo<ComparisonSeries[]>(() => {
-    // Neutral reference colours for the benchmark lines; the primary leads.
-    const benchColors = [
-      theme.palette.text.primary,
-      theme.palette.text.secondary,
-    ]
-    // The primary benchmark (first one, SPY) is the correlation reference.
-    const primaryIdx = items.length
-    const primaryData = results[primaryIdx]?.data
-    const primaryReturns = primaryData
-      ? dailyReturns(primaryData.candles)
-      : null
+    // The benchmark draws in the highest-contrast neutral — black on the light
+    // canvas, white on the dark one (a literal black would vanish on the near-
+    // black dark background).
+    const benchColor = theme.palette.text.primary
 
     const out: ComparisonSeries[] = []
     for (let i = 0; i < symbols.length; i++) {
@@ -145,47 +85,47 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
         pct: (c.close / first - 1) * 100,
       }))
 
-      // Every line but the primary itself correlates against it — including the
-      // other index (QQQ), which shows how tightly the Nasdaq-100 tracks SPY.
-      let corr: number | null = null
-      if (i !== primaryIdx && primaryReturns) {
-        const sr = dailyReturns(candles)
-        const a: number[] = []
-        const b: number[] = []
-        for (const [ts, ret] of sr) {
-          const bret = primaryReturns.get(ts)
-          if (bret !== undefined) {
-            a.push(ret)
-            b.push(bret)
-          }
-        }
-        corr = pearson(a, b)
-      }
-
       out.push({
         symbol: symbols[i],
         label: isBenchmark ? benchmarks[benchPos].label : items[i].label,
-        color: isBenchmark
-          ? (benchColors[benchPos] ?? theme.palette.text.primary)
-          : LINE_COLORS[i % LINE_COLORS.length],
+        color: isBenchmark ? benchColor : LINE_COLORS[i % LINE_COLORS.length],
         isBenchmark,
-        dash: isBenchmark
-          ? (BENCH_DASH[benchPos] ?? BENCH_DASH[BENCH_DASH.length - 1])
-          : undefined,
+        // Benchmark is a solid line; members are solid too — colour carries them.
+        dash: undefined,
         points,
         totalPct: points[points.length - 1].pct,
-        corr,
       })
     }
     return out
-  }, [
-    results,
-    symbols,
-    items,
-    benchmarks,
-    theme.palette.text.primary,
-    theme.palette.text.secondary,
-  ])
+  }, [results, symbols, items, benchmarks, theme.palette.text.primary])
+
+  // How each member fared against the benchmark over the range: its return
+  // minus the benchmark's, in percentage points (positive = it beat QQQ). The
+  // benchmark rides along as its own row (rel 0) so it anchors the zero line,
+  // with members that beat it above and members that lagged it below.
+  const benchmarkSeries = series.find((s) => s.isBenchmark)
+  const relRows: RelRow[] =
+    benchmarkSeries == null
+      ? []
+      : [
+          ...series
+            .filter((s) => !s.isBenchmark)
+            .map((s) => ({
+              symbol: s.symbol,
+              label: s.label,
+              color: s.color,
+              totalPct: s.totalPct,
+              rel: s.totalPct - benchmarkSeries.totalPct,
+            })),
+          {
+            symbol: benchmarkSeries.symbol,
+            label: benchmarkSeries.label,
+            color: benchmarkSeries.color,
+            totalPct: benchmarkSeries.totalPct,
+            rel: 0,
+            isBenchmark: true,
+          },
+        ]
 
   const intraday = useMemo(() => {
     const tf = results.find((r) => r.data)?.data?.timeframe ?? ''
@@ -194,7 +134,7 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={1.5}
@@ -205,29 +145,20 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
           }}
         >
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-            Performance vs. the indices
+            Performance vs. the Nasdaq 100
           </Typography>
-          <ToggleButtonGroup
-            size="small"
-            exclusive
+          <ChartRangeToggle
             value={range}
-            onChange={(_, value: ChartRange | null) => value && setRange(value)}
-            aria-label="Comparison range"
-            sx={{ flexWrap: 'wrap' }}
-          >
-            {RANGE_OPTIONS.map((r) => (
-              <ToggleButton key={r} value={r} sx={{ px: 1.5, py: 0.25 }}>
-                {r}
-              </ToggleButton>
-            ))}
-          </ToggleButtonGroup>
+            onChange={setRange}
+            ariaLabel="Comparison range"
+          />
         </Stack>
 
         <Typography color="text.secondary" sx={{ fontSize: '0.85rem', mb: 2 }}>
           Each line is rebased to 0% at the start of the range, so paths that
-          move together are correlated regardless of share price. The S&amp;P
-          500 (SPY) and Nasdaq-100 (QQQ) are dashed; ρ is each line&apos;s
-          daily-return correlation to SPY (1.0 = lockstep).
+          move together track regardless of share price. The Nasdaq-100 (QQQ) is
+          the solid benchmark line; the bars below show how much each stock has
+          gained or lost against QQQ over the selected range.
         </Typography>
 
         {loading && (
@@ -247,7 +178,16 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
           </Alert>
         )}
         {!loading && !allFailed && (
-          <PerformanceComparisonChart series={series} intraday={intraday} />
+          <>
+            <PerformanceComparisonChart series={series} intraday={intraday} />
+            {relRows.length > 0 && benchmarkSeries && (
+              <RelativePerformanceBars
+                rows={relRows}
+                benchmarkSymbol={benchmarkSeries.symbol}
+                rangeLabel={range}
+              />
+            )}
+          </>
         )}
       </CardContent>
     </Card>

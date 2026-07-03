@@ -35,8 +35,6 @@ export interface ComparisonSeries {
   points: SeriesPoint[]
   /** Total return over the range = the last point's pct. */
   totalPct: number
-  /** Pearson correlation of daily returns vs. the primary benchmark; null when N/A. */
-  corr: number | null
 }
 
 const fmtPct = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
@@ -243,11 +241,6 @@ export default function PerformanceComparisonChart({
               >
                 {v == null ? '—' : fmtPct(v)}
               </Box>
-              {s.corr != null && (
-                <Box component="span" sx={{ color: axis }}>
-                  ρ{s.corr.toFixed(2)}
-                </Box>
-              )}
             </Box>
           )
         })}
