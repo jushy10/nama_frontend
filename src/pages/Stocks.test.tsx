@@ -180,6 +180,7 @@ const annualEarningsSample = {
       revenue_actual: 130_497_000_000,
       revenue_estimate: null,
       net_income: 72_880_000_000,
+      eps_actual_consensus: null,
       is_reported: true,
     },
     {
@@ -190,6 +191,7 @@ const annualEarningsSample = {
       revenue_actual: 215_938_000_000,
       revenue_estimate: null,
       net_income: 120_067_000_000,
+      eps_actual_consensus: null,
       is_reported: true,
     },
     {
@@ -200,6 +202,7 @@ const annualEarningsSample = {
       revenue_actual: null,
       revenue_estimate: 392_638_707_720,
       net_income: null,
+      eps_actual_consensus: null,
       is_reported: false,
     },
   ],

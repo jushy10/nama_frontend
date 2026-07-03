@@ -69,16 +69,22 @@ function trailingTtmPe(
 /**
  * The walk's anchor: today's price over the last completed fiscal year's
  * reported EPS — a full-year window like the forward consensus years, so
- * every arrow in the walk is a symmetric twelve-month step. The annual
- * endpoint's actual is reported diluted (GAAP) EPS while the forward years
- * are analyst consensus; the caption beneath the walk owns up to that basis
- * gap. `pe` is null when the year was a loss (a P/E over negative earnings
- * is meaningless); the whole anchor is null when no reported year is served.
+ * every arrow in the walk is a symmetric twelve-month step. The anchor EPS
+ * prefers the year's `eps_actual_consensus` — the actual on the same
+ * analyst-consensus (adjusted) basis the forward steps use, so the walk
+ * compares like with like — and falls back to the reported diluted (GAAP)
+ * `eps_actual` when the consensus figure isn't served; the caption beneath
+ * the walk owns up to the basis gap only in that fallback. `pe` is null when
+ * the year was a loss (a P/E over negative earnings is meaningless); the
+ * whole anchor is null when no reported year is served.
  */
 interface FyAnchor {
   label: string // "FY26", or "(last FY)" when the year is unlabelled
   pe: number | null
   eps: number
+  /** True when `eps` is on the analyst-consensus basis (the forward steps'
+   *  basis); false on the GAAP-diluted fallback. */
+  consensusBasis: boolean
 }
 
 function lastReportedFyPe(
@@ -86,11 +92,12 @@ function lastReportedFyPe(
   price: number,
 ): FyAnchor | null {
   const reported = (annual?.years ?? []).filter(
-    (y) => y.is_reported && y.eps_actual != null,
+    (y) => y.is_reported && (y.eps_actual_consensus ?? y.eps_actual) != null,
   )
   const last = reported[reported.length - 1] // oldest → newest
   if (!last) return null
-  const eps = last.eps_actual as number
+  const consensusBasis = last.eps_actual_consensus != null
+  const eps = (last.eps_actual_consensus ?? last.eps_actual) as number
   return {
     label:
       last.fiscal_year != null
@@ -98,6 +105,7 @@ function lastReportedFyPe(
         : '(last FY)',
     pe: eps > 0 ? price / eps : null,
     eps,
+    consensusBasis,
   }
 }
 
@@ -474,9 +482,11 @@ function PeWalk({
  *   reported actuals blend into consensus estimates.
  *
  * Every multiple divides the SAME price, so a falling multiple is the
- * expected earnings growth (less any reported-vs-consensus basis gap on the
- * fiscal-year anchor). The card drops entirely when there's no forward
- * consensus to show.
+ * expected earnings growth. The fiscal-year anchor prefers the consensus-basis
+ * actual the API serves, so the walk stays on one basis end to end; only its
+ * GAAP fallback can carry a reported-vs-consensus basis gap (which the caption
+ * then flags). The card drops entirely when there's no forward consensus to
+ * show.
  */
 export default function ForwardPeCard({
   price,
@@ -585,7 +595,11 @@ export default function ForwardPeCard({
               anchor={{
                 label: `P/E ${fyAnchor?.label ?? '(last FY)'}`,
                 value: fyAnchor?.pe != null ? fmtMultiple(fyAnchor.pe) : '—',
-                hint: fyAnchor ? `Reported EPS ${fmtEps(fyAnchor.eps)}` : null,
+                hint: fyAnchor
+                  ? `Reported EPS ${fmtEps(fyAnchor.eps)}${
+                      fyAnchor.consensusBasis ? '' : ' (GAAP)'
+                    }`
+                  : null,
               }}
               steps={fySteps.map((s, i) => ({
                 key: `${s.label}-${i}`,
@@ -614,12 +628,24 @@ export default function ForwardPeCard({
               color="text.secondary"
               sx={{ display: 'block', mt: 1.5 }}
             >
-              The anchor is today&apos;s price over the last completed fiscal
-              year&apos;s reported diluted EPS, so every step in the walk covers
-              a full fiscal year. Each forward step divides the same price by
-              that year&apos;s analyst-consensus EPS — a basis that can sit
-              above reported (GAAP) EPS for companies with large non-GAAP
-              adjustments.
+              {fyAnchor == null || fyAnchor.consensusBasis ? (
+                <>
+                  The anchor is today&apos;s price over the last completed
+                  fiscal year&apos;s reported EPS on the analyst-consensus basis
+                  — the same basis each forward step&apos;s estimate uses — so
+                  every step in the walk covers a full fiscal year and compares
+                  like with like.
+                </>
+              ) : (
+                <>
+                  The anchor is today&apos;s price over the last completed
+                  fiscal year&apos;s reported diluted EPS, so every step in the
+                  walk covers a full fiscal year. Each forward step divides the
+                  same price by that year&apos;s analyst-consensus EPS — a basis
+                  that can sit above reported (GAAP) EPS for companies with
+                  large non-GAAP adjustments.
+                </>
+              )}
             </Typography>
           </Box>
         )}

@@ -86,11 +86,14 @@ const year = (
   revenue_actual: null,
   revenue_estimate: null,
   net_income: null,
+  eps_actual_consensus: null,
   is_reported: false,
   ...over,
 })
 
 // One reported fiscal year plus the two forecast years the card walks across.
+// The reported year carries both bases: GAAP diluted 3.10 and the
+// consensus-basis 3.20 the anchor should prefer.
 const annualSample: AnnualEarnings = {
   symbol: 'NVDA',
   count: 3,
@@ -103,6 +106,7 @@ const annualSample: AnnualEarnings = {
       eps_actual: 3.1,
       revenue_actual: 200_000_000_000,
       net_income: 100_000_000_000,
+      eps_actual_consensus: 3.2,
       is_reported: true,
     }),
     year({
@@ -134,12 +138,13 @@ describe('ForwardPeCard', () => {
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()
 
-    // Anchor: 200 ÷ 3.10 — the last completed fiscal year's reported EPS. The
-    // multiple shows on the tile and again on the fiscal-year chart's anchor
-    // bar, labelled with the year.
+    // Anchor: 200 ÷ 3.20 — the last completed fiscal year's reported EPS on
+    // the consensus basis (preferred over the GAAP 3.10). The multiple shows
+    // on the tile and again on the fiscal-year chart's anchor bar, labelled
+    // with the year.
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
-    expect(screen.getAllByText('64.52').length).toBeGreaterThan(0)
-    expect(screen.getByText('Reported EPS $3.10')).toBeInTheDocument()
+    expect(screen.getAllByText('62.50').length).toBeGreaterThan(0)
+    expect(screen.getByText('Reported EPS $3.20')).toBeInTheDocument()
     expect(screen.getByText('FY26')).toBeInTheDocument()
 
     // FY1: 200 ÷ 4.00 and FY2: 200 ÷ 5.00, labelled with their fiscal years.
@@ -160,12 +165,37 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('FY28')).toBeInTheDocument()
 
     // Each forward step carries its move versus the anchor multiple
-    // (50/64.52 − 1 = −22.5%; 40/64.52 − 1 = −38.0%).
-    expect(screen.getByText('-22.5% vs FY26')).toBeInTheDocument()
-    expect(screen.getByText('-38.0% vs FY26')).toBeInTheDocument()
+    // (50/62.50 − 1 = −20.0%; 40/62.50 − 1 = −36.0%).
+    expect(screen.getByText('-20.0% vs FY26')).toBeInTheDocument()
+    expect(screen.getByText('-36.0% vs FY26')).toBeInTheDocument()
 
-    // The bases are spelled out beneath the walk.
-    expect(screen.getByText(/last completed fiscal year/i)).toBeInTheDocument()
+    // Anchored on the consensus basis, the walk compares like with like — the
+    // caption says so, and the GAAP caveat is gone.
+    expect(screen.getByText(/analyst-consensus basis/i)).toBeInTheDocument()
+    expect(screen.queryByText(/GAAP/)).not.toBeInTheDocument()
+  })
+
+  it('anchors on GAAP diluted EPS, with the caveat, when no consensus-basis actual is served', () => {
+    renderWithProviders(
+      <ForwardPeCard
+        price={200}
+        annual={{
+          ...annualSample,
+          years: annualSample.years.map((y) =>
+            y.is_reported ? { ...y, eps_actual_consensus: null } : y,
+          ),
+        }}
+      />,
+    )
+
+    // Anchor falls back to 200 ÷ 3.10 (GAAP diluted), and the tile names the
+    // basis so the mismatch with the consensus steps is visible.
+    expect(screen.getAllByText('64.52').length).toBeGreaterThan(0)
+    expect(screen.getByText('Reported EPS $3.10 (GAAP)')).toBeInTheDocument()
+    // The caption owns up to the basis gap again.
+    expect(
+      screen.getByText(/can sit above reported \(GAAP\) EPS/i),
+    ).toBeInTheDocument()
   })
 
   it('tints a compressing multiple green and an expanding one red', () => {
@@ -255,7 +285,7 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('P/E (TTM)')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
-    expect(screen.getAllByText('64.52').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('62.50').length).toBeGreaterThan(0)
   })
 
   it('falls back to the snapshot forward P/E when the annual series is missing', () => {
