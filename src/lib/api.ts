@@ -52,6 +52,47 @@ export interface Stock {
   growth: GrowthMetrics | null
 }
 
+/** Opt-in enrichment blocks the ticker-card endpoint can attach. */
+export type TickerCardInclude = 'dividend' | 'performance' | 'metrics'
+
+/**
+ * A ticker card's dividend block: percent yield plus the annual per-share
+ * payout in the quote currency. Either is null for a non-payer or an
+ * uncovered field.
+ */
+export interface TickerDividend {
+  yield_percentage: number | null
+  per_share: number | null
+}
+
+/**
+ * A ticker card's derived metrics — currently just the forward PEG (forward
+ * P/E over expected FY1→FY2 EPS growth). Null when no forward consensus is
+ * stored or a leg is non-positive.
+ */
+export interface TickerMetrics {
+  forward_peg: number | null
+}
+
+/**
+ * The lean per-ticker card from `/stocks/ticker/{ticker}`: the live quote plus
+ * name and market cap. The `dividend`/`performance`/`metrics` blocks arrive
+ * only when requested via `include` and are null otherwise (or when their
+ * source is down). Views that need trailing ratios, growth, or OHLC detail
+ * still use the full `Stock` snapshot.
+ */
+export interface TickerCard {
+  ticker: string
+  name: string | null
+  price: number
+  change: number | null
+  change_percent: number | null
+  market_cap: number | null
+  dividend: TickerDividend | null
+  performance: StockPerformance | null
+  metrics: TickerMetrics | null
+}
+
 /**
  * A market sector, tracked via its SPDR Select Sector ETF (XLK, XLF, …).
  * `change`/`change_percent` are the move for the current session; `performance`
@@ -344,7 +385,11 @@ async function toApiError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, detail)
 }
 
-/** Fetch a single stock snapshot by ticker symbol. */
+/**
+ * Fetch the full stock snapshot by ticker symbol — trailing ratios, growth,
+ * OHLC, and the rest. Quote-level strips should prefer the lighter
+ * `getTickerCard` instead.
+ */
 export async function getStock(
   symbol: string,
   opts: { signal?: AbortSignal } = {},
@@ -357,15 +402,37 @@ export async function getStock(
 }
 
 /**
- * Fetch several snapshots concurrently, preserving the order of `symbols`. A
- * symbol that fails (bad ticker, network blip) resolves to `null` instead of
+ * Fetch the lean quote card for one ticker (`/stocks/ticker/{ticker}`). Pass
+ * `include` to attach the opt-in blocks — an unrequested block comes back
+ * null and costs the backend no upstream call.
+ */
+export async function getTickerCard(
+  ticker: string,
+  opts: { include?: TickerCardInclude[]; signal?: AbortSignal } = {},
+): Promise<TickerCard> {
+  const include = opts.include?.length
+    ? `?include=${opts.include.join(',')}`
+    : ''
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(ticker)}${include}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as TickerCard
+}
+
+/**
+ * Fetch several ticker cards concurrently, preserving the order of `tickers`.
+ * A ticker that fails (bad symbol, network blip) resolves to `null` instead of
  * rejecting the whole batch, so one dud never blanks the rest of the row.
  */
-export async function getStocks(
-  symbols: string[],
-  opts: { signal?: AbortSignal } = {},
-): Promise<(Stock | null)[]> {
-  return Promise.all(symbols.map((s) => getStock(s, opts).catch(() => null)))
+export async function getTickerCards(
+  tickers: string[],
+  opts: { include?: TickerCardInclude[]; signal?: AbortSignal } = {},
+): Promise<(TickerCard | null)[]> {
+  return Promise.all(
+    tickers.map((t) => getTickerCard(t, opts).catch(() => null)),
+  )
 }
 
 /** Fetch the day's snapshot for every tracked market sector. */

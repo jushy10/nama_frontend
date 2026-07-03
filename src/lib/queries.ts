@@ -22,7 +22,7 @@ import {
   getScreener,
   getSectors,
   getStock,
-  getStocks,
+  getTickerCards,
   type AnalystRecommendations,
   type AnnualEarnings,
   type CandleSeries,
@@ -33,6 +33,7 @@ import {
   type Sector,
   type Stock,
   type StockIndex,
+  type TickerCard,
 } from '@/lib/api'
 
 /**
@@ -58,19 +59,20 @@ export function useStock(
 }
 
 /**
- * Snapshots for several tickers at once, order preserved. A symbol that fails
- * resolves to `null` rather than failing the batch (see `getStocks`), so this
- * query effectively never errors. Pass `refetchInterval` for a self-refreshing
- * strip; pass `enabled: false` to hold the request.
+ * Lean quote cards for several tickers at once, order preserved. A ticker that
+ * fails resolves to `null` rather than failing the batch (see
+ * `getTickerCards`), so this query effectively never errors. Pass
+ * `refetchInterval` for a self-refreshing strip; pass `enabled: false` to hold
+ * the request.
  */
-export function useStocks(
-  symbols: string[],
+export function useTickerCards(
+  tickers: string[],
   opts: { refetchInterval?: number; enabled?: boolean } = {},
-): UseQueryResult<(Stock | null)[]> {
+): UseQueryResult<(TickerCard | null)[]> {
   return useQuery({
-    queryKey: ['stocks', symbols],
-    queryFn: ({ signal }) => getStocks(symbols, { signal }),
-    enabled: opts.enabled ?? symbols.length > 0,
+    queryKey: ['ticker-cards', tickers],
+    queryFn: ({ signal }) => getTickerCards(tickers, { signal }),
+    enabled: opts.enabled ?? tickers.length > 0,
     refetchInterval: opts.refetchInterval,
   })
 }

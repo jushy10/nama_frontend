@@ -2,8 +2,8 @@ import { Avatar, Box, Skeleton, Stack, Typography } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { stockLogoUrl, type Stock } from '@/lib/api'
-import { useStocks } from '@/lib/queries'
+import { stockLogoUrl, type TickerCard } from '@/lib/api'
+import { useTickerCards } from '@/lib/queries'
 
 export type QuoteDef = {
   /** Friendly name shown to the user (index name or company). */
@@ -47,7 +47,7 @@ function QuoteTile({
   onSelect,
 }: {
   def: QuoteDef
-  stock: Stock | null
+  stock: TickerCard | null
   linkToStock: boolean
   selected: boolean
   onSelect?: (symbol: string) => void
@@ -264,7 +264,7 @@ export default function QuoteGrid({
   onSelect?: (symbol: string) => void
 }) {
   const symbols = items.map((i) => i.symbol)
-  const { data } = useStocks(symbols, { refetchInterval: refreshMs })
+  const { data } = useTickerCards(symbols, { refetchInterval: refreshMs })
   const quotes = data ?? null
 
   const allFailed = quotes != null && quotes.every((q) => q == null)
