@@ -124,7 +124,9 @@ function TopMoverCard({
         bgcolor: 'action.hover',
         cursor: stock ? 'pointer' : 'default',
         transition: 'border-color 150ms ease',
-        '&:hover': stock ? { borderColor: up ? 'success.main' : 'error.main' } : {},
+        '&:hover': stock
+          ? { borderColor: up ? 'success.main' : 'error.main' }
+          : {},
       }}
     >
       <Stack
@@ -152,7 +154,11 @@ function TopMoverCard({
         </Typography>
       </Stack>
       {loading && (
-        <Stack direction="row" spacing={1.5} sx={{ mt: 1.5, alignItems: 'center' }}>
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ mt: 1.5, alignItems: 'center' }}
+        >
           <Skeleton variant="rounded" width={40} height={40} />
           <Box sx={{ flex: 1 }}>
             <Skeleton width={72} />
@@ -406,8 +412,8 @@ export default function Screener() {
             Screener
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            The day's top movers — filter by index and sector, then flip
-            between gainers and losers.
+            The day's top movers — filter by index and sector, then flip between
+            gainers and losers.
           </Typography>
         </Box>
         <Tooltip title="Refresh">
