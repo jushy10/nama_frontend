@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   optionsLevel,
   optionsSentiment,
+  optionsSignal,
   pegVerdict,
   profitabilityVerdict,
   rangeReturnPct,
@@ -186,5 +187,31 @@ describe('optionsLevel', () => {
 
   it('returns null when there is no figure to judge', () => {
     expect(optionsLevel('implied_volatility', null)).toBeNull()
+  })
+})
+
+describe('optionsSignal', () => {
+  it('calls a decisive call tilt Go Long and a soft one Lean Long', () => {
+    expect(optionsSignal(0.24)).toBe('Go Long')
+    expect(optionsSignal(0.69)).toBe('Go Long')
+    expect(optionsSignal(0.7)).toBe('Lean Long') // strong edge softens to Lean
+    expect(optionsSignal(0.94)).toBe('Lean Long')
+  })
+
+  it('treats the balanced band around parity as Neutral, edges inclusive', () => {
+    expect(optionsSignal(0.95)).toBe('Neutral')
+    expect(optionsSignal(1)).toBe('Neutral')
+    expect(optionsSignal(1.05)).toBe('Neutral')
+  })
+
+  it('calls a soft put tilt Lean Short and a decisive one Go Short', () => {
+    expect(optionsSignal(1.06)).toBe('Lean Short')
+    expect(optionsSignal(1.4)).toBe('Lean Short') // strong edge softens to Lean
+    expect(optionsSignal(1.41)).toBe('Go Short')
+    expect(optionsSignal(2.3)).toBe('Go Short')
+  })
+
+  it('returns null when there is no ratio to judge', () => {
+    expect(optionsSignal(null)).toBeNull()
   })
 })

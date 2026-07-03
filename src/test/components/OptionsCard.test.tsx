@@ -72,27 +72,48 @@ describe('OptionsCard', () => {
     expect(screen.getByText('Pricey')).toBeInTheDocument()
   })
 
-  it('calls a call-heavy ratio Optimistic with its blurb', () => {
+  it('signals Go Long on a decisive call tilt, with the blurb and disclaimer', () => {
     renderWithProviders(<OptionsCard metrics={FULL} />)
-    expect(screen.getByText('Optimistic')).toBeInTheDocument()
-    expect(screen.getByText(/betting the price goes up/i)).toBeInTheDocument()
+    expect(screen.getByText('Signal')).toBeInTheDocument()
+    expect(screen.getByText('Go Long')).toBeInTheDocument()
+    expect(screen.getByText(/good time to go long/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/not price analysis, not advice/i),
+    ).toBeInTheDocument()
   })
 
-  it('calls a put-heavy ratio Protective and Betting down', () => {
+  it('signals Lean Long on a soft call tilt', () => {
     renderWithProviders(
-      <OptionsCard metrics={{ ...FULL, put_call_ratio: 1.42 }} />,
+      <OptionsCard metrics={{ ...FULL, put_call_ratio: 0.85 }} />,
     )
-    expect(screen.getByText('Protective')).toBeInTheDocument()
-    expect(screen.getByText('Betting down')).toBeInTheDocument()
-    expect(screen.getByText(/protecting against a fall/i)).toBeInTheDocument()
+    expect(screen.getByText('Lean Long')).toBeInTheDocument()
+    expect(screen.getByText(/mildly favours going long/i)).toBeInTheDocument()
   })
 
-  it('calls a near-parity ratio Balanced and Split', () => {
+  it('signals Go Short on a decisive put tilt, with Betting down on the tile', () => {
+    renderWithProviders(
+      <OptionsCard metrics={{ ...FULL, put_call_ratio: 1.62 }} />,
+    )
+    expect(screen.getByText('Go Short')).toBeInTheDocument()
+    expect(screen.getByText('Betting down')).toBeInTheDocument()
+    expect(screen.getByText(/good time to go short/i)).toBeInTheDocument()
+  })
+
+  it('signals Lean Short on a soft put tilt', () => {
+    renderWithProviders(
+      <OptionsCard metrics={{ ...FULL, put_call_ratio: 1.2 }} />,
+    )
+    expect(screen.getByText('Lean Short')).toBeInTheDocument()
+    expect(screen.getByText(/mildly favours going short/i)).toBeInTheDocument()
+  })
+
+  it('signals Neutral on a near-parity ratio, with Split on the tile', () => {
     renderWithProviders(
       <OptionsCard metrics={{ ...FULL, put_call_ratio: 1.0 }} />,
     )
-    expect(screen.getByText('Balanced')).toBeInTheDocument()
+    expect(screen.getByText('Neutral')).toBeInTheDocument()
     expect(screen.getByText('Split')).toBeInTheDocument()
+    expect(screen.getByText(/no edge/i)).toBeInTheDocument()
   })
 
   it('dashes missing figures without dropping their neighbours', () => {
@@ -110,9 +131,9 @@ describe('OptionsCard', () => {
     // No graded figure → no one-word call beside the dash.
     expect(screen.queryByText('Calm')).not.toBeInTheDocument()
     expect(screen.queryByText('Normal')).not.toBeInTheDocument()
-    // No ratio → no positioning chip or blurb.
-    expect(screen.queryByText('Positioning')).not.toBeInTheDocument()
-    expect(screen.queryByText('Optimistic')).not.toBeInTheDocument()
+    // No ratio → no signal chip or blurb.
+    expect(screen.queryByText('Signal')).not.toBeInTheDocument()
+    expect(screen.queryByText('Go Long')).not.toBeInTheDocument()
   })
 
   it('shows a fallback when every figure is null', () => {
