@@ -662,6 +662,50 @@ export function clampToRegularHours(series: CandleSeries): CandleSeries {
   return { ...series, candles, count: candles.length }
 }
 
+/**
+ * Slice an intraday series down to its final session's bars. The regular
+ * 9:30–4:00 ET session always sits inside a single UTC calendar day, so after
+ * the regular-hours clamp a bar's UTC date identifies its session.
+ */
+export function lastSessionOnly(series: CandleSeries): CandleSeries {
+  const last = series.candles[series.candles.length - 1]
+  if (!last) return series
+  const utcDay = (t: number) => Math.floor(t / 86_400)
+  const candles = series.candles.filter(
+    (c) => utcDay(c.time) === utcDay(last.time),
+  )
+  return { ...series, candles, count: candles.length }
+}
+
+/**
+ * The `range=1D` fallback: on days with no session (market holidays, weekends,
+ * pre-open mornings) the API has no bars for "today" and 404s. Pull the past
+ * week of bars instead and keep only the most recent session's, so the chart
+ * shows the last close rather than an error.
+ */
+async function getLastSessionCandles(
+  symbol: string,
+  timeframe: Timeframe,
+  signal?: AbortSignal,
+): Promise<CandleSeries> {
+  const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const qs = new URLSearchParams({ timeframe, start })
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/candles?${qs}`,
+    { signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as CandleSeries
+  if (!Array.isArray(data?.candles)) {
+    throw new ApiError(res.status, 'Malformed candle response')
+  }
+  const series = lastSessionOnly(clampToRegularHours(data))
+  if (series.candles.length === 0) {
+    throw new ApiError(404, `No recent candle data for '${symbol}'.`)
+  }
+  return series
+}
+
 /** Fetch the candlestick series for a ticker over a range/timeframe. */
 export async function getCandles(
   symbol: string,
@@ -686,7 +730,14 @@ export async function getCandles(
     `${API_BASE}/stocks/${encodeURIComponent(symbol)}/candles?${qs}`,
     { signal: opts.signal },
   )
-  if (!res.ok) throw await toApiError(res)
+  if (!res.ok) {
+    // `range=1D` means "today's session", which doesn't exist on closed days —
+    // fall back to the most recent session instead of surfacing the 404.
+    if (range === '1D' && res.status === 404) {
+      return getLastSessionCandles(symbol, timeframe, opts.signal)
+    }
+    throw await toApiError(res)
+  }
   const data = (await res.json()) as CandleSeries
   if (!Array.isArray(data?.candles)) {
     throw new ApiError(res.status, 'Malformed candle response')
