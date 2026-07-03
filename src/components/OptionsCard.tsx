@@ -2,9 +2,11 @@ import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import {
   optionsLevel,
   optionsSentiment,
+  optionsSignal,
   type OptionsLevel,
   type OptionsMetrics,
   type OptionsSentiment,
+  type OptionsSignal,
 } from '@/lib/api'
 
 // Amber for every unremarkable middle read — matches the RSI/Profitability/PEG
@@ -30,38 +32,53 @@ const LEVEL_WORDS: Record<
   insurance_cost: { low: 'Cheap', mid: 'Fair', high: 'Pricey' },
 }
 
-// Per-lean chip label, colour, one-word tile call, and plain-language blurb.
-// Calls dominating reads green (upside bets), puts dominating red (downside
-// cover), parity amber.
-const SENTIMENT: Record<
-  OptionsSentiment,
-  { label: string; color: string; word: string; blurb: string }
-> = {
-  optimistic: {
-    label: 'Optimistic',
+// One-word tile call and colour per put/call lean. Calls dominating reads
+// green (upside bets), puts dominating red (downside cover), parity amber.
+const SENTIMENT: Record<OptionsSentiment, { color: string; word: string }> = {
+  optimistic: { color: 'success.main', word: 'Betting up' },
+  balanced: { color: MID_COLOR, word: 'Split' },
+  protective: { color: 'error.main', word: 'Betting down' },
+}
+
+// Per-signal chip colour and plain-language blurb: what today's flow says
+// about going long or short. Longs read green, shorts red, no-edge amber.
+const SIGNAL: Record<OptionsSignal, { color: string; blurb: string }> = {
+  'Go Long': {
     color: 'success.main',
-    word: 'Betting up',
     blurb:
-      'Most traders are betting the price goes up — few are paying for ' +
-      'protection against a fall.',
+      'Up bets heavily outnumber down bets today — the options flow says ' +
+      'this is a good time to go long.',
   },
-  balanced: {
-    label: 'Balanced',
+  'Lean Long': {
+    color: 'success.main',
+    blurb:
+      'Up bets outnumber down bets, but not decisively — the options flow ' +
+      'mildly favours going long.',
+  },
+  Neutral: {
     color: MID_COLOR,
-    word: 'Split',
     blurb:
-      'Up bets and down bets are about even — traders have no clear lean ' +
-      'either way.',
+      'Up bets and down bets are about even — the options flow gives no ' +
+      'edge for going long or short today.',
   },
-  protective: {
-    label: 'Protective',
+  'Lean Short': {
     color: 'error.main',
-    word: 'Betting down',
     blurb:
-      'Most traders are protecting against a fall rather than betting the ' +
-      'price goes up.',
+      'Down bets outnumber up bets, but not decisively — the options flow ' +
+      'mildly favours going short.',
+  },
+  'Go Short': {
+    color: 'error.main',
+    blurb:
+      'Down bets heavily outnumber up bets today — the options flow says ' +
+      'this is a good time to go short.',
   },
 }
+
+// The signal follows today's flow only — worth saying out loud on a card that
+// hands out the words "long" and "short".
+const DISCLAIMER =
+  "A rough read of one day's options flow — not price analysis, not advice."
 
 /** Plain percent, e.g. 30.01 → "30.0%". */
 const fmtPct = (n: number) => `${n.toFixed(1)}%`
@@ -159,7 +176,9 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
     put_call_ratio: pcr,
   } = metrics
   const sentiment = optionsSentiment(pcr)
-  const meta = sentiment ? SENTIMENT[sentiment] : null
+  const lean = sentiment ? SENTIMENT[sentiment] : null
+  const signal = optionsSignal(pcr)
+  const call = signal ? SIGNAL[signal] : null
   const ivLevel = optionsLevel('implied_volatility', iv)
   const moveLevel = optionsLevel('expected_move', move)
   const insuranceLevel = optionsLevel('insurance_cost', insurance)
@@ -183,7 +202,7 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
             </Typography>
           </Box>
 
-          {meta && (
+          {signal && call && (
             <Box sx={{ textAlign: 'right' }}>
               <Typography
                 variant="caption"
@@ -194,7 +213,7 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
                   display: 'block',
                 }}
               >
-                Positioning
+                Signal
               </Typography>
               <Box
                 sx={{
@@ -204,15 +223,15 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
                   py: 0.5,
                   borderRadius: 2,
                   border: '1px solid',
-                  borderColor: meta.color,
-                  color: meta.color,
+                  borderColor: call.color,
+                  color: call.color,
                   bgcolor: 'action.hover',
                   fontWeight: 700,
                   fontSize: '1rem',
                   letterSpacing: '0.02em',
                 }}
               >
-                {meta.label}
+                {signal}
               </Box>
             </Box>
           )}
@@ -269,19 +288,19 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
               <Stat
                 label="Up or down bets?"
                 value={pcr == null ? '—' : fmtRatio(pcr)}
-                word={meta?.word ?? null}
-                color={meta?.color}
+                word={lean?.word ?? null}
+                color={lean?.color}
                 sub="down bets traded per up bet today (put/call ratio)"
               />
             </Box>
 
-            {meta && (
+            {call && (
               <Typography
                 variant="body2"
                 color="text.secondary"
                 sx={{ mt: 2.5 }}
               >
-                {meta.blurb}
+                {call.blurb} {DISCLAIMER}
               </Typography>
             )}
           </>

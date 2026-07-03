@@ -369,6 +369,49 @@ export function optionsLevel(
   return 'mid'
 }
 
+/**
+ * A five-step long/short call read off the options flow, most to least
+ * bullish. Deliberately the "Go / Lean" vocabulary rather than RSI's
+ * Buy/Sell so the two cards never read as the same signal — this one follows
+ * where option traders' money is going today, nothing about price levels.
+ */
+export type OptionsSignal =
+  | 'Go Long'
+  | 'Lean Long'
+  | 'Neutral'
+  | 'Lean Short'
+  | 'Go Short'
+
+/**
+ * Put/call cut-offs for the strong calls, either side of the balanced band
+ * (PCR_BALANCED_MARGIN). Below 0.7 calls outnumber puts ~3:2 or better — a
+ * decisive bullish tilt in today's flow — and the mirror ratio above 1.4
+ * (1/0.7) is a decisively protective book. Between a strong edge and the
+ * balanced band the flow leans without conviction, so the call softens to
+ * "Lean". Follow-the-flow rules of thumb, NOT contrarian and NOT symbol-aware
+ * — the card frames it as a rough guide, not advice.
+ */
+export const PCR_STRONG_LONG = 0.7
+export const PCR_STRONG_SHORT = 1.4
+
+/**
+ * Map a put/call ratio to a long/short call. Follows the flow: heavy call
+ * buying reads long, heavy put buying short, the balanced band around parity
+ * neutral, with the strong edges reserved for a decisive tilt (the cut-off
+ * values themselves count as the softer "Lean"). Returns null when there's no
+ * ratio to judge.
+ */
+export function optionsSignal(
+  putCallRatio: number | null,
+): OptionsSignal | null {
+  if (putCallRatio == null) return null
+  if (putCallRatio < PCR_STRONG_LONG) return 'Go Long'
+  if (putCallRatio < 1 - PCR_BALANCED_MARGIN) return 'Lean Long'
+  if (putCallRatio <= 1 + PCR_BALANCED_MARGIN) return 'Neutral'
+  if (putCallRatio <= PCR_STRONG_SHORT) return 'Lean Short'
+  return 'Go Short'
+}
+
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
