@@ -14,25 +14,26 @@ import {
 } from '@tanstack/react-query'
 import {
   ApiError,
+  getAnnualEarnings,
   getCandles,
-  getEarnings,
-  getOptionsMetrics,
+  getQuarterlyEarnings,
   getRecommendations,
   getRsi,
   getScreener,
   getSectors,
-  getStock,
-  getStocks,
+  getTickerCard,
+  getTickerCards,
   type AnalystRecommendations,
+  type AnnualEarnings,
   type CandleSeries,
   type ChartRange,
-  type EarningsHistory,
-  type OptionsMetrics,
+  type QuarterlyEarnings,
   type RsiSeries,
   type ScreenerResult,
   type Sector,
-  type Stock,
   type StockIndex,
+  type TickerCard,
+  type TickerCardInclude,
 } from '@/lib/api'
 
 /**
@@ -46,31 +47,38 @@ export function errorMessage(
   return error instanceof ApiError ? error.message : fallback
 }
 
-/** Live snapshot for one ticker. Idle (no request) until `symbol` is set. */
-export function useStock(
-  symbol: string | null | undefined,
-): UseQueryResult<Stock> {
+/**
+ * The quote card for one ticker, with the requested opt-in blocks attached.
+ * Idle (no request) until `ticker` is set. The include list is part of the
+ * query key, so a card with different blocks is cached apart.
+ */
+export function useTickerCard(
+  ticker: string | null | undefined,
+  include: TickerCardInclude[] = [],
+): UseQueryResult<TickerCard> {
   return useQuery({
-    queryKey: ['stock', symbol],
-    queryFn: ({ signal }) => getStock(symbol as string, { signal }),
-    enabled: !!symbol,
+    queryKey: ['ticker-card', ticker, include],
+    queryFn: ({ signal }) =>
+      getTickerCard(ticker as string, { include, signal }),
+    enabled: !!ticker,
   })
 }
 
 /**
- * Snapshots for several tickers at once, order preserved. A symbol that fails
- * resolves to `null` rather than failing the batch (see `getStocks`), so this
- * query effectively never errors. Pass `refetchInterval` for a self-refreshing
- * strip; pass `enabled: false` to hold the request.
+ * Lean quote cards for several tickers at once, order preserved. A ticker that
+ * fails resolves to `null` rather than failing the batch (see
+ * `getTickerCards`), so this query effectively never errors. Pass
+ * `refetchInterval` for a self-refreshing strip; pass `enabled: false` to hold
+ * the request.
  */
-export function useStocks(
-  symbols: string[],
+export function useTickerCards(
+  tickers: string[],
   opts: { refetchInterval?: number; enabled?: boolean } = {},
-): UseQueryResult<(Stock | null)[]> {
+): UseQueryResult<(TickerCard | null)[]> {
   return useQuery({
-    queryKey: ['stocks', symbols],
-    queryFn: ({ signal }) => getStocks(symbols, { signal }),
-    enabled: opts.enabled ?? symbols.length > 0,
+    queryKey: ['ticker-cards', tickers],
+    queryFn: ({ signal }) => getTickerCards(tickers, { signal }),
+    enabled: opts.enabled ?? tickers.length > 0,
     refetchInterval: opts.refetchInterval,
   })
 }
@@ -144,29 +152,32 @@ export function useRsi(
   })
 }
 
-/** Recent quarterly earnings for a ticker. Idle until `symbol` is set. */
-export function useEarnings(
+/**
+ * The consolidated quarterly earnings series (reported + upcoming quarters in
+ * one call) for a ticker — what the earnings card's beat charts run on.
+ * Idle until `symbol` is set.
+ */
+export function useQuarterlyEarnings(
   symbol: string | null | undefined,
-  limit = 8,
-): UseQueryResult<EarningsHistory> {
+): UseQueryResult<QuarterlyEarnings> {
   return useQuery({
-    queryKey: ['earnings', symbol, limit],
-    queryFn: ({ signal }) => getEarnings(symbol as string, { limit, signal }),
+    queryKey: ['earnings-quarterly', symbol],
+    queryFn: ({ signal }) => getQuarterlyEarnings(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }
 
 /**
- * Options-market metrics for a ticker (IV, expected move, insurance cost,
- * put/call ratio). `data` is null when the symbol has no priceable options.
- * Idle until `symbol` is set.
+ * The annual earnings series (reported + upcoming fiscal years in one call) for
+ * a ticker — the yearly counterpart of `useQuarterlyEarnings`. Idle until
+ * `symbol` is set.
  */
-export function useOptionsMetrics(
+export function useAnnualEarnings(
   symbol: string | null | undefined,
-): UseQueryResult<OptionsMetrics | null> {
+): UseQueryResult<AnnualEarnings> {
   return useQuery({
-    queryKey: ['options', symbol],
-    queryFn: ({ signal }) => getOptionsMetrics(symbol as string, { signal }),
+    queryKey: ['earnings-annual', symbol],
+    queryFn: ({ signal }) => getAnnualEarnings(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

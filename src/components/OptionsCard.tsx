@@ -107,11 +107,7 @@ function Stat({
   )
 }
 
-export default function OptionsCard({
-  metrics,
-}: {
-  metrics: OptionsMetrics
-}) {
+export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
   const {
     implied_volatility: iv,
     expected_move_percent: move,

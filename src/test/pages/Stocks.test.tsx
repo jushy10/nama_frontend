@@ -2,25 +2,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import Stocks from '@/pages/Stocks'
 
+// The ticker card (/stocks/ticker/{ticker}) with every opt-in block attached
+// — the page's one snapshot request.
 const sample = {
-  symbol: 'NVDA',
+  ticker: 'NVDA',
   name: 'NVIDIA Corporation Common Stock',
   exchange: 'NASDAQ',
   price: 209.97,
   change: 5.27,
   change_percent: 2.57,
-  open: 207.4,
-  high: 211.385,
-  low: 206.5,
-  previous_close: 204.7,
-  volume: 4026083,
-  bid: 210.0,
-  ask: 231.8,
-  spread: 21.8,
-  as_of: '2026-06-18T20:45:23.729548Z',
   market_cap: 3_210_000_000_000,
-  dividend_per_share: 0.04,
-  dividend_yield: 0.02,
+  dividend: { yield_percentage: 0.02, per_share: 0.04 },
   performance: {
     '1w': 3.1,
     '1m': -1.2,
@@ -29,7 +21,13 @@ const sample = {
     ytd: 22.3,
     '1y': 40.1,
   },
-  drawdown_from_high: -24.5,
+  metrics: {
+    peg: 1.19,
+    forward_peg: 1.42,
+    gross_margin: 47.9,
+    operating_margin: 32.6,
+    net_margin: 27.2,
+  },
 }
 
 const candlesSample = {
@@ -76,51 +74,114 @@ const rsiSample = {
   ],
 }
 
-const earningsSample = {
+// The consolidated quarterly series (oldest → newest): two reported quarters
+// plus two upcoming ones carrying the forward EPS/revenue consensus. Drives
+// the beat charts + the next-report chip.
+const quarterlyEarningsSample = {
   symbol: 'NVDA',
   count: 4,
-  beats: 3,
-  scored: 4,
-  beat_rate: 75.0,
-  metrics: {
-    eps: 8.27,
-    eps_growth_yoy: 29.0,
-    revenue_growth_yoy: 12.8,
-    gross_margin: 47.9,
-    operating_margin: 32.6,
-    net_margin: 27.2,
-    roe: 146.7,
-    roic: null,
-    payout_ratio: 12.7,
-  },
-  next_report: {
-    report_date: '2026-07-30',
-    fiscal_year: 2027,
-    fiscal_quarter: 2,
-    eps_estimate: 1.05,
-    revenue_estimate: 89_000_000_000,
-    session: 'amc',
-  },
+  reported_count: 2,
+  upcoming_count: 2,
   quarters: [
     {
-      period: '2026-05-28',
-      fiscal_year: 2027,
-      fiscal_quarter: 1,
-      actual: 0.96,
-      estimate: 0.92,
-      surprise: 0.04,
-      surprise_percent: 4.3,
-      beat: true,
-    },
-    {
-      period: '2025-11-20',
       fiscal_year: 2026,
       fiscal_quarter: 3,
-      actual: 0.81,
-      estimate: 0.75,
-      surprise: 0.06,
-      surprise_percent: 8.0,
+      period_end: '2025-11-20',
+      report_date: '2025-11-19',
+      eps_actual: 0.81,
+      eps_estimate: 0.75,
+      eps_surprise: 0.06,
+      eps_surprise_percent: 8.0,
+      revenue_estimate: null,
+      revenue_actual: null,
       beat: true,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 1,
+      period_end: '2026-05-28',
+      report_date: '2026-05-27',
+      eps_actual: 0.96,
+      eps_estimate: 0.92,
+      eps_surprise: 0.04,
+      eps_surprise_percent: 4.3,
+      revenue_estimate: null,
+      revenue_actual: null,
+      beat: true,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 2,
+      period_end: '2026-08-27',
+      report_date: '2026-07-30',
+      eps_actual: null,
+      eps_estimate: 1.05,
+      eps_surprise: null,
+      eps_surprise_percent: null,
+      revenue_estimate: 89_000_000_000,
+      revenue_actual: null,
+      beat: null,
+      is_reported: false,
+    },
+    {
+      fiscal_year: 2027,
+      fiscal_quarter: 3,
+      period_end: '2026-11-26',
+      report_date: '2026-10-29',
+      eps_actual: null,
+      eps_estimate: 1.18,
+      eps_surprise: null,
+      eps_surprise_percent: null,
+      revenue_estimate: 95_400_000_000,
+      revenue_actual: null,
+      beat: null,
+      is_reported: false,
+    },
+  ],
+}
+
+// The annual series (oldest → newest): two reported fiscal years plus one
+// upcoming (estimated) one. Drives the card's Quarterly/Annual toggle.
+const annualEarningsSample = {
+  symbol: 'NVDA',
+  count: 3,
+  reported_count: 2,
+  upcoming_count: 1,
+  years: [
+    {
+      fiscal_year: 2025,
+      period_end: '2025-01-31',
+      eps_actual: 2.94,
+      eps_estimate: null,
+      revenue_actual: 130_497_000_000,
+      revenue_estimate: null,
+      net_income: 72_880_000_000,
+      eps_actual_consensus: null,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2026,
+      period_end: '2026-01-31',
+      eps_actual: 4.9,
+      eps_estimate: null,
+      revenue_actual: 215_938_000_000,
+      revenue_estimate: null,
+      net_income: 120_067_000_000,
+      eps_actual_consensus: null,
+      is_reported: true,
+    },
+    {
+      fiscal_year: 2027,
+      period_end: '2027-01-25',
+      eps_actual: null,
+      eps_estimate: 8.97,
+      revenue_actual: null,
+      revenue_estimate: 392_638_707_720,
+      net_income: null,
+      eps_actual_consensus: null,
+      is_reported: false,
     },
   ],
 }
@@ -148,8 +209,9 @@ function stubFetch(
   stock: unknown,
   candles: unknown,
   rsi: unknown = rsiSample,
-  earnings: unknown = earningsSample,
   recommendations: unknown = recommendationsSample,
+  quarterly: unknown = quarterlyEarningsSample,
+  annual: unknown = annualEarningsSample,
 ) {
   vi.stubGlobal(
     'fetch',
@@ -157,13 +219,15 @@ function stubFetch(
       const u = String(url)
       const body = u.includes('/recommendations')
         ? recommendations
-        : u.includes('/earnings')
-          ? earnings
-          : u.includes('/rsi')
-            ? rsi
-            : u.includes('/candles')
-              ? candles
-              : stock
+        : u.includes('/earnings/quarterly')
+          ? quarterly
+          : u.includes('/earnings/annual')
+            ? annual
+            : u.includes('/rsi')
+              ? rsi
+              : u.includes('/candles')
+                ? candles
+                : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -187,9 +251,12 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'NVDA' }),
     ).toBeInTheDocument()
     expect(screen.getByText('$209.97')).toBeInTheDocument()
-    // The symbol is normalized to upper-case before the request.
+    // The symbol is normalized to upper-case before the request, which goes to
+    // the ticker-card endpoint with every opt-in block attached.
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/NVDA'),
+      expect.stringContaining(
+        '/stocks/ticker/NVDA?include=dividend,performance,metrics',
+      ),
       expect.anything(),
     )
 
@@ -207,24 +274,31 @@ describe('Stocks search', () => {
     // Volume was dropped from the snapshot card.
     expect(screen.queryByText('Volume')).not.toBeInTheDocument()
 
-    // Drawdown-from-high gets its own DCA card with a tiered buy call.
-    expect(screen.getByText('DCA Signal')).toBeInTheDocument()
-    expect(screen.getByText('24.5%')).toBeInTheDocument()
-    expect(screen.getByText('Moderate Buy')).toBeInTheDocument()
-
     // Net margin drives a profitability verdict card; 27.2% reads Highly
-    // Profitable. (Rides the earnings query, so await its heading.)
+    // Profitable. (Rides the ticker card's metrics block.)
     expect(
       await screen.findByRole('heading', { name: 'Profitability' }),
     ).toBeInTheDocument()
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
 
-    // The candlestick chart loads from the candles endpoint.
+    // The PEG card rides beside it: 1.19 sits in the 1–2 middle, so it reads
+    // Fairly Priced. The endpoint serves the ratio without its inputs, so the
+    // figure carries the generic label.
+    expect(
+      screen.getByRole('heading', { name: 'PEG Ratio' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('1.19')).toBeInTheDocument()
+    expect(screen.getByText('Fairly Priced')).toBeInTheDocument()
+    expect(screen.getByText('P/E per point of EPS growth')).toBeInTheDocument()
+
+    // The candlestick chart loads from the candles endpoint, and the header
+    // carries the range's move: first open (200) → last close (209.97).
     expect(
       await screen.findByRole('heading', { name: /price chart/i }),
     ).toBeInTheDocument()
     expect(await screen.findByText('Vol')).toBeInTheDocument()
+    expect(screen.getByText(/\+4\.9[89]%/)).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/candles'),
       expect.anything(),
@@ -260,11 +334,10 @@ describe('Stocks search', () => {
     // $0.96 is the newest quarter's actual — shown both on the bar and in the
     // hover detail line, so match all occurrences.
     expect(screen.getAllByText('$0.96').length).toBeGreaterThan(0)
-    // Trailing earnings metrics relocated from the stock endpoint render as tiles.
-    expect(screen.getByText('Trailing metrics')).toBeInTheDocument()
-    expect(screen.getByText('Net Margin')).toBeInTheDocument()
-    // 27.2% shows on this tile and as the profitability card's headline figure.
-    expect(screen.getAllByText('27.2%').length).toBeGreaterThan(0)
+    // The tile grids are gone from the earnings card — the margin read lives
+    // on the Profitability card and PEG on its own card.
+    expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
+    expect(screen.queryByText('Financial health')).not.toBeInTheDocument()
     // The next-earnings consensus plots forward "expected" bars on the EPS and
     // revenue charts, labelled with the forecast quarter (Q2 '27) and the
     // consensus value beneath — the report date is no longer drawn on the bars.
@@ -272,6 +345,18 @@ describe('Stocks search', () => {
     // Round billions render "$89B" or "$89.0B" depending on the ICU version.
     expect(screen.getAllByText(/\$89(\.0)?B/).length).toBeGreaterThan(0)
     expect(screen.getAllByText("Q2 '27").length).toBeGreaterThan(0)
+    // Both upcoming quarters the endpoint returns plot as their own forecast
+    // column, not just the immediate next report.
+    expect(screen.getAllByText("Q3 '27").length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$1.18').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/\$95\.4B/).length).toBeGreaterThan(0)
+    // Upcoming columns carry the sequential (QoQ) growth their consensus
+    // implies: Q2'27E over the reported Q1'27 (1.05/0.96 → +9.4%), Q3'27E
+    // chained over Q2'27's own consensus (1.18/1.05 → +12.4%), and Q3'27E
+    // revenue over Q2'27E's estimate (95.4B/89B → +7.2%).
+    expect(screen.getByText('+9.4%')).toBeInTheDocument()
+    expect(screen.getByText('+12.4%')).toBeInTheDocument()
+    expect(screen.getByText('+7.2%')).toBeInTheDocument()
     expect(screen.queryByText('Est. Jul 30')).not.toBeInTheDocument()
     // The hover detail line defaults to the latest quarter (est 0.92 → act 0.96).
     expect(screen.getByText('$0.92')).toBeInTheDocument()
@@ -279,6 +364,40 @@ describe('Stocks search', () => {
       expect.stringContaining('/stocks/NVDA/earnings'),
       expect.anything(),
     )
+
+    // The forward P/E card anchors on the last completed fiscal year (price
+    // ÷ FY26's reported EPS: 209.97 / 4.90 = 42.85) and walks to the
+    // analyst-expected multiple: price ÷ the FY27 consensus EPS
+    // (209.97 / 8.97 = 23.41). The quarter walk steps to the rolling 12
+    // months of EPS ending Q3 '27 (209.97 / 4.00 = 52.49), shown on its tile
+    // and chart bar.
+    expect(
+      screen.getByRole('heading', { name: 'Forward P/E' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('P/E FY26')).toBeInTheDocument()
+    expect(screen.getAllByText('42.85').length).toBeGreaterThan(0)
+    // The ticker card carries no trailing multiple, so no Current P/E tile
+    // threads into the walks.
+    expect(screen.queryByText('Current P/E')).not.toBeInTheDocument()
+    expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
+    // The FY27 multiple shows on its tile and again on the fiscal-year chart.
+    expect(screen.getAllByText('23.41').length).toBeGreaterThan(0)
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q3 '27")).toBeInTheDocument()
+    expect(screen.getAllByText('52.49').length).toBeGreaterThan(0)
+
+    // The annual series loads too, surfacing a Quarterly/Annual toggle on the
+    // card; switching shows the fiscal years — reported EPS/revenue plus the
+    // upcoming year's consensus as a forecast column.
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/NVDA/earnings/annual'),
+      expect.anything(),
+    )
+    await user.click(await screen.findByRole('button', { name: 'Annual' }))
+    expect(screen.getAllByText('FY26').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$4.90').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('FY27').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('$392.6B').length).toBeGreaterThan(0)
   })
 
   it('deep-links to a snapshot from the ?symbol= query param', async () => {
@@ -290,7 +409,7 @@ describe('Stocks search', () => {
       await screen.findByRole('heading', { name: 'NVDA' }),
     ).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/NVDA'),
+      expect.stringContaining('/stocks/ticker/NVDA'),
       expect.anything(),
     )
   })

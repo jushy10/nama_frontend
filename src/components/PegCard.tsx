@@ -1,94 +1,92 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
-import { profitabilityVerdict, type ProfitabilityVerdict } from '@/lib/api'
+import { pegVerdict, type PegVerdict } from '@/lib/api'
 
-// Amber for the cautionary "Marginally Profitable" — matches the RSI card's
-// neutral middle call.
-const THIN_COLOR = '#fbbf24' // amber-400
+// Amber for the unremarkable 1–2 middle — matches the Profitability card's
+// cautionary tier and the RSI card's neutral call.
+const FAIR_COLOR = '#fbbf24' // amber-400
 
-// The gauge spans -20% → +40% net margin: wide enough to seat a loss-maker and
-// a fat-margin software name, with 0 (break-even) the line that splits
-// profitable from not.
-const MIN = -20
-const MAX = 40
+// The gauge spans 0 → 3×. PEG is only served for positive earnings and growth,
+// so it starts at 0; 3 comfortably seats the "well past pricey" tail (anything
+// beyond clamps to the right edge), with 1 the Lynch fair-value line.
+const MIN = 0
+const MAX = 3
 const SPAN = MAX - MIN
 
-// Per-verdict colour, gauge-track tint, and the plain-language blurb. Profit
-// reads green (deepening with the margin), break-even-ish amber, a loss red.
+// Per-verdict colour, gauge-track tint, and the plain-language blurb. Cheap
+// reads green, the middle amber, pricey red — Lynch's under-1 / over-2 bands.
 const VERDICT: Record<
-  ProfitabilityVerdict,
+  PegVerdict,
   { color: string; track: string; blurb: string }
 > = {
-  'Highly Profitable': {
-    color: 'success.main',
-    track: 'rgba(52,211,153,0.45)',
-    blurb:
-      'Keeps more than 20¢ of profit on every dollar of sales — an ' +
-      'exceptional net margin with plenty of cushion.',
-  },
-  Profitable: {
+  'Cheap for Its Growth': {
     color: 'success.main',
     track: 'rgba(52,211,153,0.3)',
     blurb:
-      'Keeps a double-digit share of revenue as profit — a healthy, ' +
-      'comfortable net margin.',
+      'Earnings grew faster than the multiple the market pays for them — ' +
+      'the price looks cheap against how quickly profits are rising.',
   },
-  'Marginally Profitable': {
-    color: THIN_COLOR,
+  'Fairly Priced': {
+    color: FAIR_COLOR,
     track: 'rgba(251,191,36,0.28)',
     blurb:
-      'Makes money, but keeps under 10¢ per sales dollar — a thin net ' +
-      'margin with little room for error.',
+      'The multiple runs one to two times the earnings growth behind it — ' +
+      'the price is roughly keeping pace with the profit trend.',
   },
-  Unprofitable: {
+  'Pricey for Its Growth': {
     color: 'error.main',
     track: 'rgba(248,113,113,0.32)',
     blurb:
-      'Spends more than it earns — no bottom-line profit on its current ' +
-      'revenue.',
+      'The multiple is more than twice the earnings growth behind it — ' +
+      'the price has run well ahead of how quickly profits are rising.',
+  },
+  'Not Meaningful': {
+    color: 'error.main',
+    track: 'rgba(248,113,113,0.32)',
+    blurb:
+      'A zero-or-negative ratio means losses or shrinking earnings — PEG ' +
+      "can't grade a price against growth that isn't there.",
   },
 }
 
-/** Net margin as a signed percent, e.g. 25.34 → "25.3%", -4.2 → "-4.2%". */
-const fmtMargin = (n: number) => `${n.toFixed(1)}%`
+/** PEG to two decimals, e.g. 1.19 → "1.19". */
+const fmtPeg = (n: number) => n.toFixed(2)
 
-// Where a margin sits on the 0–100 track (clamped to the gauge's range).
-const pos = (margin: number) =>
-  ((Math.max(MIN, Math.min(MAX, margin)) - MIN) / SPAN) * 100
-// Track position of a margin edge (break-even at 0, the tier cuts at 10/20).
-const edge = (margin: number) => ((margin - MIN) / SPAN) * 100
+// Where a PEG sits on the 0–100 track (clamped to the gauge's range).
+const pos = (peg: number) =>
+  ((Math.max(MIN, Math.min(MAX, peg)) - MIN) / SPAN) * 100
+// Track position of a band edge (fair value at 1, the pricey cut at 2).
+const edge = (peg: number) => ((peg - MIN) / SPAN) * 100
 
-/** The -20→+40% track with its loss / thin / healthy zones, a bold break-even
- *  divider at 0, and a marker at the current margin. */
-function Gauge({ margin, color }: { margin: number; color: string }) {
-  const breakeven = edge(0)
+/** The 0→3× track with its cheap / fair / pricey zones, a bold fair-value
+ *  divider at 1, and a marker at the current ratio. */
+function Gauge({ peg, color }: { peg: number; color: string }) {
+  const fairValue = edge(1)
   return (
     <Box sx={{ mt: 2.5 }}>
       <Box
         role="img"
-        aria-label={`Net margin of ${fmtMargin(margin)}`}
+        aria-label={`PEG ratio of ${fmtPeg(peg)}`}
         sx={{
           position: 'relative',
           height: 8,
           borderRadius: 4,
-          // Red loss band up to break-even, then amber thin-profit, then greens
-          // deepening through the healthy and exceptional zones.
+          // Green cheap band up to the fair-value line at 1, amber through the
+          // unremarkable middle, then red once the price outruns the growth.
           background: `linear-gradient(to right,
-            ${VERDICT.Unprofitable.track} 0%,
-            ${VERDICT.Unprofitable.track} ${breakeven}%,
-            ${VERDICT['Marginally Profitable'].track} ${breakeven}%,
-            ${VERDICT['Marginally Profitable'].track} ${edge(10)}%,
-            ${VERDICT.Profitable.track} ${edge(10)}%,
-            ${VERDICT.Profitable.track} ${edge(20)}%,
-            ${VERDICT['Highly Profitable'].track} ${edge(20)}%,
-            ${VERDICT['Highly Profitable'].track} 100%)`,
+            ${VERDICT['Cheap for Its Growth'].track} 0%,
+            ${VERDICT['Cheap for Its Growth'].track} ${fairValue}%,
+            ${VERDICT['Fairly Priced'].track} ${fairValue}%,
+            ${VERDICT['Fairly Priced'].track} ${edge(2)}%,
+            ${VERDICT['Pricey for Its Growth'].track} ${edge(2)}%,
+            ${VERDICT['Pricey for Its Growth'].track} 100%)`,
         }}
       >
-        {/* break-even divider — the line that splits profit from loss */}
+        {/* fair-value divider — where a point of P/E buys a point of growth */}
         <Box
           sx={{
             position: 'absolute',
             top: -3,
-            left: `${breakeven}%`,
+            left: `${fairValue}%`,
             transform: 'translateX(-50%)',
             width: 2,
             height: 14,
@@ -97,12 +95,12 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
             opacity: 0.6,
           }}
         />
-        {/* current-margin marker */}
+        {/* current-ratio marker */}
         <Box
           sx={{
             position: 'absolute',
             top: -4,
-            left: `${pos(margin)}%`,
+            left: `${pos(peg)}%`,
             transform: 'translateX(-50%)',
             width: 3,
             height: 16,
@@ -115,15 +113,15 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
       </Box>
       <Box sx={{ position: 'relative', mt: 0.75, height: 28 }}>
         {[
-          { v: `${MIN}%`, at: 0, anchor: 'left' as const, sub: null },
+          { v: '0', at: 0, anchor: 'left' as const, sub: null },
           {
-            v: '0%',
-            at: breakeven,
+            v: '1',
+            at: fairValue,
             anchor: 'center' as const,
-            sub: 'break-even',
+            sub: 'fair value',
           },
-          { v: '+20%', at: edge(20), anchor: 'center' as const, sub: null },
-          { v: `+${MAX}%`, at: 100, anchor: 'right' as const, sub: null },
+          { v: '2', at: edge(2), anchor: 'center' as const, sub: null },
+          { v: '3+', at: 100, anchor: 'right' as const, sub: null },
         ].map(({ v, at, anchor, sub }) => (
           <Box
             key={v}
@@ -173,12 +171,14 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
   )
 }
 
-export default function ProfitabilityCard({
-  netMargin,
-}: {
-  netMargin: number | null
-}) {
-  const verdict = profitabilityVerdict(netMargin)
+/**
+ * A growth-adjusted valuation verdict from the trailing PEG ratio (trailing
+ * P/E ÷ trailing EPS growth), off the ticker card's metrics block. The card
+ * gets the served ratio only — its inputs aren't served alongside it — so the
+ * figure carries a generic "what this is" line rather than the ratio math.
+ */
+export default function PegCard({ peg }: { peg: number | null }) {
+  const verdict = pegVerdict(peg)
   const meta = verdict ? VERDICT[verdict] : null
 
   return (
@@ -191,10 +191,10 @@ export default function ProfitabilityCard({
         >
           <Box>
             <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-              Profitability
+              PEG Ratio
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Trailing net margin
+              Trailing P/E ÷ EPS growth
             </Typography>
           </Box>
 
@@ -233,9 +233,10 @@ export default function ProfitabilityCard({
           )}
         </Stack>
 
-        {netMargin == null ? (
+        {peg == null ? (
           <Typography color="text.secondary" sx={{ mt: 2 }}>
-            No net-margin data to gauge profitability.
+            No PEG data — the ratio needs positive trailing earnings and EPS
+            growth.
           </Typography>
         ) : (
           <>
@@ -253,14 +254,14 @@ export default function ProfitabilityCard({
                   lineHeight: 1,
                 }}
               >
-                {fmtMargin(netMargin)}
+                {fmtPeg(peg)}
               </Typography>
               <Typography color="text.secondary" sx={{ fontWeight: 500 }}>
-                net profit margin
+                P/E per point of EPS growth
               </Typography>
             </Stack>
 
-            <Gauge margin={netMargin} color={meta?.color ?? 'text.secondary'} />
+            <Gauge peg={peg} color={meta?.color ?? 'text.secondary'} />
 
             {meta && (
               <Typography
@@ -271,6 +272,15 @@ export default function ProfitabilityCard({
                 {meta.blurb}
               </Typography>
             )}
+
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1 }}
+            >
+              Trailing PEG — uses the past year's reported EPS growth, not
+              analyst forecasts. A rough guide that varies by sector.
+            </Typography>
           </>
         )}
       </CardContent>

@@ -10,42 +10,50 @@ import {
   Container,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from '@mui/material'
-import { type ChartRange } from '@/lib/api'
+import {
+  quarterlyToEarningsHistory,
+  quarterlyUpcoming,
+  type ChartRange,
+  type TickerCardInclude,
+} from '@/lib/api'
 import {
   errorMessage,
+  useAnnualEarnings,
   useCandles,
-  useEarnings,
   useFiveYearReturn,
-  useOptionsMetrics,
+  useQuarterlyEarnings,
   useRecommendations,
   useRsi,
-  useStock,
+  useTickerCard,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
-import DcaCard from '@/components/DcaCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
+import PegCard from '@/components/PegCard'
 import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
+import ChartRangeToggle from '@/components/ChartRangeToggle'
+import RangeReturn from '@/components/RangeReturn'
 import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
+import ForwardPeCard from '@/components/ForwardPeCard'
 
-// Curated subset of the API's ranges — the ones worth a one-tap button.
-const RANGE_OPTIONS: ChartRange[] = [
-  '1D',
-  '5D',
-  '1M',
-  '3M',
-  '6M',
-  '1Y',
-  '5Y',
-  'YTD',
+// Every opt-in block the ticker-card endpoint serves: the snapshot card needs
+// the dividend, the Performance card the trailing returns, and the
+// Profitability/PEG cards the metrics.
+const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
+  'dividend',
+  'performance',
+  'metrics',
 ]
+
+// The options block rides its own request: pricing it walks the option chain
+// upstream, so keeping it out of SNAPSHOT_BLOCKS means a slow (or absent)
+// chain never delays the snapshot — the card just pops in when it resolves.
+const OPTIONS_BLOCKS: TickerCardInclude[] = ['options_metrics']
 
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
@@ -59,14 +67,23 @@ export default function Stocks() {
   // ride the *loaded* symbol, so they only fire once a snapshot resolves and a
   // bad ticker never kicks off four more doomed requests. Each hook aborts its
   // in-flight request when the symbol/range moves on.
-  const stockQuery = useStock(urlSymbol || null)
-  const loadedSymbol = stockQuery.data?.symbol ?? null
+  const stockQuery = useTickerCard(urlSymbol || null, SNAPSHOT_BLOCKS)
+  const loadedSymbol = stockQuery.data?.ticker ?? null
   const candleQuery = useCandles(loadedSymbol, range)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
-  const earningsQuery = useEarnings(loadedSymbol, 8)
-  const optionsQuery = useOptionsMetrics(loadedSymbol)
+  // The earnings card runs entirely off the consolidated quarterly endpoint;
+  // the profitability and PEG reads ride on the ticker card's `metrics` block
+  // (the legacy /earnings call is gone).
+  const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
+  // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
+  // if it fails the toggle simply doesn't appear, so no error state is shown.
+  const annualQuery = useAnnualEarnings(loadedSymbol)
+  // The options-market read (IV, expected move, insurance, put/call), served
+  // from the same ticker-card endpoint but as its own request (see
+  // OPTIONS_BLOCKS). Best-effort: no options coverage just hides the card.
+  const optionsQuery = useTickerCard(loadedSymbol, OPTIONS_BLOCKS)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -86,15 +103,20 @@ export default function Stocks() {
   const stock = stockQuery.data
 
   return (
-    <Container maxWidth="lg" sx={{ py: 6 }}>
+    // xl (not lg) so wide monitors actually get the side-by-side rows at a
+    // useful width instead of a 1200px column between big empty margins.
+    <Container maxWidth="xl" sx={{ py: 6 }}>
       <Typography
         variant="h4"
         component="h1"
-        sx={{ color: 'primary.light', fontWeight: 700 }}
+        sx={{ color: 'primary.light', fontWeight: 700, textAlign: 'center' }}
       >
         Stock Search
       </Typography>
-      <Typography color="text.secondary" sx={{ mt: 1, mb: 3 }}>
+      <Typography
+        color="text.secondary"
+        sx={{ mt: 1, mb: 3, textAlign: 'center' }}
+      >
         Enter a ticker symbol for a live snapshot and candlestick chart from
         Alpaca.
       </Typography>
@@ -104,7 +126,7 @@ export default function Stocks() {
         direction="row"
         spacing={1}
         onSubmit={onSubmit}
-        sx={{ maxWidth: 520 }}
+        sx={{ maxWidth: 520, mx: 'auto' }}
       >
         <TextField
           label="Ticker symbol"
@@ -140,7 +162,7 @@ export default function Stocks() {
         {stock && (
           <Stack spacing={3}>
             {/* Snapshot rides beside the Performance + RSI stack on desktop
-                (md+) and stacks on mobile; the chart-heavy cards below keep the
+                (md+) and stacks on mobile; the price chart below keeps the
                 full page width. */}
             <Box
               sx={{
@@ -177,20 +199,30 @@ export default function Stocks() {
               </Stack>
             </Box>
 
-            <DcaCard drawdown={stock.drawdown_from_high} />
-
-            {/* Bottom-line profitability from trailing net margin; rides the
-                earnings query's metrics, so it pops in once those resolve. */}
-            {earningsQuery.data?.metrics && (
-              <ProfitabilityCard
-                netMargin={earningsQuery.data.metrics.net_margin}
-              />
+            {/* Profitability and PEG share one row on desktop: "is it making
+                money?" beside "is the price fair for the growth?". Both ride
+                the card's metrics block, so they render with the rest;
+                auto-fit lets either take the full row on narrow screens. */}
+            {stock.metrics && (
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
+                  gap: 3,
+                  alignItems: 'stretch',
+                }}
+              >
+                <ProfitabilityCard netMargin={stock.metrics.net_margin} />
+                <PegCard peg={stock.metrics.peg} />
+              </Box>
             )}
 
-            {/* Options-market read (IV, expected move, insurance, put/call);
-                pops in once it resolves. `data` is null for symbols with no
-                priceable options, which quietly hides the card. */}
-            {optionsQuery.data && <OptionsCard metrics={optionsQuery.data} />}
+            {/* Options-market read; pops in once its own ticker-card request
+                resolves. A null block (no priceable options) hides the card. */}
+            {optionsQuery.data?.options_metrics && (
+              <OptionsCard metrics={optionsQuery.data.options_metrics} />
+            )}
 
             {recommendationsQuery.isLoading && (
               <Stack sx={{ alignItems: 'center', py: 2 }}>
@@ -220,33 +252,23 @@ export default function Stocks() {
                     mb: 2,
                   }}
                 >
-                  <Typography
-                    variant="h6"
-                    component="h2"
-                    sx={{ fontWeight: 600 }}
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: 'baseline' }}
                   >
-                    Price chart
-                  </Typography>
-                  <ToggleButtonGroup
-                    size="small"
-                    exclusive
-                    value={range}
-                    onChange={(_, value: ChartRange | null) =>
-                      value && setRange(value)
-                    }
-                    aria-label="Chart range"
-                    sx={{ flexWrap: 'wrap' }}
-                  >
-                    {RANGE_OPTIONS.map((r) => (
-                      <ToggleButton
-                        key={r}
-                        value={r}
-                        sx={{ px: 1.5, py: 0.25 }}
-                      >
-                        {r}
-                      </ToggleButton>
-                    ))}
-                  </ToggleButtonGroup>
+                    <Typography
+                      variant="h6"
+                      component="h2"
+                      sx={{ fontWeight: 600 }}
+                    >
+                      Price chart
+                    </Typography>
+                    {candleQuery.data && (
+                      <RangeReturn candles={candleQuery.data.candles} />
+                    )}
+                  </Stack>
+                  <ChartRangeToggle value={range} onChange={setRange} />
                 </Stack>
 
                 {candleQuery.isLoading && (
@@ -277,28 +299,53 @@ export default function Stocks() {
               </CardContent>
             </Card>
 
-            {earningsQuery.isLoading && (
-              <Stack sx={{ alignItems: 'center', py: 2 }}>
-                <CircularProgress size={28} />
-              </Stack>
-            )}
-            {earningsQuery.isError && (
-              <Alert severity="warning" variant="outlined">
-                {errorMessage(
-                  earningsQuery.error,
-                  'Could not load earnings data.',
-                )}
-              </Alert>
-            )}
-            {earningsQuery.data && (
-              <EarningsCard
-                earnings={earningsQuery.data}
-                growth={stock.growth}
-                estimates={stock.analyst_estimates}
-                forwardPe={stock.forward_pe}
-                forwardPs={stock.forward_ps}
+            {/* Earnings and Forward P/E share one full-width row on desktop.
+                auto-fit (rather than a fixed 1fr 1fr) lets whichever card is
+                present take the whole row when the other is missing — the
+                Forward P/E card self-hides without a forward consensus, and
+                the earnings slot is empty while its query loads or errors. */}
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns:
+                  'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
+                gap: 3,
+                alignItems: 'stretch',
+              }}
+            >
+              {quarterlyQuery.isLoading && (
+                <Stack
+                  sx={{ alignItems: 'center', justifyContent: 'center', py: 2 }}
+                >
+                  <CircularProgress size={28} />
+                </Stack>
+              )}
+              {quarterlyQuery.isError && (
+                <Alert severity="warning" variant="outlined">
+                  {errorMessage(
+                    quarterlyQuery.error,
+                    'Could not load earnings data.',
+                  )}
+                </Alert>
+              )}
+              {quarterlyQuery.data && (
+                <EarningsCard
+                  earnings={quarterlyToEarningsHistory(quarterlyQuery.data)}
+                  upcoming={quarterlyUpcoming(quarterlyQuery.data)}
+                  annual={annualQuery.data ?? null}
+                />
+              )}
+
+              {/* Forward P/E, walked from the last reported period across the
+                  two forecast years and the upcoming quarters. Self-hides
+                  until a forward consensus (annual estimates or upcoming
+                  quarters) is available. */}
+              <ForwardPeCard
+                price={stock.price}
+                quarterly={quarterlyQuery.data ?? null}
+                annual={annualQuery.data ?? null}
               />
-            )}
+            </Box>
           </Stack>
         )}
       </Box>

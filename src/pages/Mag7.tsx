@@ -14,18 +14,15 @@ const MAG7: QuoteDef[] = [
   { label: 'Tesla', symbol: 'TSLA' },
 ]
 
-// Benchmark indices to overlay. The backend 400s raw index tickers (^GSPC,
-// ^NDX), so we use the SPY and QQQ ETF proxies — the same path the rest of the
-// app takes. SPY leads, so it's the correlation reference for every line.
-const BENCHMARKS: QuoteDef[] = [
-  { label: 'S&P 500', symbol: 'SPY' },
-  { label: 'Nasdaq 100', symbol: 'QQQ' },
-]
+// Benchmark index to overlay. The backend 400s the raw index ticker (^NDX), so
+// we use the QQQ ETF proxy — the same path the rest of the app takes. It's the
+// correlation reference for every member line.
+const BENCHMARKS: QuoteDef[] = [{ label: 'Nasdaq 100', symbol: 'QQQ' }]
 
 /** Dedicated page for the Magnificent 7 mega-caps and their move for the day. */
 export default function Mag7() {
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
       <Box sx={{ mb: 4 }}>
         <Typography
           variant="h4"
@@ -42,7 +39,7 @@ export default function Mag7() {
       </Box>
 
       <Stack spacing={4}>
-        <QuoteGrid items={MAG7} />
+        <QuoteGrid items={MAG7} linkToStock />
         <Mag7ComparisonCard items={MAG7} benchmarks={BENCHMARKS} />
       </Stack>
     </Container>
