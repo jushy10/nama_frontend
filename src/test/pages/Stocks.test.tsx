@@ -282,15 +282,17 @@ describe('Stocks search', () => {
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
 
-    // The PEG card rides beside it: 1.19 sits in the 1–2 middle, so it reads
-    // Fairly Priced. The endpoint serves the ratio without its inputs, so the
-    // figure carries the generic label.
+    // The PEG card rides beside it, showing both served readings: the
+    // trailing 1.19 (1–2 middle → Fairly Priced drives the verdict) and the
+    // forward 1.42 beside it on the shared gauge.
     expect(
       screen.getByRole('heading', { name: 'PEG Ratio' }),
     ).toBeInTheDocument()
     expect(screen.getByText('1.19')).toBeInTheDocument()
     expect(screen.getByText('Fairly Priced')).toBeInTheDocument()
-    expect(screen.getByText('P/E per point of EPS growth')).toBeInTheDocument()
+    expect(screen.getByText('1.42')).toBeInTheDocument()
+    expect(screen.getByText('TTM')).toBeInTheDocument()
+    expect(screen.getByText('FWD')).toBeInTheDocument()
 
     // The candlestick chart loads from the candles endpoint, and the header
     // carries the range's move: first open (200) → last close (209.97).
