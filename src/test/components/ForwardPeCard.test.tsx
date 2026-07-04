@@ -363,7 +363,9 @@ describe('ForwardPeCard', () => {
     expect(screen.getAllByText('Now').length).toBeGreaterThanOrEqual(1)
 
     // Each section's footnote explains the new tile.
-    expect(screen.getByText(/the figure quotes report today/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/the figure quotes report today/i),
+    ).toBeInTheDocument()
     expect(
       screen.getByText(/the standard quote, which can sit apart/i),
     ).toBeInTheDocument()
