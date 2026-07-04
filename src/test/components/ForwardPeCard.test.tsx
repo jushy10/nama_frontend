@@ -342,6 +342,35 @@ describe('ForwardPeCard', () => {
     expect(screen.queryByText('-400.00')).not.toBeInTheDocument()
   })
 
+  it('threads the Current P/E tile and a "Now" bar into both walks', () => {
+    renderWithProviders(
+      <ForwardPeCard
+        price={200}
+        quarterly={quarterlySample}
+        annual={annualSample}
+        trailingPe={55.5}
+      />,
+    )
+
+    // The trailing multiple sits between each walk's reported anchor and its
+    // forward steps — once in the fiscal-year walk, once in the by-quarter
+    // walk — with the "price ÷ TTM EPS" hint under each tile.
+    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
+    expect(screen.getAllByText('55.50').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('Price ÷ trailing 12-mo EPS')).toHaveLength(2)
+
+    // …and as a solid "Now" column on each chart.
+    expect(screen.getAllByText('Now').length).toBeGreaterThanOrEqual(1)
+
+    // Each section's footnote explains the new tile.
+    expect(
+      screen.getByText(/the figure quotes report today/i),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText(/the standard quote, which can sit apart/i),
+    ).toBeInTheDocument()
+  })
+
   it('renders nothing when there is no forward consensus at all', () => {
     const { container } = renderWithProviders(
       <ForwardPeCard
