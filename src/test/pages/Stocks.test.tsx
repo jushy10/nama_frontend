@@ -22,6 +22,7 @@ const sample = {
     '1y': 40.1,
   },
   metrics: {
+    pe: 46.5,
     peg: 1.19,
     forward_peg: 1.42,
     gross_margin: 47.9,
@@ -378,9 +379,10 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('P/E FY26')).toBeInTheDocument()
     expect(screen.getAllByText('42.85').length).toBeGreaterThan(0)
-    // The ticker card carries no trailing multiple, so no Current P/E tile
-    // threads into the walks.
-    expect(screen.queryByText('Current P/E')).not.toBeInTheDocument()
+    // The ticker card's trailing multiple (metrics.pe = 46.5) threads in as a
+    // Current P/E tile between each walk's anchor and its forward steps.
+    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
+    expect(screen.getAllByText('46.50').length).toBeGreaterThanOrEqual(2)
     expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
     // The FY27 multiple shows on its tile and again on the fiscal-year chart.
     expect(screen.getAllByText('23.41').length).toBeGreaterThan(0)

@@ -347,6 +347,7 @@ export default function Stocks() {
                 price={stock.price}
                 quarterly={quarterlyQuery.data ?? null}
                 annual={annualQuery.data ?? null}
+                trailingPe={stock.metrics?.pe ?? null}
               />
             </Box>
           </Stack>

@@ -190,8 +190,8 @@ function rollingQuarterSteps(
 }
 
 /**
- * A simple bar chart of P/E multiples, one column per period: the anchor bar
- * solid, the estimate-driven ones in the same
+ * A simple bar chart of P/E multiples, one column per period: the anchor and
+ * "Now" bars solid, the estimate-driven ones in the same
  * faint-accent-plus-dashed-outline dress the earnings charts use for
  * forecasts, with the multiple above each bar and the period beneath. All
  * bars share a zero baseline so the falling heights read as the multiple
@@ -238,8 +238,9 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
   }, [bars, W])
 
   const baseY = H - PAD.bottom
-  // Dashed divider between the reported anchor bar and the estimate columns,
-  // echoing the reported-vs-forecast split on the earnings charts.
+  // Dashed divider before the first estimate column — just after the "Now" bar
+  // (or the reported anchor, when no Current P/E is served) — echoing the
+  // reported-vs-forecast split on the earnings charts.
   const splitAt = bars.findIndex((b) => b.estimated)
 
   return (
@@ -478,6 +479,10 @@ function PeWalk({
  *   reported quarter, rolling the same window across the upcoming quarters as
  *   reported actuals blend into consensus estimates.
  *
+ * Between each anchor and its forward steps sits the **Current P/E** — the
+ * ticker card's trailing multiple, the figure quotes report today — so the
+ * walk reads reported past → present → consensus future.
+ *
  * Every multiple divides the SAME price, so a falling multiple is the
  * expected earnings growth. The fiscal-year anchor prefers the consensus-basis
  * actual the API serves, so the walk stays on one basis end to end; only its
@@ -489,6 +494,7 @@ export default function ForwardPeCard({
   price,
   quarterly = null,
   annual = null,
+  trailingPe = null,
 }: {
   /** Today's price, from the ticker card — every multiple uses it. */
   price: number
@@ -498,6 +504,10 @@ export default function ForwardPeCard({
   /** Feeds the fiscal-year walk: its last-reported-year anchor and the
    *  forward FY steps. */
   annual?: AnnualEarnings | null
+  /** The ticker card's trailing multiple (metrics.pe) — the "Current P/E"
+   *  tile each walk threads between its reported anchor and the forward
+   *  steps. */
+  trailingPe?: number | null
 }) {
   const fyAnchor = lastReportedFyPe(annual, price)
   const fySteps = fiscalYearSteps(annual, price)
@@ -505,6 +515,23 @@ export default function ForwardPeCard({
   const qSteps = rollingQuarterSteps(quarterly, price)
   // No forward consensus anywhere → nothing to say; drop the card.
   if (fySteps.length === 0 && qSteps.length === 0) return null
+
+  // The present-day reference both walks share: the ticker card's trailing
+  // multiple, threaded between the reported anchor and the forward steps as a
+  // tile and as a solid "Now" column on each chart.
+  const currentTile: (WalkTile & { key: string }) | null =
+    trailingPe != null
+      ? {
+          key: 'current-pe',
+          label: 'Current P/E',
+          value: fmtMultiple(trailingPe),
+          hint: 'Price ÷ trailing 12-mo EPS',
+        }
+      : null
+  const nowBars: PeBar[] =
+    trailingPe != null
+      ? [{ key: 'now', label: 'Now', pe: trailingPe, estimated: false }]
+      : []
 
   // Each walk as chart columns, opening on its anchor — only periods whose
   // EPS yields a meaningful (positive) multiple.
@@ -519,6 +546,7 @@ export default function ForwardPeCard({
           },
         ]
       : []),
+    ...nowBars,
     ...fySteps
       .filter((s) => s.pe != null)
       .map((s, i) => ({
@@ -539,6 +567,7 @@ export default function ForwardPeCard({
           },
         ]
       : []),
+    ...nowBars,
     ...qSteps
       .filter((s) => s.pe != null)
       .map((s) => ({
@@ -597,6 +626,7 @@ export default function ForwardPeCard({
                   : null,
               }}
               steps={[
+                ...(currentTile ? [currentTile] : []),
                 ...fySteps.map((s, i) => ({
                   key: `${s.label}-${i}`,
                   label: `Fwd P/E ${s.label}`,
@@ -643,6 +673,14 @@ export default function ForwardPeCard({
                   large non-GAAP adjustments.
                 </>
               )}
+              {trailingPe != null && (
+                <>
+                  {' '}
+                  The Current P/E between them is the ticker card&apos;s
+                  trailing multiple — today&apos;s price over the last twelve
+                  months of reported EPS, the figure quotes report today.
+                </>
+              )}
             </Typography>
           </Box>
         )}
@@ -674,6 +712,7 @@ export default function ForwardPeCard({
                 hint: qAnchor ? `TTM EPS ${fmtEps(qAnchor.ttmEps)}` : null,
               }}
               steps={[
+                ...(currentTile ? [currentTile] : []),
                 ...qSteps.map((s) => ({
                   key: s.key,
                   label: `Fwd P/E ${s.label}`,
@@ -703,6 +742,14 @@ export default function ForwardPeCard({
               quarter, then reported actuals blending into analyst estimates as
               the window rolls forward. A falling multiple means earnings are
               expected to grow into the price.
+              {trailingPe != null && (
+                <>
+                  {' '}
+                  The Current P/E is the ticker card&apos;s trailing multiple
+                  over reported EPS — the standard quote, which can sit apart
+                  from the anchor&apos;s consensus-basis window.
+                </>
+              )}
             </Typography>
           </Box>
         )}

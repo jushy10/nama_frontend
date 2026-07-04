@@ -28,13 +28,16 @@ export interface TickerDividend {
 }
 
 /**
- * A ticker card's valuation and profitability metrics. `peg` is the trailing
- * PEG (trailing P/E over already-reported EPS growth) and `forward_peg` its
- * forward cousin (forward P/E over the FY1→FY2 growth analysts expect) —
- * either is null on losses, non-positive growth, or no stored consensus. The
- * margins are trailing percentages; any field a vendor doesn't cover is null.
+ * A ticker card's valuation and profitability metrics. `pe` is the trailing
+ * price-to-earnings multiple (price over the last twelve months of reported
+ * EPS) — the figure quotes report today. `peg` is the trailing PEG (that same
+ * trailing P/E over already-reported EPS growth) and `forward_peg` its forward
+ * cousin (forward P/E over the FY1→FY2 growth analysts expect) — either is null
+ * on losses, non-positive growth, or no stored consensus. The margins are
+ * trailing percentages; any field a vendor doesn't cover is null.
  */
 export interface TickerMetrics {
+  pe: number | null
   peg: number | null
   forward_peg: number | null
   gross_margin: number | null
