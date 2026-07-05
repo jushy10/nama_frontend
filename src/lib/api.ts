@@ -453,15 +453,17 @@ export type Timeframe =
 
 /**
  * A sensible candle granularity for a given range, chosen so each chart shows
- * roughly 30–250 candles — dense enough to read, sparse enough to stay legible.
+ * enough bars to read the shape without smearing — from ~40 at the short end up
+ * to a few hundred for a decade of weeklies.
  */
 export function defaultTimeframe(range: ChartRange): Timeframe {
   switch (range) {
     case '1D':
       return '5Min'
     case '5D':
-      return '30Min'
+      return '15Min'
     case '1M':
+      return '4Hour'
     case '3M':
     case '6M':
     case '1Y':
@@ -469,8 +471,8 @@ export function defaultTimeframe(range: ChartRange): Timeframe {
       return '1Day'
     case '2Y':
     case '5Y':
-      return '1Week'
     case '10Y':
+      return '1Week'
     case 'MAX':
       return '1Month'
   }
@@ -642,6 +644,12 @@ export async function getScreener(
 /** True for minute/hour bars — the granularities where extended-hours windows appear. */
 const isIntradayTimeframe = (timeframe: string) => /Min|Hour/.test(timeframe)
 
+/** Length of one intraday bar in minutes (e.g. `4Hour` → 240); 0 if not intraday. */
+const intradayBarMinutes = (timeframe: string) => {
+  const m = /^(\d+)(Min|Hour)$/.exec(timeframe)
+  return m ? Number(m[1]) * (m[2] === 'Hour' ? 60 : 1) : 0
+}
+
 // One reusable ET wall-clock formatter (construction is the expensive part).
 // h23 keeps midnight as "00"; the IANA zone tracks EST/EDT automatically.
 const ET_CLOCK = new Intl.DateTimeFormat('en-US', {
@@ -662,15 +670,23 @@ const RTH_CLOSE = 16 * 60 // 4:00 PM
  * session that's sparse and ends at a different time per symbol (the 4 PM
  * closing auction never trades on IEX), so overlaid charts would trail off
  * raggedly. Clamping to the 9:30–4:00 ET session makes every intraday line
- * start and stop together. A bar's `time` marks its window's start, so the
- * session's last 5-minute bar is the 3:55 PM one.
+ * start and stop together.
+ *
+ * A bar is kept when its `[start, start + step)` window overlaps the session,
+ * not merely when it *starts* inside it. That distinction only bites the coarse
+ * bars: Alpaca grids 4-hour bars to 8:00 / 12:00 / 16:00 ET, so a start-only
+ * test would drop the 8:00 bar — which opens pre-market yet still covers
+ * 9:30–noon — and collapse the whole day to a lone afternoon candle. For the
+ * 5/15/30-minute bars that sit flush inside the session the two tests agree, so
+ * the last kept 5-minute bar is still the 3:55 PM one.
  */
 export function clampToRegularHours(series: CandleSeries): CandleSeries {
   if (!isIntradayTimeframe(series.timeframe)) return series
+  const step = intradayBarMinutes(series.timeframe)
   const candles = series.candles.filter((c) => {
     const [h, m] = ET_CLOCK.format(new Date(c.time * 1000)).split(':')
-    const minute = Number(h) * 60 + Number(m)
-    return minute >= RTH_OPEN && minute < RTH_CLOSE
+    const start = Number(h) * 60 + Number(m)
+    return start < RTH_CLOSE && start + step > RTH_OPEN
   })
   return { ...series, candles, count: candles.length }
 }
