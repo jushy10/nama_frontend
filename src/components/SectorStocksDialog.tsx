@@ -14,26 +14,137 @@ import {
 import CloseIcon from '@mui/icons-material/Close'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
+import { Link as RouterLink } from 'react-router-dom'
 import { stockLogoUrl, type Sector, type TickerCard } from '@/lib/api'
 import { useTickerCards } from '@/lib/queries'
 
 /**
- * Top constituents per S&P sector, by index weight (heaviest first). The backend
- * exposes no holdings endpoint, so we keep a curated list here and pull a live
- * snapshot for each ticker. Keys must match the API's `sector` names.
+ * Top ten constituents per S&P sector, by index weight (heaviest first). The
+ * backend exposes no holdings endpoint, so we keep a curated list here and pull
+ * a live snapshot for each ticker. Keys must match the API's `sector` names.
  */
 const SECTOR_CONSTITUENTS: Record<string, string[]> = {
-  Technology: ['AAPL', 'MSFT', 'NVDA', 'AVGO', 'ORCL', 'CRM'],
-  Financials: ['JPM', 'V', 'MA', 'BAC', 'WFC', 'GS'],
-  'Health Care': ['LLY', 'UNH', 'JNJ', 'ABBV', 'MRK', 'TMO'],
-  Energy: ['XOM', 'CVX', 'COP', 'WMB', 'EOG', 'SLB'],
-  'Consumer Discretionary': ['AMZN', 'TSLA', 'HD', 'MCD', 'BKNG', 'LOW'],
-  'Consumer Staples': ['COST', 'WMT', 'PG', 'KO', 'PEP', 'PM'],
-  Industrials: ['GE', 'CAT', 'RTX', 'UBER', 'BA', 'HON'],
-  Materials: ['LIN', 'SHW', 'ECL', 'FCX', 'NEM', 'APD'],
-  Utilities: ['NEE', 'SO', 'DUK', 'CEG', 'AEP', 'D'],
-  'Real Estate': ['PLD', 'AMT', 'EQIX', 'WELL', 'SPG', 'PSA'],
-  'Communication Services': ['META', 'GOOGL', 'NFLX', 'DIS', 'TMUS', 'T'],
+  Technology: [
+    'AAPL',
+    'MSFT',
+    'NVDA',
+    'AVGO',
+    'ORCL',
+    'CRM',
+    'CSCO',
+    'ACN',
+    'AMD',
+    'IBM',
+  ],
+  Financials: ['JPM', 'V', 'MA', 'BAC', 'WFC', 'GS', 'AXP', 'MS', 'SPGI', 'C'],
+  'Health Care': [
+    'LLY',
+    'UNH',
+    'JNJ',
+    'ABBV',
+    'MRK',
+    'TMO',
+    'ABT',
+    'ISRG',
+    'DHR',
+    'AMGN',
+  ],
+  Energy: [
+    'XOM',
+    'CVX',
+    'COP',
+    'WMB',
+    'EOG',
+    'SLB',
+    'OKE',
+    'KMI',
+    'MPC',
+    'PSX',
+  ],
+  'Consumer Discretionary': [
+    'AMZN',
+    'TSLA',
+    'HD',
+    'MCD',
+    'BKNG',
+    'LOW',
+    'TJX',
+    'SBUX',
+    'ORLY',
+    'NKE',
+  ],
+  'Consumer Staples': [
+    'COST',
+    'WMT',
+    'PG',
+    'KO',
+    'PEP',
+    'PM',
+    'MO',
+    'MDLZ',
+    'CL',
+    'TGT',
+  ],
+  Industrials: [
+    'GE',
+    'CAT',
+    'RTX',
+    'UBER',
+    'BA',
+    'HON',
+    'UNP',
+    'ETN',
+    'DE',
+    'ADP',
+  ],
+  Materials: [
+    'LIN',
+    'SHW',
+    'ECL',
+    'FCX',
+    'NEM',
+    'APD',
+    'CTVA',
+    'DOW',
+    'NUE',
+    'VMC',
+  ],
+  Utilities: [
+    'NEE',
+    'SO',
+    'DUK',
+    'CEG',
+    'AEP',
+    'D',
+    'SRE',
+    'VST',
+    'EXC',
+    'PEG',
+  ],
+  'Real Estate': [
+    'PLD',
+    'AMT',
+    'EQIX',
+    'WELL',
+    'SPG',
+    'PSA',
+    'DLR',
+    'O',
+    'CCI',
+    'VICI',
+  ],
+  'Communication Services': [
+    'META',
+    'GOOGL',
+    'NFLX',
+    'DIS',
+    'TMUS',
+    'T',
+    'VZ',
+    'CMCSA',
+    'CHTR',
+    'EA',
+  ],
 }
 
 const fmt = (n: number | null) =>
@@ -50,11 +161,17 @@ const fmtPct = (n: number | null) =>
 const moveColor = (n: number | null | undefined) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
 
-/** One holding row: logo + symbol/name on the left, price + day move on the right. */
+/**
+ * One holding row: logo + symbol/name on the left, price + day move on the
+ * right. The whole row links to the ticker's page on the Stocks screen.
+ */
 function HoldingRow({ stock }: { stock: TickerCard }) {
   const up = (stock.change_percent ?? 0) >= 0
   return (
     <Stack
+      component={RouterLink}
+      to={`/stocks?symbol=${encodeURIComponent(stock.ticker)}`}
+      aria-label={`View ${stock.ticker} details`}
       direction="row"
       spacing={1.5}
       sx={{
@@ -64,6 +181,15 @@ function HoldingRow({ stock }: { stock: TickerCard }) {
         px: 1.5,
         borderRadius: 2,
         bgcolor: 'action.hover',
+        color: 'inherit',
+        textDecoration: 'none',
+        transition: 'background-color 150ms',
+        '&:hover': { bgcolor: 'action.selected' },
+        '&:focus-visible': {
+          outline: '2px solid',
+          outlineColor: 'primary.main',
+          outlineOffset: 2,
+        },
       }}
     >
       <Stack
