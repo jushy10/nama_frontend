@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Route, Routes, useSearchParams } from 'react-router-dom'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import Sectors from '@/pages/Sectors'
+
+/** Minimal stand-in for the stocks page that echoes the ?symbol= it received. */
+function StockStub() {
+  const [params] = useSearchParams()
+  return <div>stock page: {params.get('symbol')}</div>
+}
 
 const sectorsSample = {
   count: 3,
@@ -181,6 +188,35 @@ describe('Sectors page', () => {
     expect(await screen.findByText('Apple Inc.')).toBeInTheDocument()
     expect(screen.getByText('AAPL')).toBeInTheDocument()
     expect(screen.getByText('Top holdings by index weight')).toBeInTheDocument()
+  })
+
+  it('navigates to the stock page when a holding is clicked', async () => {
+    stubRoutedFetch(sectorsSample, {
+      AAPL: {
+        ticker: 'AAPL',
+        name: 'Apple Inc.',
+        price: 200.5,
+        change: 2.1,
+        change_percent: 1.06,
+      },
+    })
+    const { user } = renderWithProviders(
+      <Routes>
+        <Route path="/sectors" element={<Sectors />} />
+        <Route path="/stocks" element={<StockStub />} />
+      </Routes>,
+      { initialEntries: ['/sectors'] },
+    )
+
+    await screen.findByText('Technology')
+    await user.click(
+      screen.getByRole('button', { name: /view top holdings in technology/i }),
+    )
+
+    const link = await screen.findByRole('link', { name: /view AAPL details/i })
+    await user.click(link)
+
+    expect(await screen.findByText(/stock page: AAPL/i)).toBeInTheDocument()
   })
 
   it('shows an error message when the request fails', async () => {
