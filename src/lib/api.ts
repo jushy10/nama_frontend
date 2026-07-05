@@ -655,10 +655,25 @@ export function humanizeClassification(slug: string): string {
     .join(' ')
 }
 
-/** A sortable column of the universe search. */
-export type StockSearchSort = 'market_cap' | 'revenue_growth' | 'eps_growth'
+/**
+ * A sort key for the universe search. The three column metrics plus `growth` —
+ * the equal-weight blend of trailing revenue and EPS growth (server-computed),
+ * which ranks the fastest all-round growers from one control.
+ */
+export type StockSearchSort =
+  | 'market_cap'
+  | 'revenue_growth'
+  | 'eps_growth'
+  | 'growth'
 /** Sort direction, shared by any sortable list. */
 export type SortOrder = 'asc' | 'desc'
+
+/**
+ * A market-cap size bucket — the screener's `market_cap` tier filter. Mega ≥ $200B,
+ * large $10–200B, mid $2–10B, small $250M–$2B (the API's half-open ranges; since the
+ * universe floor is $1B, `small` surfaces the $1–2B slice).
+ */
+export type MarketCapTier = 'mega' | 'large' | 'mid' | 'small'
 
 /**
  * One row of a universe search (`GET /stocks/ticker`) — the screened stock's
@@ -698,9 +713,10 @@ export interface StockSearchResponse {
  * matches (case-insensitive substring) the company name OR ticker, so "NV"
  * surfaces Nvidia and NVDA; `sector`/`industry` take a classification slug (or a
  * raw label — the API slugifies it); `inSp500`/`inNasdaq100` narrow to index
- * members. `sort` (default market cap) and `order` (default desc) order the page;
- * `limit`/`offset` window it. Only screened stocks are returned, so every row
- * carries a market cap.
+ * members; `marketCap` narrows to one cap tier (mega/large/mid/small). `sort`
+ * (default market cap, or `growth` for the blended rank) and `order` (default desc)
+ * order the page; `limit`/`offset` window it. Only screened stocks are returned, so
+ * every row carries a market cap.
  */
 export async function searchStocks(
   opts: {
@@ -709,6 +725,7 @@ export async function searchStocks(
     industry?: string | null
     inSp500?: boolean | null
     inNasdaq100?: boolean | null
+    marketCap?: MarketCapTier | null
     sort?: StockSearchSort
     order?: SortOrder
     limit?: number
@@ -722,6 +739,7 @@ export async function searchStocks(
   if (opts.industry) qs.set('industry', opts.industry)
   if (opts.inSp500) qs.set('in_sp500', 'true')
   if (opts.inNasdaq100) qs.set('in_nasdaq100', 'true')
+  if (opts.marketCap) qs.set('market_cap', opts.marketCap)
   if (opts.sort) qs.set('sort', opts.sort)
   if (opts.order) qs.set('order', opts.order)
   if (opts.limit != null) qs.set('limit', String(opts.limit))
