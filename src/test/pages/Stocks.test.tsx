@@ -293,6 +293,11 @@ describe('Stocks search', () => {
     expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
     expect(screen.getByText('Performance')).toBeInTheDocument()
 
+    // The snapshot card's key-stats grid carries the trailing P/E beside market
+    // cap and the dividend figures. "P/E (TTM)" also labels the Forward P/E
+    // card's by-quarter walk anchor, so match all.
+    expect(screen.getAllByText('P/E (TTM)').length).toBeGreaterThan(0)
+
     // The snapshot card carries the humanized sector · industry classification.
     expect(screen.getByText('Technology · Semiconductors')).toBeInTheDocument()
 
