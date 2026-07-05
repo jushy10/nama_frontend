@@ -433,6 +433,7 @@ export const CHART_RANGES = [
   '1Y',
   '2Y',
   '5Y',
+  '10Y',
   'YTD',
   'MAX',
 ] as const
@@ -469,6 +470,7 @@ export function defaultTimeframe(range: ChartRange): Timeframe {
     case '2Y':
     case '5Y':
       return '1Week'
+    case '10Y':
     case 'MAX':
       return '1Month'
   }
@@ -734,6 +736,13 @@ export async function getCandles(
     // outright for weekly/monthly bars). An explicit far-past `start` gets the
     // real series instead — the server clamps it to the earliest data it has.
     qs.set('start', '2000-01-01T00:00:00Z')
+  } else if (range === '10Y') {
+    // The API's `range` enum stops at 5Y, so a 10-year window comes from an
+    // explicit start ten years back (the same trick as MAX; the server clamps
+    // it to the earliest data it has).
+    const start = new Date()
+    start.setFullYear(start.getFullYear() - 10)
+    qs.set('start', start.toISOString())
   } else {
     qs.set('range', range)
   }

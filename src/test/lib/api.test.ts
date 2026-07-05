@@ -332,3 +332,31 @@ describe('getCandles 1D fallback', () => {
     expect(mock).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('getCandles 10Y window', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it("requests a monthly start-anchored window since the API's range enum stops at 5Y", async () => {
+    let requestedUrl = ''
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(intradaySeries([])),
+        })
+      }),
+    )
+
+    await getCandles('SPY', { range: '10Y' })
+
+    // 10Y is served via an explicit `start` (like MAX) rather than `range=10Y`,
+    // which the backend would reject, on coarse monthly bars.
+    expect(requestedUrl).toContain('/stocks/SPY/candles')
+    expect(requestedUrl).toContain('timeframe=1Month')
+    expect(requestedUrl).toContain('start=')
+    expect(requestedUrl).not.toContain('range=')
+  })
+})

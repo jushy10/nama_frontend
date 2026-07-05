@@ -11,6 +11,7 @@ const RANGE_OPTIONS: ChartRange[] = [
   '6M',
   '1Y',
   '5Y',
+  '10Y',
   'YTD',
 ]
 
