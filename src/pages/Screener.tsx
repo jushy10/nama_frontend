@@ -26,6 +26,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import {
@@ -43,20 +44,23 @@ const SEARCH_DEBOUNCE_MS = 300
 // Page sizes, matching the API's 1–100 limit.
 const ROWS_PER_PAGE = [25, 50, 100]
 
-// The three sortable metric columns. `hide` keeps the header and its cells in
-// lockstep as the table narrows.
+// Responsive helpers: hide a cell below a breakpoint while keeping the header and
+// its body cells in lockstep as the table narrows.
 const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
 const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
 const HIDE_LG = { display: { xs: 'none', lg: 'table-cell' } } as const
 
+// The three sortable metric columns — all shown at every width so the metric you
+// sort by is always visible. `label` is the terse header; `sortLabel` is the
+// fuller name used in the always-available "Sort by" menu.
 const METRIC_COLUMNS: {
   key: StockSearchSort
   label: string
-  hide?: typeof HIDE_SM
+  sortLabel: string
 }[] = [
-  { key: 'market_cap', label: 'Mkt Cap' },
-  { key: 'revenue_growth', label: 'Rev Growth', hide: HIDE_SM },
-  { key: 'eps_growth', label: 'EPS Growth' },
+  { key: 'market_cap', label: 'Mkt Cap', sortLabel: 'Market cap' },
+  { key: 'revenue_growth', label: 'Rev Growth', sortLabel: 'Revenue growth' },
+  { key: 'eps_growth', label: 'EPS Growth', sortLabel: 'EPS growth' },
 ]
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
@@ -196,7 +200,6 @@ function StockRow({
       <TableCell
         align="right"
         sx={{
-          ...HIDE_SM,
           color: growthColor(stock.revenue_growth_yoy),
           fontWeight: 600,
           fontVariantNumeric: 'tabular-nums',
@@ -243,7 +246,7 @@ function SkeletonRow() {
       <TableCell align="right">
         <Skeleton width={56} sx={{ ml: 'auto' }} />
       </TableCell>
-      <TableCell align="right" sx={HIDE_SM}>
+      <TableCell align="right">
         <Skeleton width={48} sx={{ ml: 'auto' }} />
       </TableCell>
       <TableCell align="right">
@@ -393,7 +396,7 @@ export default function Screener() {
           onChange={(e) => setSector(e.target.value)}
           sx={{ minWidth: 190 }}
         >
-          <MenuItem value="all">All sectors</MenuItem>
+          <MenuItem value="all">All Sectors</MenuItem>
           {sectors.map((s) => (
             <MenuItem key={s} value={s}>
               {humanizeClassification(s)}
@@ -408,7 +411,7 @@ export default function Screener() {
           onChange={(e) => setIndustry(e.target.value)}
           sx={{ minWidth: 210 }}
         >
-          <MenuItem value="all">All industries</MenuItem>
+          <MenuItem value="all">All Industries</MenuItem>
           {industries.map((i) => (
             <MenuItem key={i} value={i}>
               {humanizeClassification(i)}
@@ -432,6 +435,46 @@ export default function Screener() {
             Nasdaq 100
           </ToggleButton>
         </ToggleButtonGroup>
+
+        {/* Explicit sort control: the column-header sort labels are hidden on the
+            narrowest screens, so this keeps every metric sortable on mobile. */}
+        <Stack
+          direction="row"
+          spacing={0.5}
+          sx={{
+            alignItems: 'center',
+            flex: { xs: '1 1 auto', md: '0 0 auto' },
+          }}
+        >
+          <TextField
+            select
+            size="small"
+            label="Sort by"
+            value={sort}
+            onChange={(e) => setSort(e.target.value as StockSearchSort)}
+            sx={{ minWidth: 150, flexGrow: 1 }}
+          >
+            {METRIC_COLUMNS.map((col) => (
+              <MenuItem key={col.key} value={col.key}>
+                {col.sortLabel}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
+            <IconButton
+              onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+              aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
+              sx={{ color: 'text.secondary' }}
+            >
+              <ArrowDownwardIcon
+                sx={{
+                  transition: 'transform 150ms ease',
+                  transform: order === 'asc' ? 'rotate(180deg)' : 'none',
+                }}
+              />
+            </IconButton>
+          </Tooltip>
+        </Stack>
 
         {hasFilters && (
           <Button
@@ -507,7 +550,6 @@ export default function Screener() {
                       key={col.key}
                       align="right"
                       sortDirection={sort === col.key ? order : false}
-                      sx={col.hide}
                     >
                       <TableSortLabel
                         active={sort === col.key}
@@ -564,6 +606,10 @@ export default function Screener() {
             sx={{
               mt: 1,
               '& .MuiTablePagination-toolbar': { px: { xs: 0, sm: 2 } },
+              // "Rows per page" label eats width on phones; the selector stays.
+              '& .MuiTablePagination-selectLabel': {
+                display: { xs: 'none', sm: 'block' },
+              },
             }}
           />
         </>

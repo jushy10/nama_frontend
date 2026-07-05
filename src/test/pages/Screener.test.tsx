@@ -138,6 +138,34 @@ describe('Screener', () => {
     expect(lastSearchUrl(calls)).toMatch(/order=desc/)
   })
 
+  it('sorts by a metric chosen from the mobile "Sort by" menu', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // The header sort labels are hidden on phones, so the dropdown is the way
+    // to reach every metric (here revenue growth) regardless of viewport.
+    await user.click(screen.getByRole('combobox', { name: /sort by/i }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Revenue growth' }),
+    )
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/sort=revenue_growth/),
+    )
+  })
+
+  it('flips the sort direction with the direction toggle', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // Default is descending; the toggle's label names the action it performs.
+    await user.click(screen.getByRole('button', { name: /sort ascending/i }))
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/order=asc/))
+  })
+
   it('pages through results via the offset param', async () => {
     const calls = stubApi({ ...SEARCH_PAGE, total: 60 })
     const { user } = renderWithProviders(<Screener />)
