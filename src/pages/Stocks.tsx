@@ -41,19 +41,17 @@ import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 import ForwardPeCard from '@/components/ForwardPeCard'
 
-// Every opt-in block the ticker-card endpoint serves: the snapshot card needs
-// the dividend, the Performance card the trailing returns, and the
-// Profitability/PEG cards the metrics.
+// Every opt-in block the ticker-card endpoint serves, fetched in one request:
+// the snapshot card needs the dividend, the Performance card the trailing
+// returns, the Profitability/PEG cards the metrics, and the Options card the
+// options read. Bundling them keeps the page to a single ticker-card call —
+// the endpoint prices them all server-side and returns them together.
 const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
   'dividend',
   'performance',
   'metrics',
+  'options_metrics',
 ]
-
-// The options block rides its own request: pricing it walks the option chain
-// upstream, so keeping it out of SNAPSHOT_BLOCKS means a slow (or absent)
-// chain never delays the snapshot — the card just pops in when it resolves.
-const OPTIONS_BLOCKS: TickerCardInclude[] = ['options_metrics']
 
 export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
@@ -80,10 +78,6 @@ export default function Stocks() {
   // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
   // if it fails the toggle simply doesn't appear, so no error state is shown.
   const annualQuery = useAnnualEarnings(loadedSymbol)
-  // The options-market read (IV, expected move, insurance, put/call), served
-  // from the same ticker-card endpoint but as its own request (see
-  // OPTIONS_BLOCKS). Best-effort: no options coverage just hides the card.
-  const optionsQuery = useTickerCard(loadedSymbol, OPTIONS_BLOCKS)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -213,7 +207,11 @@ export default function Stocks() {
                   alignItems: 'stretch',
                 }}
               >
-                <ProfitabilityCard netMargin={stock.metrics.net_margin} />
+                <ProfitabilityCard
+                  netMargin={stock.metrics.net_margin}
+                  revenueGrowth={stock.metrics.revenue_growth_yoy}
+                  epsGrowth={stock.metrics.eps_growth_yoy}
+                />
                 <PegCard
                   peg={stock.metrics.peg}
                   forwardPeg={stock.metrics.forward_peg}
@@ -221,10 +219,10 @@ export default function Stocks() {
               </Box>
             )}
 
-            {/* Options-market read; pops in once its own ticker-card request
-                resolves. A null block (no priceable options) hides the card. */}
-            {optionsQuery.data?.options_metrics && (
-              <OptionsCard metrics={optionsQuery.data.options_metrics} />
+            {/* Options-market read, riding the single snapshot request. A null
+                block (no priceable options) simply hides the card. */}
+            {stock.options_metrics && (
+              <OptionsCard metrics={stock.options_metrics} />
             )}
 
             {recommendationsQuery.isLoading && (

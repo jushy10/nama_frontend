@@ -51,6 +51,55 @@ const VERDICT: Record<
 /** Net margin as a signed percent, e.g. 25.34 → "25.3%", -4.2 → "-4.2%". */
 const fmtMargin = (n: number) => `${n.toFixed(1)}%`
 
+/** A growth rate as an explicitly signed percent, e.g. 16.2 → "+16.2%". */
+const fmtGrowth = (n: number) => `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
+
+/**
+ * One trailing-growth figure: an uppercase label over a signed percent, green
+ * when the line grew and red when it shrank (an em dash when not served). Sits
+ * beside net margin so the card reads as growth *and* profit, not margin alone.
+ */
+function GrowthFigure({
+  label,
+  value,
+}: {
+  label: string
+  value: number | null
+}) {
+  const color =
+    value == null
+      ? 'text.secondary'
+      : value >= 0
+        ? 'success.main'
+        : 'error.main'
+  return (
+    <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, bgcolor: 'action.hover' }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          display: 'block',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontSize: '0.65rem',
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          mt: 0.25,
+          fontWeight: 700,
+          color,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {value == null ? '—' : fmtGrowth(value)}
+      </Typography>
+    </Box>
+  )
+}
+
 // Where a margin sits on the 0–100 track (clamped to the gauge's range).
 const pos = (margin: number) =>
   ((Math.max(MIN, Math.min(MAX, margin)) - MIN) / SPAN) * 100
@@ -173,13 +222,25 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
   )
 }
 
+/**
+ * The bottom-line profitability read (trailing net margin), with the trailing
+ * year-over-year growth of the top and bottom line beneath it — margin answers
+ * "does it keep a profit?", growth "and is the business still expanding?". The
+ * growth strip renders whenever either rate is served, independent of the
+ * margin verdict above it.
+ */
 export default function ProfitabilityCard({
   netMargin,
+  revenueGrowth = null,
+  epsGrowth = null,
 }: {
   netMargin: number | null
+  revenueGrowth?: number | null
+  epsGrowth?: number | null
 }) {
   const verdict = profitabilityVerdict(netMargin)
   const meta = verdict ? VERDICT[verdict] : null
+  const hasGrowth = revenueGrowth != null || epsGrowth != null
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -272,6 +333,41 @@ export default function ProfitabilityCard({
               </Typography>
             )}
           </>
+        )}
+
+        {hasGrowth && (
+          <Box
+            sx={{
+              mt: netMargin == null ? 2 : 2.5,
+              pt: 2,
+              borderTop: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: 'block',
+                mb: 1,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                fontSize: '0.65rem',
+              }}
+            >
+              Trailing growth · YoY
+            </Typography>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: 1,
+              }}
+            >
+              <GrowthFigure label="Revenue" value={revenueGrowth} />
+              <GrowthFigure label="EPS" value={epsGrowth} />
+            </Box>
+          </Box>
         )}
       </CardContent>
     </Card>

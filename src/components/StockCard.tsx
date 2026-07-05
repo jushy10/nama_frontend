@@ -33,6 +33,27 @@ const fmtYield = (n: number | null) => (n == null ? '—' : `${n.toFixed(2)}%`)
 /** Per-share dollar amount. */
 const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
 
+/**
+ * Turn the backend's snake_case classification slug into a display label —
+ * `"engineering_construction"` → `"Engineering Construction"`. Words are split
+ * on underscores and title-cased; anything already spaced passes through.
+ */
+const humanizeClass = (s: string) =>
+  s
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+
+/** The "Sector · Industry" summary line, skipping whichever side is absent. */
+const classificationLine = (
+  sector: string | null,
+  industry: string | null,
+): string | null => {
+  const parts = [sector, industry].filter(Boolean).map((s) => humanizeClass(s!))
+  return parts.length ? parts.join(' · ') : null
+}
+
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Box
@@ -73,6 +94,7 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
   const up = (stock.change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
+  const classification = classificationLine(stock.sector, stock.industry)
 
   return (
     <Card
@@ -136,6 +158,21 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
               {stock.name && (
                 <Typography variant="body2" color="text.secondary">
                   {stock.name}
+                </Typography>
+              )}
+              {classification && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mt: 0.25,
+                    color: 'text.secondary',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    fontSize: '0.68rem',
+                  }}
+                >
+                  {classification}
                 </Typography>
               )}
             </Box>
