@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   clampToRegularHours,
+  defaultTimeframe,
   getCandles,
   lastSessionOnly,
   optionsLevel,
@@ -90,6 +91,25 @@ describe('clampToRegularHours', () => {
     ])
   })
 
+  it('keeps a 4-hour bar whose window overlaps the session, not just its opener', () => {
+    // Alpaca grids 4H bars to 8:00 / 12:00 / 16:00 ET (12:00 / 16:00 / 20:00 UTC
+    // in summer). The 8:00 bar opens pre-market but still covers 9:30–noon, so
+    // it survives; the 16:00 bar is wholly after-hours, so it's dropped. We keep
+    // the morning and afternoon bars, not a lone afternoon candle.
+    const s = series('4Hour', [
+      barAtUtc(2026, 7, 1, 8, 0), // 4:00 AM ET — overnight, no overlap
+      barAtUtc(2026, 7, 1, 12, 0), // 8:00 AM ET — covers 9:30–noon
+      barAtUtc(2026, 7, 1, 16, 0), // 12:00 PM ET — the afternoon
+      barAtUtc(2026, 7, 1, 20, 0), // 4:00 PM ET — after-hours
+    ])
+    const clamped = clampToRegularHours(s)
+    expect(clamped.candles.map((c) => c.time)).toEqual([
+      s.candles[1].time,
+      s.candles[2].time,
+    ])
+    expect(clamped.count).toBe(2)
+  })
+
   it('passes daily and coarser series through untouched', () => {
     // Daily bars are stamped at midnight/early-morning ET — a session filter
     // would wrongly empty them.
@@ -98,6 +118,22 @@ describe('clampToRegularHours', () => {
       barAtUtc(2026, 7, 2, 4, 0),
     ])
     expect(clampToRegularHours(s)).toBe(s)
+  })
+})
+
+describe('defaultTimeframe', () => {
+  it('maps each range to a granularity that keeps the bar count readable', () => {
+    expect(defaultTimeframe('1D')).toBe('5Min')
+    expect(defaultTimeframe('5D')).toBe('15Min')
+    expect(defaultTimeframe('1M')).toBe('4Hour')
+    expect(defaultTimeframe('3M')).toBe('1Day')
+    expect(defaultTimeframe('6M')).toBe('1Day')
+    expect(defaultTimeframe('1Y')).toBe('1Day')
+    expect(defaultTimeframe('YTD')).toBe('1Day')
+    expect(defaultTimeframe('2Y')).toBe('1Week')
+    expect(defaultTimeframe('5Y')).toBe('1Week')
+    expect(defaultTimeframe('10Y')).toBe('1Week')
+    expect(defaultTimeframe('MAX')).toBe('1Month')
   })
 })
 
@@ -336,7 +372,7 @@ describe('getCandles 1D fallback', () => {
 describe('getCandles 10Y window', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it("requests a monthly start-anchored window since the API's range enum stops at 5Y", async () => {
+  it("requests a weekly start-anchored window since the API's range enum stops at 5Y", async () => {
     let requestedUrl = ''
     vi.stubGlobal(
       'fetch',
@@ -353,9 +389,9 @@ describe('getCandles 10Y window', () => {
     await getCandles('SPY', { range: '10Y' })
 
     // 10Y is served via an explicit `start` (like MAX) rather than `range=10Y`,
-    // which the backend would reject, on coarse monthly bars.
+    // which the backend would reject, on weekly bars.
     expect(requestedUrl).toContain('/stocks/SPY/candles')
-    expect(requestedUrl).toContain('timeframe=1Month')
+    expect(requestedUrl).toContain('timeframe=1Week')
     expect(requestedUrl).toContain('start=')
     expect(requestedUrl).not.toContain('range=')
   })
