@@ -306,11 +306,9 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
-    // The trailing YoY growth strip sits beneath the margin, signed and
-    // labelled by line — the two new metrics off the same block.
-    expect(screen.getByText('Trailing growth · YoY')).toBeInTheDocument()
-    expect(screen.getByText('+69.2%')).toBeInTheDocument()
-    expect(screen.getByText('+80.5%')).toBeInTheDocument()
+    // The trailing-growth strip lives on the earnings card's Annual view, not
+    // here — the quarterly (default) view shows no trailing-growth summary.
+    expect(screen.queryByText('Trailing growth · YoY')).not.toBeInTheDocument()
 
     // The options card renders straight from the merged snapshot (no separate
     // options request), grading the flow off the put/call ratio.
@@ -435,6 +433,12 @@ describe('Stocks search', () => {
     expect(screen.getAllByText('$4.90').length).toBeGreaterThan(0)
     expect(screen.getAllByText('FY27').length).toBeGreaterThan(0)
     expect(screen.getAllByText('$392.6B').length).toBeGreaterThan(0)
+    // Switching to Annual also surfaces the trailing YoY growth strip, fed by
+    // the ticker card's metrics block (revenue +69.2%, EPS +80.5%) — distinct
+    // from the forecast column's consensus-implied growth.
+    expect(screen.getByText('Trailing growth · YoY')).toBeInTheDocument()
+    expect(screen.getByText('+69.2%')).toBeInTheDocument()
+    expect(screen.getByText('+80.5%')).toBeInTheDocument()
   })
 
   it('deep-links to a snapshot from the ?symbol= query param', async () => {

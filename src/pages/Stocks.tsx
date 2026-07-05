@@ -207,11 +207,7 @@ export default function Stocks() {
                   alignItems: 'stretch',
                 }}
               >
-                <ProfitabilityCard
-                  netMargin={stock.metrics.net_margin}
-                  revenueGrowth={stock.metrics.revenue_growth_yoy}
-                  epsGrowth={stock.metrics.eps_growth_yoy}
-                />
+                <ProfitabilityCard netMargin={stock.metrics.net_margin} />
                 <PegCard
                   peg={stock.metrics.peg}
                   forwardPeg={stock.metrics.forward_peg}
@@ -334,6 +330,8 @@ export default function Stocks() {
                   earnings={quarterlyToEarningsHistory(quarterlyQuery.data)}
                   upcoming={quarterlyUpcoming(quarterlyQuery.data)}
                   annual={annualQuery.data ?? null}
+                  revenueGrowth={stock.metrics?.revenue_growth_yoy ?? null}
+                  epsGrowth={stock.metrics?.eps_growth_yoy ?? null}
                 />
               )}
 
