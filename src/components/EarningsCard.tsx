@@ -764,10 +764,90 @@ const chartLabelSx: SxProps<Theme> = {
   mb: 0.5,
 }
 
+/**
+ * The trailing year-over-year growth summary shown above the annual charts: the
+ * top and bottom line's most recent trailing growth, framing the fiscal-year
+ * history below. Green when a line grew over the trailing year, red when it
+ * shrank, an em dash when a side isn't served. This is the *reported* trailing
+ * read — distinct from the forward, consensus-implied growth the upcoming
+ * columns annotate.
+ */
+function TrailingGrowth({
+  revenueGrowth,
+  epsGrowth,
+}: {
+  revenueGrowth: number | null
+  epsGrowth: number | null
+}) {
+  const figure = (label: string, value: number | null) => {
+    const color =
+      value == null
+        ? 'text.secondary'
+        : value >= 0
+          ? 'success.main'
+          : 'error.main'
+    return (
+      <Box sx={{ px: 1.5, py: 1, borderRadius: 1.5, bgcolor: 'action.hover' }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            fontSize: '0.65rem',
+          }}
+        >
+          {label}
+        </Typography>
+        <Typography
+          sx={{
+            mt: 0.25,
+            fontWeight: 700,
+            color,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {value == null ? '—' : fmtPct(value)}
+        </Typography>
+      </Box>
+    )
+  }
+  return (
+    <Box sx={{ mt: 2 }}>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{
+          display: 'block',
+          mb: 1,
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          fontSize: '0.65rem',
+        }}
+      >
+        Trailing growth · YoY
+      </Typography>
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 160px))',
+          gap: 1,
+        }}
+      >
+        {figure('Revenue', revenueGrowth)}
+        {figure('EPS', epsGrowth)}
+      </Box>
+    </Box>
+  )
+}
+
 export default function EarningsCard({
   earnings,
   upcoming = null,
   annual = null,
+  revenueGrowth = null,
+  epsGrowth = null,
 }: {
   earnings: EarningsHistory
   // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
@@ -779,6 +859,12 @@ export default function EarningsCard({
   // EPS & revenue charts switch to fiscal years — reported years as bars,
   // upcoming (estimated) years as forecast columns.
   annual?: AnnualEarnings | null
+  // Trailing year-over-year growth (percent) for the top and bottom line, from
+  // the ticker card's metrics block. Surfaced as a summary strip on the Annual
+  // view only — a trailing YoY read belongs beside the fiscal-year history, and
+  // would double up with the QoQ story the quarterly view already tells.
+  revenueGrowth?: number | null
+  epsGrowth?: number | null
 }) {
   const theme = useTheme()
   const { quarters } = earnings
@@ -792,6 +878,10 @@ export default function EarningsCard({
   const hasAnnual = annualQuarters.length > 0 || annualForecasts.length > 0
   const [period, setPeriod] = useState<'quarterly' | 'annual'>('quarterly')
   const isAnnual = hasAnnual && period === 'annual'
+  // The trailing YoY growth summary rides the annual view only, and only when
+  // at least one line's growth is served.
+  const showTrailingGrowth =
+    isAnnual && (revenueGrowth != null || epsGrowth != null)
 
   // The reported history the bars draw — quarters or fiscal years, per the
   // toggle — and the forward consensus columns beside it: every upcoming
@@ -930,6 +1020,12 @@ export default function EarningsCard({
           </Typography>
         ) : (
           <>
+            {showTrailingGrowth && (
+              <TrailingGrowth
+                revenueGrowth={revenueGrowth}
+                epsGrowth={epsGrowth}
+              />
+            )}
             <Box sx={{ mt: 2.5 }}>
               {hasRevenue && (
                 <Typography variant="caption" sx={chartLabelSx}>

@@ -520,6 +520,46 @@ describe('EarningsCard', () => {
     expect(screen.queryByText('FY26')).not.toBeInTheDocument()
   })
 
+  it('shows the trailing YoY growth strip only on the annual view', async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        annual={annualSample}
+        revenueGrowth={22.4}
+        epsGrowth={55.1}
+      />,
+    )
+    // Hidden on the default quarterly view — a trailing YoY read belongs beside
+    // the fiscal-year history, not the QoQ quarterly story.
+    expect(screen.queryByText('Trailing growth · YoY')).not.toBeInTheDocument()
+    expect(screen.queryByText('+22.4%')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+    expect(screen.getByText('Trailing growth · YoY')).toBeInTheDocument()
+    expect(screen.getByText('+22.4%')).toBeInTheDocument() // revenue
+    expect(screen.getByText('+55.1%')).toBeInTheDocument() // EPS
+
+    // Toggling back to quarterly hides it again.
+    await user.click(screen.getByRole('button', { name: 'Quarterly' }))
+    expect(screen.queryByText('Trailing growth · YoY')).not.toBeInTheDocument()
+  })
+
+  it('dashes a trailing-growth line that is not served', async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        annual={annualSample}
+        revenueGrowth={-3.6}
+        epsGrowth={null}
+      />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+    // A shrinking line signs negative…
+    expect(screen.getByText('-3.6%')).toBeInTheDocument()
+    // …and the unserved EPS side still renders its cell, as an em dash.
+    expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
   it('shortens the revenue bar labels on a narrow (phone-width) chart', async () => {
     // jsdom has no layout, so the chart measures 0 and keeps its 820-unit
     // desktop fallback. Mock the measurement narrow enough that the sample's

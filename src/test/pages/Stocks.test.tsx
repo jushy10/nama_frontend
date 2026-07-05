@@ -2,12 +2,16 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import Stocks from '@/pages/Stocks'
 
-// The ticker card (/stocks/ticker/{ticker}) with every opt-in block attached
-// — the page's one snapshot request.
+// The ticker card (/stocks/ticker/{ticker}) with every opt-in block attached —
+// the page's one and only snapshot request. `options_metrics` now rides this
+// same response (no separate options call), and the card carries the company's
+// sector/industry classification plus the trailing growth metrics.
 const sample = {
   ticker: 'NVDA',
   name: 'NVIDIA Corporation Common Stock',
   exchange: 'NASDAQ',
+  sector: 'technology',
+  industry: 'semiconductors',
   price: 209.97,
   change: 5.27,
   change_percent: 2.57,
@@ -28,6 +32,16 @@ const sample = {
     gross_margin: 47.9,
     operating_margin: 32.6,
     net_margin: 27.2,
+    revenue_growth_yoy: 69.2,
+    eps_growth_yoy: 80.5,
+  },
+  options_metrics: {
+    implied_volatility: 30.01,
+    expected_move_percent: 6.4,
+    expected_move_by: '2026-07-31',
+    insurance_cost_percent: 4.9,
+    insurance_expires: '2026-09-18',
+    put_call_ratio: 0.24,
   },
 }
 
@@ -253,13 +267,20 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('$209.97')).toBeInTheDocument()
     // The symbol is normalized to upper-case before the request, which goes to
-    // the ticker-card endpoint with every opt-in block attached.
+    // the ticker-card endpoint with every opt-in block — including
+    // options_metrics — attached to the one request.
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining(
-        '/stocks/ticker/NVDA?include=dividend,performance,metrics',
+        '/stocks/ticker/NVDA?include=dividend,performance,metrics,options_metrics',
       ),
       expect.anything(),
     )
+    // ...and the ticker-card endpoint is hit exactly once — the options read
+    // now rides the snapshot instead of firing its own second request.
+    const tickerCalls = vi
+      .mocked(fetch)
+      .mock.calls.filter(([url]) => String(url).includes('/stocks/ticker/'))
+    expect(tickerCalls).toHaveLength(1)
 
     // The company logo is rendered from the logo endpoint.
     const logo = screen.getByRole('img', { name: /nvda logo/i })
@@ -272,6 +293,9 @@ describe('Stocks search', () => {
     expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
     expect(screen.getByText('Performance')).toBeInTheDocument()
 
+    // The snapshot card carries the humanized sector · industry classification.
+    expect(screen.getByText('Technology · Semiconductors')).toBeInTheDocument()
+
     // Volume was dropped from the snapshot card.
     expect(screen.queryByText('Volume')).not.toBeInTheDocument()
 
@@ -282,6 +306,13 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
+    // The trailing-growth strip lives on the earnings card's Annual view, not
+    // here — the quarterly (default) view shows no trailing-growth summary.
+    expect(screen.queryByText('Trailing growth · YoY')).not.toBeInTheDocument()
+
+    // The options card renders straight from the merged snapshot (no separate
+    // options request), grading the flow off the put/call ratio.
+    expect(screen.getByText('Options Market')).toBeInTheDocument()
 
     // The PEG card rides beside it, showing both served readings: the
     // trailing 1.19 (1–2 middle → Fairly Priced drives the verdict) and the
@@ -402,6 +433,12 @@ describe('Stocks search', () => {
     expect(screen.getAllByText('$4.90').length).toBeGreaterThan(0)
     expect(screen.getAllByText('FY27').length).toBeGreaterThan(0)
     expect(screen.getAllByText('$392.6B').length).toBeGreaterThan(0)
+    // Switching to Annual also surfaces the trailing YoY growth strip, fed by
+    // the ticker card's metrics block (revenue +69.2%, EPS +80.5%) — distinct
+    // from the forecast column's consensus-implied growth.
+    expect(screen.getByText('Trailing growth · YoY')).toBeInTheDocument()
+    expect(screen.getByText('+69.2%')).toBeInTheDocument()
+    expect(screen.getByText('+80.5%')).toBeInTheDocument()
   })
 
   it('deep-links to a snapshot from the ?symbol= query param', async () => {

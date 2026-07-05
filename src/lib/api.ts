@@ -34,7 +34,9 @@ export interface TickerDividend {
  * trailing P/E over already-reported EPS growth) and `forward_peg` its forward
  * cousin (forward P/E over the FY1→FY2 growth analysts expect) — either is null
  * on losses, non-positive growth, or no stored consensus. The margins are
- * trailing percentages; any field a vendor doesn't cover is null.
+ * trailing percentages. `revenue_growth_yoy`/`eps_growth_yoy` are the trailing
+ * year-over-year growth rates (percent) for the top and bottom line — the pace
+ * behind the multiples above. Any field a vendor doesn't cover is null.
  */
 export interface TickerMetrics {
   pe: number | null
@@ -43,6 +45,8 @@ export interface TickerMetrics {
   gross_margin: number | null
   operating_margin: number | null
   net_margin: number | null
+  revenue_growth_yoy: number | null
+  eps_growth_yoy: number | null
 }
 
 /**
@@ -66,15 +70,19 @@ export interface OptionsMetrics {
 
 /**
  * The per-ticker card from `/stocks/ticker/{ticker}` — the app's one stock
- * snapshot: the live quote plus name, exchange, and market cap. The
- * `dividend`/`performance`/`metrics`/`options_metrics` blocks arrive only when
- * requested via `include` and are null otherwise (or when their source is
- * down).
+ * snapshot: the live quote plus name, exchange, market cap, and the company's
+ * `sector`/`industry` classification. The classification arrives as the
+ * backend's snake_case slugs (e.g. `"industrials"`, `"engineering_construction"`)
+ * and is null when uncovered. The `dividend`/`performance`/`metrics`/
+ * `options_metrics` blocks arrive only when requested via `include` and are null
+ * otherwise (or when their source is down).
  */
 export interface TickerCard {
   ticker: string
   name: string | null
   exchange: string | null
+  sector: string | null
+  industry: string | null
   price: number
   change: number | null
   change_percent: number | null
