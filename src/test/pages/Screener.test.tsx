@@ -166,6 +166,32 @@ describe('Screener', () => {
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/order=asc/))
   })
 
+  it('sorts by the combined EPS + revenue growth blend', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByRole('combobox', { name: /sort by/i }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Growth (EPS + Rev)' }),
+    )
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=growth/))
+  })
+
+  it('filters by a market-cap tier via the market_cap param', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByRole('combobox', { name: /market cap/i }))
+    await user.click(await screen.findByRole('option', { name: /large-cap/i }))
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/market_cap=large/),
+    )
+  })
+
   it('pages through results via the offset param', async () => {
     const calls = stubApi({ ...SEARCH_PAGE, total: 60 })
     const { user } = renderWithProviders(<Screener />)

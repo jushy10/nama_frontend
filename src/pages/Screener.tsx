@@ -32,6 +32,7 @@ import SearchIcon from '@mui/icons-material/Search'
 import {
   humanizeClassification,
   stockLogoUrl,
+  type MarketCapTier,
   type SortOrder,
   type StockSearchResult,
   type StockSearchSort,
@@ -50,17 +51,32 @@ const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
 const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
 const HIDE_LG = { display: { xs: 'none', lg: 'table-cell' } } as const
 
-// The three sortable metric columns — all shown at every width so the metric you
-// sort by is always visible. `label` is the terse header; `sortLabel` is the
-// fuller name used in the always-available "Sort by" menu.
-const METRIC_COLUMNS: {
-  key: StockSearchSort
-  label: string
-  sortLabel: string
-}[] = [
-  { key: 'market_cap', label: 'Mkt Cap', sortLabel: 'Market cap' },
-  { key: 'revenue_growth', label: 'Rev Growth', sortLabel: 'Revenue growth' },
-  { key: 'eps_growth', label: 'EPS Growth', sortLabel: 'EPS growth' },
+// The three metric columns — all shown at every width so the metric you sort by is
+// always visible. Their headers double as sort toggles (see `onSort`).
+const METRIC_COLUMNS: { key: StockSearchSort; label: string }[] = [
+  { key: 'market_cap', label: 'Mkt Cap' },
+  { key: 'revenue_growth', label: 'Rev Growth' },
+  { key: 'eps_growth', label: 'EPS Growth' },
+]
+
+// The always-available "Sort by" menu — the three columns plus `growth`, the
+// server-side equal-weight blend of trailing revenue + EPS growth. `growth` has no
+// column of its own; it reorders the list by both figures at once.
+const SORT_OPTIONS: { key: StockSearchSort; label: string }[] = [
+  { key: 'market_cap', label: 'Market cap' },
+  { key: 'revenue_growth', label: 'Revenue growth' },
+  { key: 'eps_growth', label: 'EPS growth' },
+  { key: 'growth', label: 'Growth (EPS + Rev)' },
+]
+
+// The market-cap tier filter's options, each mapping to the API's `market_cap`
+// value; `all` clears the filter. Ranges are the API's half-open buckets.
+const MARKET_CAP_TIERS: { value: MarketCapTier | 'all'; label: string }[] = [
+  { value: 'all', label: 'All Caps' },
+  { value: 'mega', label: 'Mega-cap (≥ $200B)' },
+  { value: 'large', label: 'Large-cap ($10–200B)' },
+  { value: 'mid', label: 'Mid-cap ($2–10B)' },
+  { value: 'small', label: 'Small-cap ($250M–$2B)' },
 ]
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
@@ -269,6 +285,7 @@ export default function Screener() {
   const [industry, setIndustry] = useState('all')
   const [sp500, setSp500] = useState(false)
   const [nasdaq100, setNasdaq100] = useState(false)
+  const [marketCap, setMarketCap] = useState<MarketCapTier | 'all'>('all')
   const [sort, setSort] = useState<StockSearchSort>('market_cap')
   const [order, setOrder] = useState<SortOrder>('desc')
   const [page, setPage] = useState(0)
@@ -279,7 +296,16 @@ export default function Screener() {
   // otherwise a narrow filter could leave you stranded past its last page.
   useEffect(() => {
     setPage(0)
-  }, [debouncedSearch, sector, industry, sp500, nasdaq100, sort, order])
+  }, [
+    debouncedSearch,
+    sector,
+    industry,
+    sp500,
+    nasdaq100,
+    marketCap,
+    sort,
+    order,
+  ])
 
   const query = useStockSearch({
     q: debouncedSearch.trim() || null,
@@ -287,6 +313,7 @@ export default function Screener() {
     industry: industry === 'all' ? null : industry,
     inSp500: sp500,
     inNasdaq100: nasdaq100,
+    marketCap: marketCap === 'all' ? null : marketCap,
     sort,
     order,
     limit: rowsPerPage,
@@ -305,7 +332,8 @@ export default function Screener() {
     sector !== 'all' ||
     industry !== 'all' ||
     sp500 ||
-    nasdaq100
+    nasdaq100 ||
+    marketCap !== 'all'
 
   // Clicking a sorted column flips its direction; a new column starts descending
   // (biggest / fastest-growing first, the useful default for each metric).
@@ -327,6 +355,7 @@ export default function Screener() {
     setIndustry('all')
     setSp500(false)
     setNasdaq100(false)
+    setMarketCap('all')
   }
 
   const membership = [
@@ -418,6 +447,22 @@ export default function Screener() {
             </MenuItem>
           ))}
         </TextField>
+        <TextField
+          select
+          size="small"
+          label="Market cap"
+          value={marketCap}
+          onChange={(e) =>
+            setMarketCap(e.target.value as MarketCapTier | 'all')
+          }
+          sx={{ minWidth: 190 }}
+        >
+          {MARKET_CAP_TIERS.map((tier) => (
+            <MenuItem key={tier.value} value={tier.value}>
+              {tier.label}
+            </MenuItem>
+          ))}
+        </TextField>
 
         <ToggleButtonGroup
           size="small"
@@ -454,9 +499,9 @@ export default function Screener() {
             onChange={(e) => setSort(e.target.value as StockSearchSort)}
             sx={{ minWidth: 150, flexGrow: 1 }}
           >
-            {METRIC_COLUMNS.map((col) => (
-              <MenuItem key={col.key} value={col.key}>
-                {col.sortLabel}
+            {SORT_OPTIONS.map((opt) => (
+              <MenuItem key={opt.key} value={opt.key}>
+                {opt.label}
               </MenuItem>
             ))}
           </TextField>

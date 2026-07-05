@@ -31,6 +31,7 @@ import {
   type CandleSeries,
   type ChartRange,
   type Classifications,
+  type MarketCapTier,
   type QuarterlyEarnings,
   type RsiSeries,
   type ScreenerResult,
@@ -241,6 +242,7 @@ export interface StockSearchParams {
   industry: string | null
   inSp500: boolean
   inNasdaq100: boolean
+  marketCap: MarketCapTier | null
   sort: StockSearchSort
   order: SortOrder
   limit: number
@@ -266,6 +268,7 @@ export function useStockSearch(
         industry: params.industry,
         inSp500: params.inSp500 || null,
         inNasdaq100: params.inNasdaq100 || null,
+        marketCap: params.marketCap,
         sort: params.sort,
         order: params.order,
         limit: params.limit,
