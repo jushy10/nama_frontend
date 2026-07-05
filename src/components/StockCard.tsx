@@ -4,6 +4,7 @@ import {
   Card,
   CardContent,
   Chip,
+  Divider,
   Stack,
   Typography,
 } from '@mui/material'
@@ -33,6 +34,9 @@ const fmtYield = (n: number | null) => (n == null ? '—' : `${n.toFixed(2)}%`)
 /** Per-share dollar amount. */
 const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
 
+/** A bare valuation multiple, e.g. a P/E of 46.5 → "46.50". */
+const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
+
 /**
  * Turn the backend's snake_case classification slug into a display label —
  * `"engineering_construction"` → `"Engineering Construction"`. Words are split
@@ -54,14 +58,23 @@ const classificationLine = (
   return parts.length ? parts.join(' · ') : null
 }
 
+/**
+ * One labelled figure in the key-stats grid. Tiles stretch to fill the card's
+ * height (see the grid's `gridAutoRows`), so the content is vertically centred
+ * to sit evenly however tall the row grows.
+ */
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Box
       sx={{
         borderRadius: 2,
         bgcolor: 'action.hover',
-        px: 1.5,
-        py: 1,
+        px: 2,
+        py: 1.5,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        gap: 0.75,
       }}
     >
       <Typography
@@ -71,6 +84,8 @@ function Stat({ label, value }: { label: string; value: string }) {
           color: 'text.secondary',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
+          fontSize: '0.72rem',
+          lineHeight: 1.2,
         }}
       >
         {label}
@@ -79,8 +94,10 @@ function Stat({ label, value }: { label: string; value: string }) {
         component="dd"
         sx={{
           m: 0,
-          mt: 0.25,
-          fontWeight: 500,
+          fontWeight: 700,
+          fontSize: '1.5rem',
+          lineHeight: 1.15,
+          letterSpacing: '-0.01em',
           fontVariantNumeric: 'tabular-nums',
         }}
       >
@@ -95,6 +112,7 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
   const classification = classificationLine(stock.sector, stock.industry)
+  const metrics = stock.metrics
 
   return (
     <Card
@@ -112,15 +130,18 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
           flexGrow: 1,
           display: 'flex',
           flexDirection: 'column',
-          justifyContent: 'space-between',
         }}
       >
         <Stack
           direction="row"
-          spacing={2}
+          spacing={2.5}
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{ alignItems: 'flex-start', minWidth: 0 }}
+          >
             <Avatar
               variant="rounded"
               src={stockLogoUrl(stock.ticker)}
@@ -129,21 +150,31 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
                 img: { loading: 'lazy', style: { objectFit: 'contain' } },
               }}
               sx={{
-                width: 56,
-                height: 56,
+                width: 76,
+                height: 76,
+                flexShrink: 0,
                 bgcolor: '#fff',
                 color: '#111',
-                p: 0.75,
+                fontWeight: 700,
+                fontSize: '1.75rem',
+                p: 1.25,
+                borderRadius: '18px',
+                border: '1px solid',
+                borderColor: 'divider',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
               }}
             >
               {stock.ticker.charAt(0)}
             </Avatar>
-            <Box>
-              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+              >
                 <Typography
-                  variant="h5"
                   component="h2"
-                  sx={{ fontWeight: 700 }}
+                  sx={{ fontWeight: 700, lineHeight: 1.05, fontSize: '2rem' }}
                 >
                   {stock.ticker}
                 </Typography>
@@ -151,25 +182,44 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
                   <Chip
                     label={stock.exchange}
                     size="small"
-                    sx={{ height: 20, fontSize: '0.7rem' }}
+                    variant="outlined"
+                    sx={{
+                      height: 22,
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: 'text.secondary',
+                      borderColor: 'divider',
+                    }}
                   />
                 )}
               </Stack>
               {stock.name && (
-                <Typography variant="body2" color="text.secondary">
+                <Typography
+                  sx={{
+                    mt: 0.5,
+                    color: 'text.primary',
+                    fontSize: '1.15rem',
+                    fontWeight: 500,
+                    lineHeight: 1.3,
+                    display: '-webkit-box',
+                    WebkitBoxOrient: 'vertical',
+                    WebkitLineClamp: 2,
+                    overflow: 'hidden',
+                  }}
+                >
                   {stock.name}
                 </Typography>
               )}
               {classification && (
                 <Typography
-                  variant="caption"
                   sx={{
                     display: 'block',
-                    mt: 0.25,
+                    mt: 0.75,
                     color: 'text.secondary',
                     textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    fontSize: '0.68rem',
+                    letterSpacing: '0.06em',
+                    fontSize: '0.8rem',
+                    fontWeight: 500,
                   }}
                 >
                   {classification}
@@ -179,11 +229,12 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
           </Stack>
           <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
             <Typography
-              variant="h4"
               sx={{
                 fontWeight: 700,
+                fontSize: '2.25rem',
                 fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.1,
+                lineHeight: 1.05,
+                letterSpacing: '-0.01em',
               }}
             >
               ${fmt(stock.price)}
@@ -191,12 +242,12 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
             {/* the day's move as a tinted pill, so direction reads at a glance */}
             <Box
               sx={{
-                mt: 0.75,
+                mt: 1,
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: 0.5,
-                px: 1.25,
-                py: 0.5,
+                px: 1.5,
+                py: 0.6,
                 borderRadius: 999,
                 color: changeColor,
                 bgcolor: up
@@ -207,15 +258,15 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
               <Box
                 component="span"
                 aria-hidden
-                sx={{ fontSize: '0.6rem', lineHeight: 1 }}
+                sx={{ fontSize: '0.65rem', lineHeight: 1 }}
               >
                 {up ? '▲' : '▼'}
               </Box>
               <Typography
                 component="span"
-                variant="body2"
                 sx={{
                   fontWeight: 600,
+                  fontSize: '0.95rem',
                   fontVariantNumeric: 'tabular-nums',
                   lineHeight: 1,
                 }}
@@ -228,20 +279,26 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
           </Box>
         </Stack>
 
+        <Divider sx={{ mt: 2.5, mb: 2.5 }} />
+
+        {/* Key stats fill the height the snapshot borrows from the taller
+            Performance + RSI stack beside it: a 2×2 grid whose rows stretch
+            (gridAutoRows 1fr) so the tiles grow to occupy the card rather than
+            leaving a gap. P/E rides the card's `metrics` block and shows a dash
+            when it's absent. */}
         <Box
           component="dl"
           sx={{
-            mt: 3,
-            mb: 0,
+            m: 0,
+            flexGrow: 1,
             display: 'grid',
-            gridTemplateColumns: {
-              xs: 'repeat(2, 1fr)',
-              sm: 'repeat(3, 1fr)',
-            },
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridAutoRows: '1fr',
             gap: 1,
           }}
         >
           <Stat label="Mkt Cap" value={fmtMoney(stock.market_cap)} />
+          <Stat label="P/E (TTM)" value={fmtMultiple(metrics?.pe ?? null)} />
           <Stat
             label="Div Yield"
             value={fmtYield(stock.dividend?.yield_percentage ?? null)}
