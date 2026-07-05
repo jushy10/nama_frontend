@@ -1,13 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Avatar,
   Box,
+  Button,
+  Chip,
   Container,
   IconButton,
+  InputAdornment,
   MenuItem,
-  Paper,
   Skeleton,
   Stack,
   Table,
@@ -15,7 +17,9 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
+  TableSortLabel,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -23,47 +27,68 @@ import {
   Typography,
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
-import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import SearchIcon from '@mui/icons-material/Search'
 import {
+  humanizeClassification,
   stockLogoUrl,
-  GICS_SECTORS,
-  SCREENER_INDICES,
-  type ScreenedStock,
-  type StockIndex,
+  type SortOrder,
+  type StockSearchResult,
+  type StockSearchSort,
 } from '@/lib/api'
-import { errorMessage, useScreener } from '@/lib/queries'
+import { errorMessage, useClassifications, useStockSearch } from '@/lib/queries'
 
-// Re-poll on the same cadence the rest of the app promises.
-const REFRESH_MS = 60_000
-// "Names per side" choices, matching the API's 1–50 limit.
-const LIMITS = [10, 25, 50]
+// Wait this long after the last keystroke before searching, so typing a ticker
+// doesn't fire a request per letter.
+const SEARCH_DEBOUNCE_MS = 300
+// Page sizes, matching the API's 1–100 limit.
+const ROWS_PER_PAGE = [25, 50, 100]
 
-type Side = 'gainers' | 'losers'
+// The three sortable metric columns. `hide` keeps the header and its cells in
+// lockstep as the table narrows.
+const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
+const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
+const HIDE_LG = { display: { xs: 'none', lg: 'table-cell' } } as const
 
-const fmtPrice = (n: number | null) =>
+const METRIC_COLUMNS: {
+  key: StockSearchSort
+  label: string
+  hide?: typeof HIDE_SM
+}[] = [
+  { key: 'market_cap', label: 'Mkt Cap' },
+  { key: 'revenue_growth', label: 'Rev Growth', hide: HIDE_SM },
+  { key: 'eps_growth', label: 'EPS Growth' },
+]
+
+// Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
+// industry, indices, + the three metrics.
+const COLSPAN = 4 + METRIC_COLUMNS.length
+
+/** Compact dollar magnitude, e.g. $3.21T / $845B / $12.4M. */
+const fmtMoney = (n: number | null) =>
   n == null
     ? '—'
-    : n.toLocaleString('en-US', {
-        minimumFractionDigits: 2,
+    : '$' +
+      n.toLocaleString('en-US', {
+        notation: 'compact',
         maximumFractionDigits: 2,
       })
 
-const fmtSigned = (n: number | null) =>
-  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}`
-
+/** Signed percent to one decimal — growth reads best with its direction. */
 const fmtPct = (n: number | null) =>
-  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
+  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
 
-const moveColor = (n: number | null | undefined) =>
+const growthColor = (n: number | null) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
 
-// Columns hidden on narrow screens degrade gracefully — symbol/price/%-change
-// always show; sector and absolute change drop first as width shrinks.
-const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
-const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
+/** Debounce a fast-changing value (the search box) so effects downstream settle. */
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const id = setTimeout(() => setDebounced(value), delayMs)
+    return () => clearTimeout(id)
+  }, [value, delayMs])
+  return debounced
+}
 
 /** Company logo in a white rounded tile, falling back to the ticker's initial. */
 function StockLogo({ symbol, size = 32 }: { symbol: string; size?: number }) {
@@ -72,199 +97,68 @@ function StockLogo({ symbol, size = 32 }: { symbol: string; size?: number }) {
       variant="rounded"
       src={stockLogoUrl(symbol)}
       alt={`${symbol} logo`}
-      slotProps={{
-        img: { loading: 'lazy', style: { objectFit: 'contain' } },
-      }}
-      sx={{
-        width: size,
-        height: size,
-        bgcolor: '#fff',
-        color: '#111',
-        p: 0.5,
-      }}
+      slotProps={{ img: { loading: 'lazy', style: { objectFit: 'contain' } } }}
+      sx={{ width: size, height: size, bgcolor: '#fff', color: '#111', p: 0.5 }}
     >
       {symbol.charAt(0)}
     </Avatar>
   )
 }
 
-/**
- * Hero card for the single best (or worst) name of the day. Clicking through
- * opens the stock's detail page, same as a table row.
- */
-function TopMoverCard({
-  label,
-  stock,
-  loading,
-  onSelect,
-}: {
-  label: string
-  stock: ScreenedStock | null
-  loading: boolean
-  onSelect: (symbol: string) => void
-}) {
-  const up = label === 'Top gainer'
+/** The S&P 500 / Nasdaq-100 membership badges, or a dash when in neither. */
+function IndexChips({ stock }: { stock: StockSearchResult }) {
+  if (!stock.in_sp500 && !stock.in_nasdaq100) {
+    return <Box sx={{ color: 'text.secondary' }}>—</Box>
+  }
   return (
-    <Paper
-      variant="outlined"
-      onClick={stock ? () => onSelect(stock.symbol) : undefined}
-      onKeyDown={(e) => {
-        if (stock && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault()
-          onSelect(stock.symbol)
-        }
-      }}
-      tabIndex={stock ? 0 : undefined}
-      role={stock ? 'link' : undefined}
-      aria-label={stock ? `View ${stock.symbol} details` : undefined}
-      sx={{
-        p: 2.5,
-        flex: 1,
-        borderRadius: 3,
-        bgcolor: 'action.hover',
-        cursor: stock ? 'pointer' : 'default',
-        transition: 'border-color 150ms ease',
-        '&:hover': stock
-          ? { borderColor: up ? 'success.main' : 'error.main' }
-          : {},
-      }}
-    >
-      <Stack
-        direction="row"
-        spacing={0.75}
-        sx={{
-          alignItems: 'center',
-          color: up ? 'success.main' : 'error.main',
-        }}
-      >
-        {up ? (
-          <TrendingUpIcon fontSize="small" />
-        ) : (
-          <TrendingDownIcon fontSize="small" />
-        )}
-        <Typography
-          variant="caption"
-          sx={{
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em',
-          }}
-        >
-          {label}
-        </Typography>
-      </Stack>
-      {loading && (
-        <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ mt: 1.5, alignItems: 'center' }}
-        >
-          <Skeleton variant="rounded" width={40} height={40} />
-          <Box sx={{ flex: 1 }}>
-            <Skeleton width={72} />
-            <Skeleton width={140} />
-          </Box>
-          <Skeleton width={72} />
-        </Stack>
+    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+      {stock.in_sp500 && (
+        <Chip label="S&P 500" size="small" variant="outlined" />
       )}
-      {!loading && !stock && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
-          No names match these filters.
-        </Typography>
+      {stock.in_nasdaq100 && (
+        <Chip label="N100" size="small" variant="outlined" />
       )}
-      {!loading && stock && (
-        <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ mt: 1.5, alignItems: 'center', minWidth: 0 }}
-        >
-          <StockLogo symbol={stock.symbol} size={40} />
-          <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              {stock.symbol}
-            </Typography>
-            {stock.name && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  display: 'block',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {stock.name}
-              </Typography>
-            )}
-          </Box>
-          <Box sx={{ textAlign: 'right' }}>
-            <Typography
-              sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
-            >
-              ${fmtPrice(stock.price)}
-            </Typography>
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: 700,
-                fontVariantNumeric: 'tabular-nums',
-                color: moveColor(stock.change_percent),
-              }}
-            >
-              {fmtPct(stock.change_percent)}
-            </Typography>
-          </Box>
-        </Stack>
-      )}
-    </Paper>
+    </Stack>
   )
 }
 
-/** One screened name: rank, logo + symbol/name, sector, price, change, % change. */
+/** One screened name: logo + ticker/name, sector, industry, indices, and the
+ *  market-cap / trailing-growth metrics. Clicking opens the stock's detail page. */
 function StockRow({
-  rank,
   stock,
   onSelect,
 }: {
-  rank: number
-  stock: ScreenedStock
-  onSelect: (symbol: string) => void
+  stock: StockSearchResult
+  onSelect: (ticker: string) => void
 }) {
-  const up = (stock.change_percent ?? 0) >= 0
   return (
     <TableRow
       hover
-      onClick={() => onSelect(stock.symbol)}
+      onClick={() => onSelect(stock.ticker)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
-          onSelect(stock.symbol)
+          onSelect(stock.ticker)
         }
       }}
       tabIndex={0}
       role="link"
-      aria-label={`View ${stock.symbol} details`}
+      aria-label={`View ${stock.ticker} details`}
       sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}
     >
-      <TableCell
-        sx={{ color: 'text.secondary', fontVariantNumeric: 'tabular-nums' }}
-      >
-        {rank}
-      </TableCell>
       <TableCell>
         <Stack
           direction="row"
           spacing={{ xs: 0, sm: 1.5 }}
           sx={{ alignItems: 'center', minWidth: 0 }}
         >
-          {/* Logo hidden on phones to keep #/symbol/price/%-change on one screen. */}
+          {/* Logo hidden on phones to keep ticker + metrics on one screen. */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' } }}>
-            <StockLogo symbol={stock.symbol} />
+            <StockLogo symbol={stock.ticker} />
           </Box>
           <Box sx={{ minWidth: 0 }}>
             <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-              {stock.symbol}
+              {stock.ticker}
             </Typography>
             {stock.name && (
               <Typography
@@ -285,58 +179,49 @@ function StockRow({
         </Stack>
       </TableCell>
       <TableCell sx={{ ...HIDE_MD, color: 'text.secondary' }}>
-        {stock.sector ?? '—'}
+        {stock.sector ? humanizeClassification(stock.sector) : '—'}
+      </TableCell>
+      <TableCell sx={{ ...HIDE_LG, color: 'text.secondary' }}>
+        {stock.industry ? humanizeClassification(stock.industry) : '—'}
+      </TableCell>
+      <TableCell sx={HIDE_SM}>
+        <IndexChips stock={stock} />
       </TableCell>
       <TableCell
         align="right"
         sx={{ fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
       >
-        ${fmtPrice(stock.price)}
+        {fmtMoney(stock.market_cap)}
       </TableCell>
       <TableCell
         align="right"
         sx={{
           ...HIDE_SM,
-          color: moveColor(stock.change),
+          color: growthColor(stock.revenue_growth_yoy),
+          fontWeight: 600,
           fontVariantNumeric: 'tabular-nums',
         }}
       >
-        {fmtSigned(stock.change)}
+        {fmtPct(stock.revenue_growth_yoy)}
       </TableCell>
-      <TableCell align="right">
-        <Stack
-          direction="row"
-          sx={{
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            color: moveColor(stock.change_percent),
-          }}
-        >
-          {stock.change_percent != null &&
-            (up ? (
-              <ArrowDropUpIcon fontSize="small" sx={{ mx: -0.5 }} />
-            ) : (
-              <ArrowDropDownIcon fontSize="small" sx={{ mx: -0.5 }} />
-            ))}
-          <Typography
-            variant="body2"
-            sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
-          >
-            {fmtPct(stock.change_percent)}
-          </Typography>
-        </Stack>
+      <TableCell
+        align="right"
+        sx={{
+          color: growthColor(stock.eps_growth_yoy),
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {fmtPct(stock.eps_growth_yoy)}
       </TableCell>
     </TableRow>
   )
 }
 
-/** Placeholder row shown per expected result while the first fetch is in flight. */
+/** Placeholder row shown per expected result while the first page loads. */
 function SkeletonRow() {
   return (
     <TableRow>
-      <TableCell>
-        <Skeleton width={16} />
-      </TableCell>
       <TableCell>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           <Skeleton variant="rounded" width={32} height={32} />
@@ -347,54 +232,104 @@ function SkeletonRow() {
         </Stack>
       </TableCell>
       <TableCell sx={HIDE_MD}>
-        <Skeleton width={120} />
+        <Skeleton width={110} />
+      </TableCell>
+      <TableCell sx={HIDE_LG}>
+        <Skeleton width={110} />
+      </TableCell>
+      <TableCell sx={HIDE_SM}>
+        <Skeleton width={64} />
       </TableCell>
       <TableCell align="right">
-        <Skeleton width={64} sx={{ ml: 'auto' }} />
+        <Skeleton width={56} sx={{ ml: 'auto' }} />
       </TableCell>
       <TableCell align="right" sx={HIDE_SM}>
         <Skeleton width={48} sx={{ ml: 'auto' }} />
       </TableCell>
       <TableCell align="right">
-        <Skeleton width={64} sx={{ ml: 'auto' }} />
+        <Skeleton width={48} sx={{ ml: 'auto' }} />
       </TableCell>
     </TableRow>
   )
 }
 
 /**
- * Screener page: filter the universe by index and sector, spotlight the day's
- * single best and worst name, and read the top gainers or losers in a table.
- * Loads on mount, re-runs whenever a filter changes, and quietly re-polls
- * every minute. A background refresh that fails leaves the current table in
- * place rather than blanking it.
+ * Screener page: search and filter the screened ≥$1B US universe by name/ticker,
+ * sector, industry and index membership, sorted by market cap or trailing growth.
+ * Rows are stored facts (no live price) served straight from the DB, so a page is
+ * one cheap query; clicking a row opens that stock's live detail page.
  */
 export default function Screener() {
-  const [index, setIndex] = useState<StockIndex | 'all'>('all')
-  const [sector, setSector] = useState<string>('all')
-  const [limit, setLimit] = useState<number>(10)
-  const [side, setSide] = useState<Side>('gainers')
+  const [searchInput, setSearchInput] = useState('')
+  const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
+  const [sector, setSector] = useState('all')
+  const [industry, setIndustry] = useState('all')
+  const [sp500, setSp500] = useState(false)
+  const [nasdaq100, setNasdaq100] = useState(false)
+  const [sort, setSort] = useState<StockSearchSort>('market_cap')
+  const [order, setOrder] = useState<SortOrder>('desc')
+  const [page, setPage] = useState(0)
+  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
   const navigate = useNavigate()
 
-  // Filters live in the query key, so changing one refetches (and aborts the
-  // in-flight request); `side` is local, so flipping gainers/losers just
-  // re-slices the cached result. Re-polls every minute in the background.
-  const screenerQuery = useScreener(
-    {
-      index: index === 'all' ? null : index,
-      sector: sector === 'all' ? null : sector,
-      limit,
-    },
-    { refetchInterval: REFRESH_MS },
-  )
-  const data = screenerQuery.data ?? null
-  const rows = data?.[side] ?? []
-  // Only the first load (nothing on screen yet) surfaces an error; a failed
-  // background poll keeps the last good table, since React Query retains `data`.
-  const showError = screenerQuery.isError && !data
+  // Any filter/sort change starts a new result set, so jump back to page 1 —
+  // otherwise a narrow filter could leave you stranded past its last page.
+  useEffect(() => {
+    setPage(0)
+  }, [debouncedSearch, sector, industry, sp500, nasdaq100, sort, order])
 
-  const openStock = (symbol: string) =>
-    navigate(`/stocks?symbol=${encodeURIComponent(symbol)}`)
+  const query = useStockSearch({
+    q: debouncedSearch.trim() || null,
+    sector: sector === 'all' ? null : sector,
+    industry: industry === 'all' ? null : industry,
+    inSp500: sp500,
+    inNasdaq100: nasdaq100,
+    sort,
+    order,
+    limit: rowsPerPage,
+    offset: page * rowsPerPage,
+  })
+  const classifications = useClassifications()
+  const sectors = classifications.data?.sectors ?? []
+  const industries = classifications.data?.industries ?? []
+
+  const data = query.data ?? null
+  const rows = data?.results ?? []
+  // Only the very first load (nothing on screen yet) surfaces an error.
+  const showError = query.isError && !data
+  const hasFilters =
+    !!searchInput ||
+    sector !== 'all' ||
+    industry !== 'all' ||
+    sp500 ||
+    nasdaq100
+
+  // Clicking a sorted column flips its direction; a new column starts descending
+  // (biggest / fastest-growing first, the useful default for each metric).
+  const onSort = (col: StockSearchSort) => {
+    if (sort === col) {
+      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSort(col)
+      setOrder('desc')
+    }
+  }
+
+  const openStock = (ticker: string) =>
+    navigate(`/stocks?symbol=${encodeURIComponent(ticker)}`)
+
+  const clearFilters = () => {
+    setSearchInput('')
+    setSector('all')
+    setIndustry('all')
+    setSp500(false)
+    setNasdaq100(false)
+  }
+
+  const membership = [
+    ...(sp500 ? ['sp500'] : []),
+    ...(nasdaq100 ? ['nasdaq100'] : []),
+  ]
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
@@ -412,13 +347,13 @@ export default function Screener() {
             Screener
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
-            The day's top movers — filter by index and sector, then flip between
-            gainers and losers.
+            Search the $1B+ US universe by name, sector, industry and index —
+            sorted by size or trailing growth.
           </Typography>
         </Box>
         <Tooltip title="Refresh">
           <IconButton
-            onClick={() => screenerQuery.refetch()}
+            onClick={() => query.refetch()}
             aria-label="Refresh screener"
             sx={{ color: 'text.secondary' }}
           >
@@ -427,193 +362,211 @@ export default function Screener() {
         </Tooltip>
       </Stack>
 
-      {/* Day's standout names under the current filters. */}
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ mt: 4 }}>
-        <TopMoverCard
-          label="Top gainer"
-          stock={data?.gainers[0] ?? null}
-          loading={screenerQuery.isLoading}
-          onSelect={openStock}
-        />
-        <TopMoverCard
-          label="Top loser"
-          stock={data?.losers[0] ?? null}
-          loading={screenerQuery.isLoading}
-          onSelect={openStock}
-        />
-      </Stack>
-
       {/* Filters */}
       <Stack
-        direction={{ xs: 'column', sm: 'row' }}
+        direction={{ xs: 'column', md: 'row' }}
         spacing={1.5}
-        sx={{ mt: 4, flexWrap: 'wrap', alignItems: { sm: 'center' } }}
+        sx={{ mt: 4, flexWrap: 'wrap', alignItems: { md: 'center' } }}
       >
         <TextField
-          select
           size="small"
-          label="Index"
-          value={index}
-          onChange={(e) => setIndex(e.target.value as StockIndex | 'all')}
-          sx={{ minWidth: 150 }}
-        >
-          <MenuItem value="all">All names</MenuItem>
-          {SCREENER_INDICES.map((i) => (
-            <MenuItem key={i.value} value={i.value}>
-              {i.label}
-            </MenuItem>
-          ))}
-        </TextField>
+          label="Search name or ticker"
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          placeholder="e.g. NV"
+          sx={{ minWidth: { xs: '100%', md: 260 } }}
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon fontSize="small" />
+                </InputAdornment>
+              ),
+            },
+          }}
+        />
         <TextField
           select
           size="small"
           label="Sector"
           value={sector}
           onChange={(e) => setSector(e.target.value)}
-          sx={{ minWidth: 210 }}
+          sx={{ minWidth: 190 }}
         >
           <MenuItem value="all">All sectors</MenuItem>
-          {GICS_SECTORS.map((s) => (
+          {sectors.map((s) => (
             <MenuItem key={s} value={s}>
-              {s}
+              {humanizeClassification(s)}
             </MenuItem>
           ))}
         </TextField>
         <TextField
           select
           size="small"
-          label="Per side"
-          value={limit}
-          onChange={(e) => setLimit(Number(e.target.value))}
-          sx={{ minWidth: 110 }}
+          label="Industry"
+          value={industry}
+          onChange={(e) => setIndustry(e.target.value)}
+          sx={{ minWidth: 210 }}
         >
-          {LIMITS.map((n) => (
-            <MenuItem key={n} value={n}>
-              {n}
+          <MenuItem value="all">All industries</MenuItem>
+          {industries.map((i) => (
+            <MenuItem key={i} value={i}>
+              {humanizeClassification(i)}
             </MenuItem>
           ))}
         </TextField>
 
-        <Box sx={{ flexGrow: 1, display: { xs: 'none', sm: 'block' } }} />
-
         <ToggleButtonGroup
           size="small"
-          exclusive
-          value={side}
-          onChange={(_, value: Side | null) => value && setSide(value)}
-          aria-label="Gainers or losers"
-          sx={{
-            width: { xs: '100%', sm: 'auto' },
-            '& .MuiToggleButton-root': { flex: { xs: 1, sm: 'none' } },
+          value={membership}
+          onChange={(_, values: string[]) => {
+            setSp500(values.includes('sp500'))
+            setNasdaq100(values.includes('nasdaq100'))
           }}
+          aria-label="Index membership"
         >
-          <ToggleButton value="gainers" sx={{ px: 2, py: 0.5 }}>
-            Gainers
+          <ToggleButton value="sp500" sx={{ px: 2, py: 0.5 }}>
+            S&amp;P 500
           </ToggleButton>
-          <ToggleButton value="losers" sx={{ px: 2, py: 0.5 }}>
-            Losers
+          <ToggleButton value="nasdaq100" sx={{ px: 2, py: 0.5 }}>
+            Nasdaq 100
           </ToggleButton>
         </ToggleButtonGroup>
+
+        {hasFilters && (
+          <Button
+            onClick={clearFilters}
+            size="small"
+            sx={{ color: 'text.secondary' }}
+          >
+            Clear
+          </Button>
+        )}
       </Stack>
 
       {/* Summary line */}
       {data && (
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ mt: 2, flexWrap: 'wrap', color: 'text.secondary' }}
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 2 }}
+          aria-live="polite"
         >
-          <Typography variant="body2">
-            {data.quoted_count.toLocaleString()} of{' '}
-            {data.universe_count.toLocaleString()} names quoted
-          </Typography>
-          {data.as_of && (
-            <Typography variant="body2">
-              As of {new Date(data.as_of).toLocaleString()}
-            </Typography>
-          )}
-        </Stack>
+          {`${data.total.toLocaleString()} ${data.total === 1 ? 'stock' : 'stocks'}`}
+        </Typography>
       )}
 
       {showError && (
         <Alert severity="error" variant="outlined" sx={{ mt: 3 }}>
-          {errorMessage(screenerQuery.error)}
+          {errorMessage(query.error)}
         </Alert>
       )}
 
       {!showError && (
-        <TableContainer
-          sx={{
-            mt: 3,
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 2,
-            bgcolor: 'action.hover',
-          }}
-        >
-          <Table
-            size="small"
+        <>
+          <TableContainer
             sx={{
-              '& td, & th': {
-                borderColor: 'divider',
-                px: { xs: 1, sm: 2 },
-                whiteSpace: 'nowrap',
-              },
+              mt: 3,
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 2,
+              bgcolor: 'action.hover',
+              // Dim while a new page/sort loads (previous rows stay put).
+              transition: 'opacity 150ms ease',
+              opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
             }}
           >
-            <TableHead>
-              <TableRow
-                sx={{
-                  '& th': {
-                    color: 'text.secondary',
-                    fontWeight: 600,
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.04em',
-                    fontSize: '0.7rem',
-                  },
-                }}
-              >
-                <TableCell sx={{ width: { xs: 32, sm: 48 } }}>#</TableCell>
-                <TableCell>Symbol</TableCell>
-                <TableCell sx={HIDE_MD}>Sector</TableCell>
-                <TableCell align="right">Price</TableCell>
-                <TableCell align="right" sx={HIDE_SM}>
-                  Change
-                </TableCell>
-                <TableCell align="right">% Change</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {screenerQuery.isLoading &&
-                Array.from({ length: Math.min(limit, 10) }).map((_, i) => (
-                  <SkeletonRow key={i} />
-                ))}
-              {data && rows.length === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    sx={{
-                      py: 5,
-                      textAlign: 'center',
+            <Table
+              size="small"
+              sx={{
+                '& td, & th': {
+                  borderColor: 'divider',
+                  px: { xs: 1, sm: 2 },
+                  whiteSpace: 'nowrap',
+                },
+              }}
+            >
+              <TableHead>
+                <TableRow
+                  sx={{
+                    '& th': {
                       color: 'text.secondary',
-                    }}
-                  >
-                    No names match these filters.
-                  </TableCell>
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      fontSize: '0.7rem',
+                    },
+                  }}
+                >
+                  <TableCell>Symbol</TableCell>
+                  <TableCell sx={HIDE_MD}>Sector</TableCell>
+                  <TableCell sx={HIDE_LG}>Industry</TableCell>
+                  <TableCell sx={HIDE_SM}>Index</TableCell>
+                  {METRIC_COLUMNS.map((col) => (
+                    <TableCell
+                      key={col.key}
+                      align="right"
+                      sortDirection={sort === col.key ? order : false}
+                      sx={col.hide}
+                    >
+                      <TableSortLabel
+                        active={sort === col.key}
+                        direction={sort === col.key ? order : 'desc'}
+                        onClick={() => onSort(col.key)}
+                      >
+                        {col.label}
+                      </TableSortLabel>
+                    </TableCell>
+                  ))}
                 </TableRow>
-              )}
-              {data &&
-                rows.map((stock, i) => (
+              </TableHead>
+              <TableBody>
+                {query.isLoading &&
+                  Array.from({ length: Math.min(rowsPerPage, 10) }).map(
+                    (_, i) => <SkeletonRow key={i} />,
+                  )}
+                {data && rows.length === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={COLSPAN}
+                      sx={{
+                        py: 5,
+                        textAlign: 'center',
+                        color: 'text.secondary',
+                      }}
+                    >
+                      No stocks match these filters.
+                    </TableCell>
+                  </TableRow>
+                )}
+                {rows.map((stock) => (
                   <StockRow
-                    key={stock.symbol}
-                    rank={i + 1}
+                    key={stock.ticker}
                     stock={stock}
                     onSelect={openStock}
                   />
                 ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          <TablePagination
+            component="div"
+            count={data?.total ?? 0}
+            page={page}
+            onPageChange={(_, next) => setPage(next)}
+            rowsPerPage={rowsPerPage}
+            rowsPerPageOptions={ROWS_PER_PAGE}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(Number(e.target.value))
+              setPage(0)
+            }}
+            sx={{
+              mt: 1,
+              '& .MuiTablePagination-toolbar': { px: { xs: 0, sm: 2 } },
+            }}
+          />
+        </>
       )}
     </Container>
   )

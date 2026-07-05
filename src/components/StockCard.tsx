@@ -8,7 +8,11 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { stockLogoUrl, type TickerCard } from '@/lib/api'
+import {
+  humanizeClassification,
+  stockLogoUrl,
+  type TickerCard,
+} from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null
@@ -37,24 +41,14 @@ const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
 /** A bare valuation multiple, e.g. a P/E of 46.5 → "46.50". */
 const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
 
-/**
- * Turn the backend's snake_case classification slug into a display label —
- * `"engineering_construction"` → `"Engineering Construction"`. Words are split
- * on underscores and title-cased; anything already spaced passes through.
- */
-const humanizeClass = (s: string) =>
-  s
-    .split('_')
-    .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ')
-
 /** The "Sector · Industry" summary line, skipping whichever side is absent. */
 const classificationLine = (
   sector: string | null,
   industry: string | null,
 ): string | null => {
-  const parts = [sector, industry].filter(Boolean).map((s) => humanizeClass(s!))
+  const parts = [sector, industry]
+    .filter(Boolean)
+    .map((s) => humanizeClassification(s!))
   return parts.length ? parts.join(' · ') : null
 }
 

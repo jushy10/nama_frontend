@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  humanizeClassification,
   lastSessionOnly,
   optionsLevel,
   optionsSentiment,
@@ -27,6 +28,21 @@ describe('pegVerdict', () => {
     expect(pegVerdict(0)).toBe('Not Meaningful')
     expect(pegVerdict(-1.2)).toBe('Not Meaningful')
     expect(pegVerdict(null)).toBeNull()
+  })
+})
+
+describe('humanizeClassification', () => {
+  it('title-cases a snake_case slug into a display label', () => {
+    expect(humanizeClassification('consumer_electronics')).toBe(
+      'Consumer Electronics',
+    )
+    expect(humanizeClassification('technology')).toBe('Technology')
+  })
+
+  it('drops empty segments from stray or repeated underscores', () => {
+    expect(humanizeClassification('oil_gas__e_p')).toBe('Oil Gas E P')
+    expect(humanizeClassification('_reit_')).toBe('Reit')
+    expect(humanizeClassification('')).toBe('')
   })
 })
 

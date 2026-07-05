@@ -641,6 +641,126 @@ export async function getScreener(
   return data
 }
 
+/**
+ * Turn a backend snake_case classification slug into a display label —
+ * `"consumer_electronics"` → `"Consumer Electronics"`. Words split on
+ * underscores and title-cased; anything already spaced passes through. Used for
+ * the universe screener's sector/industry menus and rows, and the stock card.
+ */
+export function humanizeClassification(slug: string): string {
+  return slug
+    .split('_')
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ')
+}
+
+/** A sortable column of the universe search. */
+export type StockSearchSort = 'market_cap' | 'revenue_growth' | 'eps_growth'
+/** Sort direction, shared by any sortable list. */
+export type SortOrder = 'asc' | 'desc'
+
+/**
+ * One row of a universe search (`GET /stocks/ticker`) — the screened stock's
+ * stored facts, with no live price (the search is a single DB read; open the row
+ * for a live quote). `market_cap` is raw USD; the two `*_growth_yoy` are the
+ * latest trailing year-over-year growth (percent, EPS on the analyst-consensus
+ * basis). `in_sp500`/`in_nasdaq100` are definite booleans; everything else may be
+ * null until the enriching sync reaches the stock.
+ */
+export interface StockSearchResult {
+  ticker: string
+  name: string | null
+  sector: string | null
+  industry: string | null
+  market_cap: number | null
+  revenue_growth_yoy: number | null
+  eps_growth_yoy: number | null
+  in_sp500: boolean
+  in_nasdaq100: boolean
+}
+
+/**
+ * A page of universe-search results plus the pagination envelope. `total` is the
+ * full match count before the window (so the pager can size itself); `count` is
+ * this page's row count; `limit`/`offset` echo the window the page was cut with.
+ */
+export interface StockSearchResponse {
+  total: number
+  limit: number
+  offset: number
+  count: number
+  results: StockSearchResult[]
+}
+
+/**
+ * Search/filter/sort the screened ≥$1B US universe (`GET /stocks/ticker`). `q`
+ * matches (case-insensitive substring) the company name OR ticker, so "NV"
+ * surfaces Nvidia and NVDA; `sector`/`industry` take a classification slug (or a
+ * raw label — the API slugifies it); `inSp500`/`inNasdaq100` narrow to index
+ * members. `sort` (default market cap) and `order` (default desc) order the page;
+ * `limit`/`offset` window it. Only screened stocks are returned, so every row
+ * carries a market cap.
+ */
+export async function searchStocks(
+  opts: {
+    q?: string | null
+    sector?: string | null
+    industry?: string | null
+    inSp500?: boolean | null
+    inNasdaq100?: boolean | null
+    sort?: StockSearchSort
+    order?: SortOrder
+    limit?: number
+    offset?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<StockSearchResponse> {
+  const qs = new URLSearchParams()
+  if (opts.q) qs.set('q', opts.q)
+  if (opts.sector) qs.set('sector', opts.sector)
+  if (opts.industry) qs.set('industry', opts.industry)
+  if (opts.inSp500) qs.set('in_sp500', 'true')
+  if (opts.inNasdaq100) qs.set('in_nasdaq100', 'true')
+  if (opts.sort) qs.set('sort', opts.sort)
+  if (opts.order) qs.set('order', opts.order)
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  if (opts.offset != null) qs.set('offset', String(opts.offset))
+  const res = await fetch(`${API_BASE}/stocks/ticker?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as StockSearchResponse
+  if (!Array.isArray(data?.results)) {
+    throw new ApiError(res.status, 'Malformed search response')
+  }
+  return data
+}
+
+/**
+ * The distinct sector and industry slugs present in the universe — the screener's
+ * filter menus (`GET /stocks/classifications`). Two flat, sorted lists; feed a
+ * chosen slug back to `searchStocks`, and humanize it for display with
+ * `humanizeClassification`.
+ */
+export interface Classifications {
+  sectors: string[]
+  industries: string[]
+}
+
+/** Fetch the universe's distinct sector + industry slugs (the filter menus). */
+export async function getClassifications(
+  signal?: AbortSignal,
+): Promise<Classifications> {
+  const res = await fetch(`${API_BASE}/stocks/classifications`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as Classifications
+  if (!Array.isArray(data?.sectors) || !Array.isArray(data?.industries)) {
+    throw new ApiError(res.status, 'Malformed classifications response')
+  }
+  return data
+}
+
 /** True for minute/hour bars — the granularities where extended-hours windows appear. */
 const isIntradayTimeframe = (timeframe: string) => /Min|Hour/.test(timeframe)
 

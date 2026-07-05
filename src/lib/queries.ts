@@ -8,6 +8,7 @@
  * request is aborted when its inputs change or the component unmounts.
  */
 import {
+  keepPreviousData,
   useQueries,
   useQuery,
   type UseQueryResult,
@@ -16,6 +17,7 @@ import {
   ApiError,
   getAnnualEarnings,
   getCandles,
+  getClassifications,
   getQuarterlyEarnings,
   getRecommendations,
   getRsi,
@@ -23,15 +25,20 @@ import {
   getSectors,
   getTickerCard,
   getTickerCards,
+  searchStocks,
   type AnalystRecommendations,
   type AnnualEarnings,
   type CandleSeries,
   type ChartRange,
+  type Classifications,
   type QuarterlyEarnings,
   type RsiSeries,
   type ScreenerResult,
   type Sector,
+  type SortOrder,
   type StockIndex,
+  type StockSearchResponse,
+  type StockSearchSort,
   type TickerCard,
   type TickerCardInclude,
 } from '@/lib/api'
@@ -224,5 +231,60 @@ export function useScreener(
     queryKey: ['screener', params.index, params.sector, params.limit],
     queryFn: ({ signal }) => getScreener({ ...params, signal }),
     refetchInterval: opts.refetchInterval,
+  })
+}
+
+/** A universe-search request: the text query, filters, sort, and page window. */
+export interface StockSearchParams {
+  q: string | null
+  sector: string | null
+  industry: string | null
+  inSp500: boolean
+  inNasdaq100: boolean
+  sort: StockSearchSort
+  order: SortOrder
+  limit: number
+  offset: number
+}
+
+/**
+ * A page of the screened universe for the given filters/sort/window
+ * (`GET /stocks/ticker`). Keeps the previous page's rows on screen while the next
+ * loads (`keepPreviousData`), so paging and re-sorting don't flash empty. The
+ * index toggles go out only when on — a false toggle means "don't narrow on this
+ * axis", not "exclude members".
+ */
+export function useStockSearch(
+  params: StockSearchParams,
+): UseQueryResult<StockSearchResponse> {
+  return useQuery({
+    queryKey: ['stock-search', params],
+    queryFn: ({ signal }) =>
+      searchStocks({
+        q: params.q,
+        sector: params.sector,
+        industry: params.industry,
+        inSp500: params.inSp500 || null,
+        inNasdaq100: params.inNasdaq100 || null,
+        sort: params.sort,
+        order: params.order,
+        limit: params.limit,
+        offset: params.offset,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * The universe's distinct sector + industry slugs for the screener's filter
+ * menus. They barely change, so hold them fresh for an hour rather than
+ * refetching on every visit.
+ */
+export function useClassifications(): UseQueryResult<Classifications> {
+  return useQuery({
+    queryKey: ['classifications'],
+    queryFn: ({ signal }) => getClassifications(signal),
+    staleTime: 60 * 60 * 1000,
   })
 }
