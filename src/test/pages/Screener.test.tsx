@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Route, Routes, useSearchParams } from 'react-router-dom'
-import { renderWithProviders, screen } from '@/test/test-utils'
+import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import Screener from '@/pages/Screener'
 
 /** Minimal stand-in for the stocks page that echoes the ?symbol= it received. */
@@ -9,95 +9,147 @@ function StockStub() {
   return <div>stock page: {params.get('symbol')}</div>
 }
 
-const RESULT = {
-  index: null,
-  sector: null,
-  limit: 10,
-  universe_count: 503,
-  quoted_count: 500,
-  as_of: '2026-06-26T20:00:00Z',
-  gainers: [
+const SEARCH_PAGE = {
+  total: 2,
+  limit: 25,
+  offset: 0,
+  count: 2,
+  results: [
     {
-      symbol: 'NVDA',
-      name: 'NVIDIA Corp',
-      sector: 'Information Technology',
-      price: 128.4,
-      change: 3.0,
-      change_percent: 2.41,
-      previous_close: 125.4,
-      as_of: null,
+      ticker: 'NVDA',
+      name: 'Nvidia',
+      sector: 'technology',
+      industry: 'semiconductors',
+      market_cap: 3.2e12,
+      revenue_growth_yoy: 61.6,
+      eps_growth_yoy: 587.4,
+      in_sp500: true,
+      in_nasdaq100: true,
     },
-  ],
-  losers: [
     {
-      symbol: 'INTC',
-      name: 'Intel Corp',
-      sector: 'Information Technology',
-      price: 20.1,
-      change: -1.2,
-      change_percent: -5.63,
-      previous_close: 21.3,
-      as_of: null,
+      ticker: 'XOM',
+      name: 'Exxon Mobil',
+      sector: 'energy',
+      industry: 'oil_gas_integrated',
+      market_cap: 5.0e11,
+      revenue_growth_yoy: -2.0,
+      eps_growth_yoy: 3.1,
+      in_sp500: true,
+      in_nasdaq100: false,
     },
   ],
 }
 
-/** Answers any /stocks/screener request with a fixed two-name payload. */
-function stubFetch(payload: unknown = RESULT) {
+const CLASSIFICATIONS = {
+  sectors: ['energy', 'technology'],
+  industries: ['oil_gas_integrated', 'semiconductors'],
+}
+
+/**
+ * Route fetch by URL: /stocks/classifications → the filter menus, everything
+ * else (the /stocks/ticker search) → the given page. Returns the list of called
+ * URLs so a test can assert the query params the page sent.
+ */
+function stubApi(searchPayload: unknown = SEARCH_PAGE) {
+  const calls: string[] = []
   vi.stubGlobal(
     'fetch',
-    vi.fn(() =>
-      Promise.resolve({
+    vi.fn((url: string | URL) => {
+      const u = String(url)
+      calls.push(u)
+      const body = u.includes('/stocks/classifications')
+        ? CLASSIFICATIONS
+        : searchPayload
+      return Promise.resolve({
         ok: true,
         status: 200,
-        json: () => Promise.resolve(payload),
-      }),
-    ),
+        json: () => Promise.resolve(body),
+      })
+    }),
   )
+  return calls
 }
+
+/** The most recent /stocks/ticker (search) request URL. */
+const lastSearchUrl = (calls: string[]) =>
+  [...calls].reverse().find((u) => u.includes('/stocks/ticker')) ?? ''
 
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Screener', () => {
-  it('shows the top gainers by default with the universe summary', async () => {
-    stubFetch()
+  it('lists the screened universe with market cap and growth', async () => {
+    stubApi()
     renderWithProviders(<Screener />)
 
-    // NVDA shows twice: once in the top-gainer card, once as a table row.
-    expect(await screen.findAllByText('NVDA')).toHaveLength(2)
-    expect(screen.getAllByText('+2.41%')).toHaveLength(2)
-    expect(screen.getByText(/500 of 503 names quoted/i)).toBeInTheDocument()
-
-    // Losers stay out of the table until the toggle flips — INTC only
-    // appears in the top-loser spotlight card.
-    expect(screen.getAllByText('INTC')).toHaveLength(1)
+    expect(await screen.findByText('NVDA')).toBeInTheDocument()
+    expect(screen.getByText('Nvidia')).toBeInTheDocument()
+    expect(screen.getByText('XOM')).toBeInTheDocument()
+    // Compact market cap, signed growth, and the total-count summary.
+    expect(screen.getByText('$3.2T')).toBeInTheDocument()
+    expect(screen.getByText('+61.6%')).toBeInTheDocument()
+    expect(screen.getByText(/2 stocks/)).toBeInTheDocument()
   })
 
-  it('spotlights the day’s top gainer and loser', async () => {
-    stubFetch()
-    renderWithProviders(<Screener />)
-
-    expect(await screen.findByText('INTC')).toBeInTheDocument()
-    expect(screen.getByText(/top gainer/i)).toBeInTheDocument()
-    expect(screen.getByText(/top loser/i)).toBeInTheDocument()
-    expect(screen.getByText('-5.63%')).toBeInTheDocument()
-  })
-
-  it('switches to losers without refetching', async () => {
-    stubFetch()
+  it('searches by name or ticker (debounced) via the q param', async () => {
+    const calls = stubApi()
     const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
 
-    await screen.findAllByText('NVDA')
-    await user.click(screen.getByRole('button', { name: /losers/i }))
+    await user.type(
+      screen.getByRole('textbox', { name: /search name or ticker/i }),
+      'NV',
+    )
 
-    // INTC now shows in both the spotlight card and the table.
-    expect(await screen.findAllByText('INTC')).toHaveLength(2)
-    // NVDA drops back to just its top-gainer card.
-    expect(screen.getAllByText('NVDA')).toHaveLength(1)
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/[?&]q=NV(&|$)/))
+  })
+
+  it('filters by a sector chosen from the classifications menu', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // The menu options come from /stocks/classifications, humanized.
+    await user.click(screen.getByRole('combobox', { name: /sector/i }))
+    await user.click(await screen.findByRole('option', { name: 'Technology' }))
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/sector=technology/),
+    )
+  })
+
+  it('filters by index membership', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByRole('button', { name: /s&p 500/i }))
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/in_sp500=true/))
+  })
+
+  it('sorts by a metric column when its header is clicked', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByText('EPS Growth'))
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=eps_growth/))
+    expect(lastSearchUrl(calls)).toMatch(/order=desc/)
+  })
+
+  it('pages through results via the offset param', async () => {
+    const calls = stubApi({ ...SEARCH_PAGE, total: 60 })
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByRole('button', { name: /go to next page/i }))
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/offset=25/))
   })
 
   it('navigates to the stock page when a row is clicked', async () => {
-    stubFetch()
+    stubApi()
     const { user } = renderWithProviders(
       <Routes>
         <Route path="/" element={<Screener />} />
@@ -105,10 +157,9 @@ describe('Screener', () => {
       </Routes>,
     )
 
-    const [row] = await screen.findAllByRole('link', {
-      name: /view NVDA details/i,
-    })
-    await user.click(row)
+    await user.click(
+      await screen.findByRole('link', { name: /view NVDA details/i }),
+    )
 
     expect(await screen.findByText(/stock page: NVDA/i)).toBeInTheDocument()
   })
@@ -116,13 +167,21 @@ describe('Screener', () => {
   it('surfaces an error when the first load fails', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(() =>
-        Promise.resolve({
+      vi.fn((url: string | URL) => {
+        const u = String(url)
+        if (u.includes('/stocks/classifications')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve(CLASSIFICATIONS),
+          })
+        }
+        return Promise.resolve({
           ok: false,
           status: 502,
           json: () => Promise.resolve({ detail: 'Upstream is down.' }),
-        }),
-      ),
+        })
+      }),
     )
     renderWithProviders(<Screener />)
 
