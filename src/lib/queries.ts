@@ -240,7 +240,9 @@ export function useScreener(
   })
 }
 
-/** A universe-search request: the text query, filters, sort, and page window. */
+/** A universe-search request: the text query, filters, sort, and page window.
+ *  A null `sort` means "no sort" — the request omits `sort`/`order` and the
+ *  backend returns rows in its own default order. */
 export interface StockSearchParams {
   q: string | null
   sector: string | null
@@ -248,7 +250,7 @@ export interface StockSearchParams {
   inSp500: boolean
   inNasdaq100: boolean
   marketCap: MarketCapTier | null
-  sort: StockSearchSort
+  sort: StockSearchSort | null
   order: SortOrder
   limit: number
   offset: number
@@ -274,8 +276,9 @@ export function useStockSearch(
         inSp500: params.inSp500 || null,
         inNasdaq100: params.inNasdaq100 || null,
         marketCap: params.marketCap,
-        sort: params.sort,
-        order: params.order,
+        // No sort → send neither param, so the backend uses its default order.
+        sort: params.sort ?? undefined,
+        order: params.sort ? params.order : undefined,
         limit: params.limit,
         offset: params.offset,
         signal,

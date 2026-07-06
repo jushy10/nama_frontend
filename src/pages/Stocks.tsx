@@ -25,7 +25,6 @@ import {
   useFiveYearReturn,
   useQuarterlyEarnings,
   useRecommendations,
-  useRsi,
   useTickerCard,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
@@ -36,7 +35,6 @@ import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
-import RsiCard from '@/components/RsiCard'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 import ForwardPeCard from '@/components/ForwardPeCard'
@@ -61,15 +59,14 @@ export default function Stocks() {
   const [symbol, setSymbol] = useState(urlSymbol)
   const [range, setRange] = useState<ChartRange>('6M')
 
-  // The snapshot keys off the URL ticker; the chart, RSI, 5Y pill, and earnings
-  // ride the *loaded* symbol, so they only fire once a snapshot resolves and a
-  // bad ticker never kicks off four more doomed requests. Each hook aborts its
-  // in-flight request when the symbol/range moves on.
+  // The snapshot keys off the URL ticker; the chart, 5Y pill, ratings, and
+  // earnings ride the *loaded* symbol, so they only fire once a snapshot
+  // resolves and a bad ticker never kicks off more doomed requests. Each hook
+  // aborts its in-flight request when the symbol/range moves on.
   const stockQuery = useTickerCard(urlSymbol || null, SNAPSHOT_BLOCKS)
   const loadedSymbol = stockQuery.data?.ticker ?? null
   const candleQuery = useCandles(loadedSymbol, range)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
-  const rsiQuery = useRsi(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   // The earnings card runs entirely off the consolidated quarterly endpoint;
   // the profitability and PEG reads ride on the ticker card's `metrics` block
@@ -155,9 +152,10 @@ export default function Stocks() {
         )}
         {stock && (
           <Stack spacing={3}>
-            {/* Snapshot rides beside the Performance + RSI stack on desktop
-                (md+) and stacks on mobile; the price chart below keeps the
-                full page width. */}
+            {/* Snapshot rides beside the Performance + Profitability stack on
+                desktop (md+) and stacks on mobile; the price chart below keeps
+                the full page width. The snapshot card stretches to match this
+                column's height, so keeping the column filled matters. */}
             <Box
               sx={{
                 display: 'grid',
@@ -168,8 +166,9 @@ export default function Stocks() {
             >
               <StockCard stock={stock} />
 
-              {/* Performance sits directly above RSI in the right-hand column;
-                  both ride the loaded snapshot. */}
+              {/* Performance sits above Profitability in the right-hand column:
+                  the trailing returns over the "is it making money?" read. Both
+                  ride the loaded snapshot (Profitability off its metrics block). */}
               <Stack spacing={3}>
                 {stock.performance && (
                   <PerformanceCard
@@ -177,42 +176,24 @@ export default function Stocks() {
                     fiveYearReturn={fiveYearReturn}
                   />
                 )}
-                <Box>
-                  {rsiQuery.isLoading && (
-                    <Stack sx={{ alignItems: 'center', py: 2 }}>
-                      <CircularProgress size={28} />
-                    </Stack>
-                  )}
-                  {rsiQuery.isError && (
-                    <Alert severity="warning" variant="outlined">
-                      {errorMessage(rsiQuery.error, 'Could not load RSI data.')}
-                    </Alert>
-                  )}
-                  {rsiQuery.data && <RsiCard rsi={rsiQuery.data} />}
-                </Box>
+                {stock.metrics && (
+                  <ProfitabilityCard
+                    netMargin={stock.metrics.net_margin}
+                    grossMargin={stock.metrics.gross_margin}
+                    operatingMargin={stock.metrics.operating_margin}
+                  />
+                )}
               </Stack>
             </Box>
 
-            {/* Profitability and PEG share one row on desktop: "is it making
-                money?" beside "is the price fair for the growth?". Both ride
-                the card's metrics block, so they render with the rest;
-                auto-fit lets either take the full row on narrow screens. */}
+            {/* The growth-adjusted valuation read — "is the price fair for the
+                growth?" — full width below the snapshot row, riding the card's
+                metrics block. */}
             {stock.metrics && (
-              <Box
-                sx={{
-                  display: 'grid',
-                  gridTemplateColumns:
-                    'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
-                  gap: 3,
-                  alignItems: 'stretch',
-                }}
-              >
-                <ProfitabilityCard netMargin={stock.metrics.net_margin} />
-                <PegCard
-                  peg={stock.metrics.peg}
-                  forwardPeg={stock.metrics.forward_peg}
-                />
-              </Box>
+              <PegCard
+                peg={stock.metrics.peg}
+                forwardPeg={stock.metrics.forward_peg}
+              />
             )}
 
             {/* Options-market read, riding the single snapshot request. A null

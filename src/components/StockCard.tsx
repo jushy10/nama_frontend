@@ -276,10 +276,10 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
         <Divider sx={{ mt: 2.5, mb: 2.5 }} />
 
         {/* Key stats fill the height the snapshot borrows from the taller
-            Performance + RSI stack beside it: a 2×2 grid whose rows stretch
-            (gridAutoRows 1fr) so the tiles grow to occupy the card rather than
-            leaving a gap. P/E rides the card's `metrics` block and shows a dash
-            when it's absent. */}
+            Performance + Profitability stack beside it: a 2×2 grid whose rows
+            stretch (gridAutoRows 1fr) so the tiles grow to occupy the card
+            rather than leaving a gap. P/E rides the card's `metrics` block and
+            shows a dash when it's absent. */}
         <Box
           component="dl"
           sx={{

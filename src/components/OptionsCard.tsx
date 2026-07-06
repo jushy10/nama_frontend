@@ -9,7 +9,7 @@ import {
   type OptionsSignal,
 } from '@/lib/api'
 
-// Amber for every unremarkable middle read — matches the RSI/Profitability/PEG
+// Amber for every unremarkable middle read — matches the Profitability/PEG
 // cards' neutral call.
 const MID_COLOR = '#fbbf24' // amber-400
 

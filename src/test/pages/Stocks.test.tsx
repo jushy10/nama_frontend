@@ -73,22 +73,6 @@ const candlesSample = {
   ],
 }
 
-const rsiSample = {
-  symbol: 'NVDA',
-  timeframe: '1Day',
-  period: 14,
-  count: 3,
-  latest: 22.81,
-  signal: 'oversold',
-  overbought: 70.0,
-  oversold: 30.0,
-  points: [
-    { time: 1781582400, timestamp: '2026-06-16T04:00:00Z', value: 23.6 },
-    { time: 1781668800, timestamp: '2026-06-17T04:00:00Z', value: 23.67 },
-    { time: 1782273600, timestamp: '2026-06-24T04:00:00Z', value: 22.81 },
-  ],
-}
-
 // The consolidated quarterly series (oldest → newest): two reported quarters
 // plus two upcoming ones carrying the forward EPS/revenue consensus. Drives
 // the beat charts + the next-report chip.
@@ -219,11 +203,10 @@ const recommendationsSample = {
   trends: [],
 }
 
-/** A fetch stub that answers snapshot, candles, RSI, earnings, and ratings apart. */
+/** A fetch stub that answers snapshot, candles, earnings, and ratings apart. */
 function stubFetch(
   stock: unknown,
   candles: unknown,
-  rsi: unknown = rsiSample,
   recommendations: unknown = recommendationsSample,
   quarterly: unknown = quarterlyEarningsSample,
   annual: unknown = annualEarningsSample,
@@ -238,11 +221,9 @@ function stubFetch(
           ? quarterly
           : u.includes('/earnings/annual')
             ? annual
-            : u.includes('/rsi')
-              ? rsi
-              : u.includes('/candles')
-                ? candles
-                : stock
+            : u.includes('/candles')
+              ? candles
+              : stock
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -311,6 +292,12 @@ describe('Stocks search', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('net profit margin')).toBeInTheDocument()
     expect(screen.getByText('Highly Profitable')).toBeInTheDocument()
+    // The card also breaks out the two margins above the bottom line — gross
+    // 47.9% and operating 32.6% — beside the headline net figure.
+    expect(screen.getByText('Gross margin')).toBeInTheDocument()
+    expect(screen.getByText('47.9%')).toBeInTheDocument()
+    expect(screen.getByText('Operating margin')).toBeInTheDocument()
+    expect(screen.getByText('32.6%')).toBeInTheDocument()
     // The trailing-growth strip lives on the earnings card's Annual view, not
     // here — the quarterly (default) view shows no trailing-growth summary.
     expect(screen.queryByText('Trailing growth · YoY')).not.toBeInTheDocument()
@@ -340,18 +327,6 @@ describe('Stocks search', () => {
     expect(screen.getByText(/\+4\.9[89]%/)).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/stocks/NVDA/candles'),
-      expect.anything(),
-    )
-
-    // The RSI card loads and turns the deeply oversold reading into a Strong Buy.
-    expect(
-      await screen.findByRole('heading', { name: 'RSI' }),
-    ).toBeInTheDocument()
-    expect(screen.getByText('22.8')).toBeInTheDocument()
-    // 'Strong Buy' is also a legend label on the analyst card below, so match all.
-    expect(screen.getAllByText('Strong Buy').length).toBeGreaterThan(0)
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/NVDA/rsi'),
       expect.anything(),
     )
 
