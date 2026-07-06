@@ -17,12 +17,13 @@ import type {
 } from '@/lib/api'
 
 // Amber for the neutral "Hold" call — the theme defines only green (up) and red
-// (down), so this fills the cautious middle, matching RsiCard's Hold colour.
+// (down), so this fills the cautious middle, the shared amber the verdict cards
+// use for a neutral read.
 const HOLD_COLOR = '#fbbf24' // amber-400
 
-// Consensus-chip styling keyed by the five-step label — the same colour language
-// RsiCard uses for its verdict, so the analyst and technical reads sit side by
-// side without clashing. `filled` (the Strong calls) renders a solid pill so the
+// Consensus-chip styling keyed by the five-step label — the five-step palette
+// shared across the app's verdict chips, so ratings read consistently with the
+// other cards. `filled` (the Strong calls) renders a solid pill so the
 // strongest conviction reads at a glance.
 const CONSENSUS_STYLE: Record<
   Recommendation,

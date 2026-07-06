@@ -1,8 +1,8 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import { profitabilityVerdict, type ProfitabilityVerdict } from '@/lib/api'
 
-// Amber for the cautionary "Marginally Profitable" — matches the RSI card's
-// neutral middle call.
+// Amber for the cautionary "Marginally Profitable" — the shared amber the
+// verdict cards use for a neutral middle call.
 const THIN_COLOR = '#fbbf24' // amber-400
 
 // The gauge spans -20% → +40% net margin: wide enough to seat a loss-maker and
@@ -173,10 +173,52 @@ function Gauge({ margin, color }: { margin: number; color: string }) {
   )
 }
 
+/** One secondary margin (gross or operating) as a compact tile: a small label
+ *  with the percent below, green when it's positive and red when it isn't, an
+ *  em dash when the vendor doesn't cover it. These sit under the headline net
+ *  read to round out the profit picture. */
+function MarginTile({ label, value }: { label: string; value: number | null }) {
+  const color =
+    value == null ? 'text.secondary' : value > 0 ? 'success.main' : 'error.main'
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        bgcolor: 'action.hover',
+        px: 1.5,
+        py: 1.25,
+        textAlign: 'center',
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{ color: 'text.secondary', display: 'block' }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          mt: 0.25,
+          fontWeight: 700,
+          color,
+          fontVariantNumeric: 'tabular-nums',
+          fontSize: '1.1rem',
+        }}
+      >
+        {value == null ? '—' : fmtMargin(value)}
+      </Typography>
+    </Box>
+  )
+}
+
 export default function ProfitabilityCard({
   netMargin,
+  grossMargin = null,
+  operatingMargin = null,
 }: {
   netMargin: number | null
+  grossMargin?: number | null
+  operatingMargin?: number | null
 }) {
   const verdict = profitabilityVerdict(netMargin)
   const meta = verdict ? VERDICT[verdict] : null
@@ -271,6 +313,21 @@ export default function ProfitabilityCard({
                 {meta.blurb}
               </Typography>
             )}
+
+            {/* The two margins above the bottom line — gross (after cost of
+                goods) and operating (after running costs) — so the fuller
+                profit picture reads at a glance, not just the net headline. */}
+            <Box
+              sx={{
+                mt: 2.5,
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 1.5,
+              }}
+            >
+              <MarginTile label="Gross margin" value={grossMargin} />
+              <MarginTile label="Operating margin" value={operatingMargin} />
+            </Box>
           </>
         )}
       </CardContent>
