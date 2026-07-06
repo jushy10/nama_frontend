@@ -170,7 +170,7 @@ function HoldingRow({ stock }: { stock: TickerCard }) {
   return (
     <Stack
       component={RouterLink}
-      to={`/stocks?symbol=${encodeURIComponent(stock.ticker)}`}
+      to={`/search?symbol=${encodeURIComponent(stock.ticker)}`}
       aria-label={`View ${stock.ticker} details`}
       direction="row"
       spacing={1.5}

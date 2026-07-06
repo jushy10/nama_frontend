@@ -186,7 +186,7 @@ function QuoteTile({
     return (
       <Box
         component={RouterLink}
-        to={`/stocks?symbol=${encodeURIComponent(def.symbol)}`}
+        to={`/search?symbol=${encodeURIComponent(def.symbol)}`}
         aria-label={`View ${def.label} (${def.symbol}) details`}
         sx={TILE_SX}
       >
@@ -243,7 +243,7 @@ const GRID_SX = {
  * single unavailable note instead of a wall of dashes.
  *
  * With `linkToStock`, each tile carries the company logo and links to that
- * ticker's snapshot (/stocks?symbol=…) — for the Mag 7, where every tile is a
+ * ticker's detail (/search?symbol=…) — for the Mag 7, where every tile is a
  * real, drill-into-able company. Index proxies leave it off.
  *
  * With `onSelect`, each tile is instead a toggle button and the tile matching

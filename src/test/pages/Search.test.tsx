@@ -1,0 +1,229 @@
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { renderWithProviders, screen } from '@/test/test-utils'
+import Search from '@/pages/Search'
+
+// The ticker card classifies the symbol (asset_type) and, for a stock, carries
+// the whole snapshot — the one request the Search page keys off.
+const stockCard = {
+  ticker: 'NVDA',
+  name: 'NVIDIA Corporation',
+  exchange: 'NASDAQ',
+  asset_type: 'equity',
+  sector: 'technology',
+  industry: 'semiconductors',
+  price: 209.97,
+  change: 5.27,
+  change_percent: 2.57,
+  market_cap: 3_210_000_000_000,
+  dividend: { yield_percentage: 0.02, per_share: 0.04 },
+  performance: {
+    '1w': 3.1,
+    '1m': -1.2,
+    '3m': 8.4,
+    '6m': 15,
+    ytd: 22.3,
+    '1y': 40.1,
+  },
+  metrics: {
+    pe: 46.5,
+    peg: 1.19,
+    forward_peg: 1.42,
+    gross_margin: 47.9,
+    operating_margin: 32.6,
+    net_margin: 27.2,
+    revenue_growth_yoy: 69.2,
+    eps_growth_yoy: 80.5,
+  },
+  options_metrics: null,
+}
+
+// An ETF's ticker card: asset_type "etf" with the fund-irrelevant blocks null.
+const etfCard = {
+  ticker: 'VOO',
+  name: 'Vanguard S&P 500 ETF',
+  exchange: 'NYSE',
+  asset_type: 'etf',
+  sector: null,
+  industry: null,
+  price: 685.28,
+  change: 3.21,
+  change_percent: 0.47,
+  market_cap: null,
+  dividend: null,
+  performance: null,
+  metrics: null,
+  options_metrics: null,
+}
+
+const etfDetail = {
+  ticker: 'VOO',
+  name: 'Vanguard S&P 500 ETF',
+  exchange: 'NYSE',
+  asset_type: 'etf',
+  price: 685.28,
+  change: 3.21,
+  change_percent: 0.47,
+  previous_close: 682.07,
+  as_of: '2026-07-06T20:00:00Z',
+  category: 'large_blend',
+  fund_family: 'Vanguard',
+  net_assets: 1_701_513_003_008,
+  expense_ratio: 0.03,
+  nav: 684.9,
+  dividend_yield: 1.03,
+  ytd_return: 11.25,
+  three_year_return: 20.41,
+  five_year_return: 13.01,
+  description: 'Tracks the S&P 500.',
+  top_holdings: [{ ticker: 'NVDA', name: 'NVIDIA Corp', weight: 7.89 }],
+  sector_weightings: [{ sector: 'technology', weight: 39.13 }],
+}
+
+const candles = {
+  symbol: 'X',
+  timeframe: '1Day',
+  count: 2,
+  candles: [
+    {
+      time: 1,
+      timestamp: '2026-06-17T00:00:00Z',
+      open: 200,
+      high: 210,
+      low: 198,
+      close: 205,
+      volume: 1_000_000,
+      direction: 'up',
+    },
+    {
+      time: 2,
+      timestamp: '2026-06-18T00:00:00Z',
+      open: 205,
+      high: 212,
+      low: 204,
+      close: 209,
+      volume: 1_200_000,
+      direction: 'up',
+    },
+  ],
+}
+
+const emptyQuarterly = {
+  symbol: 'X',
+  count: 0,
+  reported_count: 0,
+  upcoming_count: 0,
+  quarters: [],
+}
+const emptyAnnual = {
+  symbol: 'X',
+  count: 0,
+  reported_count: 0,
+  upcoming_count: 0,
+  years: [],
+}
+const recommendations = {
+  symbol: 'X',
+  count: 0,
+  direction: 'unchanged',
+  latest: null,
+  trends: [],
+}
+
+/** Route fetch by URL: the ETF detail, candles, earnings, ratings, else the
+ *  ticker card. Pass `etfDetail` only for an ETF symbol. */
+function stubFetch(card: unknown, opts: { etfDetail?: unknown } = {}) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL) => {
+      const u = String(url)
+      const body = u.includes('/stocks/etf/')
+        ? (opts.etfDetail ?? { detail: 'not an ETF' })
+        : u.includes('/candles')
+          ? candles
+          : u.includes('/recommendations')
+            ? recommendations
+            : u.includes('/earnings/quarterly')
+              ? emptyQuarterly
+              : u.includes('/earnings/annual')
+                ? emptyAnnual
+                : card
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(body),
+      })
+    }),
+  )
+}
+
+afterEach(() => vi.unstubAllGlobals())
+
+describe('Search (unified)', () => {
+  it('renders the stock detail inline for an equity ticker', async () => {
+    stubFetch(stockCard)
+    const { user } = renderWithProviders(<Search />)
+
+    await user.type(screen.getByLabelText(/ticker symbol/i), 'nvda')
+    await user.click(screen.getByRole('button', { name: /search/i }))
+
+    // The stock snapshot renders (heading, price, market cap, performance).
+    expect(
+      await screen.findByRole('heading', { name: 'NVDA' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('$209.97')).toBeInTheDocument()
+    expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
+    expect(screen.getByText('Performance')).toBeInTheDocument()
+    // Classified via the one ticker-card request with every block attached.
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '/stocks/ticker/NVDA?include=dividend,performance,metrics,options_metrics',
+      ),
+      expect.anything(),
+    )
+    // No ETF badge / holdings for a stock.
+    expect(screen.queryByText('Top Holdings')).not.toBeInTheDocument()
+  })
+
+  it('renders the fund detail inline for an ETF ticker', async () => {
+    stubFetch(etfCard, { etfDetail })
+    renderWithProviders(<Search />, { initialEntries: ['/search?symbol=VOO'] })
+
+    expect(
+      await screen.findByRole('heading', { name: 'VOO' }),
+    ).toBeInTheDocument()
+    // Fund-specific surface: badge, AUM, holdings (linked to /search), sectors.
+    expect(screen.getByText('ETF')).toBeInTheDocument()
+    expect(screen.getByText('AUM')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'Top Holdings' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'NVDA' })).toHaveAttribute(
+      'href',
+      '/search?symbol=NVDA',
+    )
+    // It fetched the full fund detail (holdings/sectors aren't on the card).
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/etf/VOO'),
+      expect.anything(),
+    )
+    // Stock-only cards don't show for a fund.
+    expect(screen.queryByText('Analyst Ratings')).not.toBeInTheDocument()
+  })
+
+  it('shows an error when the ticker is not found', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        json: () => Promise.resolve({ detail: "No data for 'ZZZZ'." }),
+      }),
+    )
+    const { user } = renderWithProviders(<Search />)
+
+    await user.type(screen.getByLabelText(/ticker symbol/i), 'ZZZZ')
+    await user.click(screen.getByRole('button', { name: /search/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/no data for/i)
+  })
+})

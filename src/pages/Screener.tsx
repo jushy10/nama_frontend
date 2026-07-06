@@ -377,7 +377,7 @@ export default function Screener() {
   }
 
   const openStock = (ticker: string) =>
-    navigate(`/stocks?symbol=${encodeURIComponent(ticker)}`)
+    navigate(`/search?symbol=${encodeURIComponent(ticker)}`)
 
   const clearFilters = () => {
     setSearchInput('')
@@ -406,7 +406,7 @@ export default function Screener() {
             component="h1"
             sx={{ color: 'primary.light', fontWeight: 700 }}
           >
-            Screener
+            Stock Screener
           </Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
             Search the $1B+ US universe by name, sector, industry and index —

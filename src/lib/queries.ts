@@ -352,8 +352,8 @@ export function useEtfCategories(): UseQueryResult<EtfCategories> {
 
 /**
  * One fund's live detail (quote + fund profile). Idle until `ticker` is set.
- * Errors with an `ApiError` 404 when the ticker isn't a screened ETF, which the
- * fund page reads to redirect a stock symbol back to `/stocks`.
+ * Errors with an `ApiError` 404 when the ticker isn't a screened ETF (Search
+ * only renders the fund detail once a ticker classifies as one).
  */
 export function useEtfDetail(
   ticker: string | null | undefined,

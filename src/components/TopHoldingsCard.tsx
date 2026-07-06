@@ -46,7 +46,7 @@ function HoldingRow({
           {holding.ticker ? (
             <Link
               component={RouterLink}
-              to={`/stocks?symbol=${encodeURIComponent(holding.ticker)}`}
+              to={`/search?symbol=${encodeURIComponent(holding.ticker)}`}
               underline="hover"
               sx={{ fontWeight: 700, color: 'text.primary', flexShrink: 0 }}
             >

@@ -203,7 +203,7 @@ describe('Sectors page', () => {
     const { user } = renderWithProviders(
       <Routes>
         <Route path="/sectors" element={<Sectors />} />
-        <Route path="/stocks" element={<StockStub />} />
+        <Route path="/search" element={<StockStub />} />
       </Routes>,
       { initialEntries: ['/sectors'] },
     )
