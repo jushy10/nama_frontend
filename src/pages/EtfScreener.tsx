@@ -214,8 +214,7 @@ function SkeletonRow() {
  * ETF Screener page: search and filter the screened top US ETF universe by
  * name/ticker and fund category, sorted by net assets (AUM) or expense ratio.
  * Rows are stored facts (no live price) served straight from the DB, so a page is
- * one cheap query; clicking a row opens that fund's live detail page (the shared
- * ticker card serves ETFs too).
+ * one cheap query; clicking a row opens that fund's live detail page (`/etfs`).
  */
 export default function EtfScreener() {
   const [searchInput, setSearchInput] = useState('')
@@ -262,7 +261,7 @@ export default function EtfScreener() {
   }
 
   const openEtf = (ticker: string) =>
-    navigate(`/stocks?symbol=${encodeURIComponent(ticker)}`)
+    navigate(`/etfs?symbol=${encodeURIComponent(ticker)}`)
 
   const clearFilters = () => {
     setSearchInput('')

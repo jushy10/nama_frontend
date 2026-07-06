@@ -19,6 +19,7 @@ import {
   getCandles,
   getClassifications,
   getEtfCategories,
+  getEtfDetail,
   getQuarterlyEarnings,
   getRecommendations,
   getRsi,
@@ -34,6 +35,7 @@ import {
   type ChartRange,
   type Classifications,
   type EtfCategories,
+  type EtfDetail,
   type EtfSearchResponse,
   type EtfSearchSort,
   type MarketCapTier,
@@ -345,5 +347,20 @@ export function useEtfCategories(): UseQueryResult<EtfCategories> {
     queryKey: ['etf-categories'],
     queryFn: ({ signal }) => getEtfCategories(signal),
     staleTime: 60 * 60 * 1000,
+  })
+}
+
+/**
+ * One fund's live detail (quote + fund profile). Idle until `ticker` is set.
+ * Errors with an `ApiError` 404 when the ticker isn't a screened ETF, which the
+ * fund page reads to redirect a stock symbol back to `/stocks`.
+ */
+export function useEtfDetail(
+  ticker: string | null | undefined,
+): UseQueryResult<EtfDetail> {
+  return useQuery({
+    queryKey: ['etf-detail', ticker],
+    queryFn: ({ signal }) => getEtfDetail(ticker as string, signal),
+    enabled: !!ticker,
   })
 }

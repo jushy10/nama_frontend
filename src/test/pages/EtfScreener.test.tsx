@@ -3,10 +3,10 @@ import { Route, Routes, useSearchParams } from 'react-router-dom'
 import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import EtfScreener from '@/pages/EtfScreener'
 
-/** Minimal stand-in for the stocks page that echoes the ?symbol= it received. */
-function StockStub() {
+/** Minimal stand-in for the fund page that echoes the ?symbol= it received. */
+function EtfStub() {
   const [params] = useSearchParams()
-  return <div>stock page: {params.get('symbol')}</div>
+  return <div>fund page: {params.get('symbol')}</div>
 }
 
 const SEARCH_PAGE = {
@@ -164,12 +164,12 @@ describe('EtfScreener', () => {
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/offset=25/))
   })
 
-  it('navigates to the stock page when a row is clicked', async () => {
+  it('navigates to the fund page when a row is clicked', async () => {
     stubApi()
     const { user } = renderWithProviders(
       <Routes>
         <Route path="/" element={<EtfScreener />} />
-        <Route path="/stocks" element={<StockStub />} />
+        <Route path="/etfs" element={<EtfStub />} />
       </Routes>,
     )
 
@@ -177,7 +177,7 @@ describe('EtfScreener', () => {
       await screen.findByRole('link', { name: /view VTI details/i }),
     )
 
-    expect(await screen.findByText(/stock page: VTI/i)).toBeInTheDocument()
+    expect(await screen.findByText(/fund page: VTI/i)).toBeInTheDocument()
   })
 
   it('surfaces an error when the first load fails', async () => {
