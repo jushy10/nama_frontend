@@ -21,6 +21,7 @@ import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
+import EtfScreener from '@/pages/EtfScreener'
 import Stocks from '@/pages/Stocks'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
@@ -28,6 +29,7 @@ import Mag7 from '@/pages/Mag7'
 const navItems = [
   { label: 'Home', to: '/', end: true },
   { label: 'Screener', to: '/screener', end: false },
+  { label: 'ETFs', to: '/etf-screener', end: false },
   { label: 'Mag 7', to: '/mag7', end: false },
   { label: 'Stocks', to: '/stocks', end: false },
   { label: 'Sectors', to: '/sectors', end: false },
@@ -212,6 +214,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/screener" element={<Screener />} />
+          <Route path="/etf-screener" element={<EtfScreener />} />
           <Route path="/mag7" element={<Mag7 />} />
           <Route path="/stocks" element={<Stocks />} />
           <Route path="/sectors" element={<Sectors />} />

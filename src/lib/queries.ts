@@ -18,6 +18,7 @@ import {
   getAnnualEarnings,
   getCandles,
   getClassifications,
+  getEtfCategories,
   getQuarterlyEarnings,
   getRecommendations,
   getRsi,
@@ -25,12 +26,16 @@ import {
   getSectors,
   getTickerCard,
   getTickerCards,
+  searchEtfs,
   searchStocks,
   type AnalystRecommendations,
   type AnnualEarnings,
   type CandleSeries,
   type ChartRange,
   type Classifications,
+  type EtfCategories,
+  type EtfSearchResponse,
+  type EtfSearchSort,
   type MarketCapTier,
   type QuarterlyEarnings,
   type RsiSeries,
@@ -291,6 +296,54 @@ export function useClassifications(): UseQueryResult<Classifications> {
   return useQuery({
     queryKey: ['classifications'],
     queryFn: ({ signal }) => getClassifications(signal),
+    staleTime: 60 * 60 * 1000,
+  })
+}
+
+/** An ETF universe-search request: the text query, category filter, sort, and page window. */
+export interface EtfSearchParams {
+  q: string | null
+  category: string | null
+  sort: EtfSearchSort
+  order: SortOrder
+  limit: number
+  offset: number
+}
+
+/**
+ * A page of the screened ETF universe for the given filter/sort/window
+ * (`GET /stocks/etfs`). Like `useStockSearch`, keeps the previous page's rows on
+ * screen while the next loads (`keepPreviousData`), so paging and re-sorting
+ * don't flash empty.
+ */
+export function useEtfSearch(
+  params: EtfSearchParams,
+): UseQueryResult<EtfSearchResponse> {
+  return useQuery({
+    queryKey: ['etf-search', params],
+    queryFn: ({ signal }) =>
+      searchEtfs({
+        q: params.q,
+        category: params.category,
+        sort: params.sort,
+        order: params.order,
+        limit: params.limit,
+        offset: params.offset,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * The ETF universe's distinct category slugs for the screener's filter menu.
+ * They barely change, so hold them fresh for an hour rather than refetching on
+ * every visit (the same policy as `useClassifications`).
+ */
+export function useEtfCategories(): UseQueryResult<EtfCategories> {
+  return useQuery({
+    queryKey: ['etf-categories'],
+    queryFn: ({ signal }) => getEtfCategories(signal),
     staleTime: 60 * 60 * 1000,
   })
 }

@@ -20,4 +20,14 @@ describe('App routing', () => {
       await screen.findByRole('heading', { name: /^screener$/i }),
     ).toBeInTheDocument()
   })
+
+  it('renders the ETF screener page at /etf-screener', async () => {
+    const { user } = renderWithProviders(<App />)
+
+    await user.click(screen.getByRole('link', { name: /^etfs$/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /etf screener/i }),
+    ).toBeInTheDocument()
+  })
 })

@@ -785,6 +785,104 @@ export async function getClassifications(
   return data
 }
 
+/**
+ * A sort key for the ETF universe search. Only two columns rank a fund on a
+ * number: `net_assets` (assets under management — the "top ETFs" default) and
+ * `expense_ratio` (the annual fee — pair with an ascending order for the cheapest
+ * first). Category is a filter, not a sort — it's a label, not a magnitude.
+ */
+export type EtfSearchSort = 'net_assets' | 'expense_ratio'
+
+/**
+ * One row of an ETF universe search (`GET /stocks/etfs`) — the screened fund's
+ * stored facts, with no live price (the search is a single DB read; open the row
+ * for a live quote). `net_assets` is raw USD (assets under management, the ETF
+ * analogue of a stock's market cap); `expense_ratio` is the annual fee as a
+ * percent (`0.03` = 0.03%). `category` is the fund's snake_case Yahoo category
+ * slug (e.g. `large_growth`). Everything but `ticker` may be null until the sync
+ * enriches the fund.
+ */
+export interface EtfSearchResult {
+  ticker: string
+  name: string | null
+  exchange: string | null
+  net_assets: number | null
+  expense_ratio: number | null
+  category: string | null
+}
+
+/**
+ * A page of ETF-search results plus the pagination envelope — the same shape as
+ * the stock search (`total` is the full match count before the window, `count`
+ * this page's row count, `limit`/`offset` echo the window the page was cut with).
+ */
+export interface EtfSearchResponse {
+  total: number
+  limit: number
+  offset: number
+  count: number
+  results: EtfSearchResult[]
+}
+
+/**
+ * Search/filter/sort the screened top US ETF universe (`GET /stocks/etfs`). `q`
+ * matches (case-insensitive substring) the fund name OR ticker, so "gold"
+ * surfaces gold-miner funds and "SPY" matches by ticker; `category` takes a
+ * category slug (or a raw label — the API slugifies it). `sort` (default net
+ * assets) and `order` (default desc) order the page; `limit`/`offset` window it.
+ */
+export async function searchEtfs(
+  opts: {
+    q?: string | null
+    category?: string | null
+    sort?: EtfSearchSort
+    order?: SortOrder
+    limit?: number
+    offset?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<EtfSearchResponse> {
+  const qs = new URLSearchParams()
+  if (opts.q) qs.set('q', opts.q)
+  if (opts.category) qs.set('category', opts.category)
+  if (opts.sort) qs.set('sort', opts.sort)
+  if (opts.order) qs.set('order', opts.order)
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  if (opts.offset != null) qs.set('offset', String(opts.offset))
+  const res = await fetch(`${API_BASE}/stocks/etfs?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EtfSearchResponse
+  if (!Array.isArray(data?.results)) {
+    throw new ApiError(res.status, 'Malformed ETF search response')
+  }
+  return data
+}
+
+/**
+ * The distinct ETF category slugs present in the universe — the ETF screener's
+ * category filter menu (`GET /stocks/etfs/categories`). One flat, sorted list;
+ * feed a chosen slug back to `searchEtfs`, and humanize it for display with
+ * `humanizeClassification`.
+ */
+export interface EtfCategories {
+  categories: string[]
+}
+
+/** Fetch the ETF universe's distinct category slugs (the filter menu). */
+export async function getEtfCategories(
+  signal?: AbortSignal,
+): Promise<EtfCategories> {
+  const res = await fetch(`${API_BASE}/stocks/etfs/categories`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EtfCategories
+  if (!Array.isArray(data?.categories)) {
+    throw new ApiError(res.status, 'Malformed ETF categories response')
+  }
+  return data
+}
+
 /** True for minute/hour bars — the granularities where extended-hours windows appear. */
 const isIntradayTimeframe = (timeframe: string) => /Min|Hour/.test(timeframe)
 
