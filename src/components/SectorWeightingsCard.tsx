@@ -13,7 +13,8 @@ function SectorRow({
   weight: EtfSectorWeight
   maxWeight: number
 }) {
-  const barWidth = maxWeight > 0 ? `${(weight.weight / maxWeight) * 100}%` : '0%'
+  const barWidth =
+    maxWeight > 0 ? `${(weight.weight / maxWeight) * 100}%` : '0%'
   return (
     <Box sx={{ py: 1 }}>
       <Stack
@@ -40,7 +41,9 @@ function SectorRow({
           overflow: 'hidden',
         }}
       >
-        <Box sx={{ width: barWidth, height: '100%', bgcolor: 'primary.main' }} />
+        <Box
+          sx={{ width: barWidth, height: '100%', bgcolor: 'primary.main' }}
+        />
       </Box>
     </Box>
   )
@@ -62,11 +65,7 @@ export default function SectorWeightingsCard({
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider', height: '100%' }}>
       <CardContent sx={{ p: 3 }}>
-        <Typography
-          variant="h6"
-          component="h2"
-          sx={{ fontWeight: 600, mb: 1 }}
-        >
+        <Typography variant="h6" component="h2" sx={{ fontWeight: 600, mb: 1 }}>
           Sector Weightings
         </Typography>
         <Stack divider={<Box sx={{ borderTop: 1, borderColor: 'divider' }} />}>

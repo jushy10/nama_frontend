@@ -8,11 +8,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import {
-  humanizeClassification,
-  stockLogoUrl,
-  type EtfDetail,
-} from '@/lib/api'
+import { humanizeClassification, stockLogoUrl, type EtfDetail } from '@/lib/api'
 
 const fmt = (n: number | null) =>
   n == null

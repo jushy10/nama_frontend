@@ -117,7 +117,11 @@ export default function TopHoldingsCard({
         <Stack
           direction="row"
           spacing={1}
-          sx={{ justifyContent: 'space-between', alignItems: 'baseline', mb: 1 }}
+          sx={{
+            justifyContent: 'space-between',
+            alignItems: 'baseline',
+            mb: 1,
+          }}
         >
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Top Holdings
