@@ -656,12 +656,15 @@ export function humanizeClassification(slug: string): string {
 }
 
 /**
- * A sort key for the universe search. The three column metrics plus `growth` —
- * the equal-weight blend of trailing revenue and EPS growth (server-computed),
- * which ranks the fastest all-round growers from one control.
+ * A sort key for the universe search — the four column metrics (market cap,
+ * trailing P/E, and trailing revenue/EPS growth) plus `growth`, the
+ * equal-weight blend of trailing revenue and EPS growth (server-computed) that
+ * ranks the fastest all-round growers from one control and has no column of its
+ * own.
  */
 export type StockSearchSort =
   | 'market_cap'
+  | 'pe'
   | 'revenue_growth'
   | 'eps_growth'
   | 'growth'
@@ -678,10 +681,12 @@ export type MarketCapTier = 'mega' | 'large' | 'mid' | 'small'
 /**
  * One row of a universe search (`GET /stocks/ticker`) — the screened stock's
  * stored facts, with no live price (the search is a single DB read; open the row
- * for a live quote). `market_cap` is raw USD; the two `*_growth_yoy` are the
- * latest trailing year-over-year growth (percent, EPS on the analyst-consensus
- * basis). `in_sp500`/`in_nasdaq100` are definite booleans; everything else may be
- * null until the enriching sync reaches the stock.
+ * for a live quote). `market_cap` is raw USD; `pe_ratio` is the trailing
+ * price-to-earnings multiple (price over trailing EPS), null for a loss-maker or
+ * an uncovered name; the two `*_growth_yoy` are the latest trailing
+ * year-over-year growth (percent, EPS on the analyst-consensus basis).
+ * `in_sp500`/`in_nasdaq100` are definite booleans; everything else may be null
+ * until the enriching sync reaches the stock.
  */
 export interface StockSearchResult {
   ticker: string
@@ -689,6 +694,7 @@ export interface StockSearchResult {
   sector: string | null
   industry: string | null
   market_cap: number | null
+  pe_ratio: number | null
   revenue_growth_yoy: number | null
   eps_growth_yoy: number | null
   in_sp500: boolean

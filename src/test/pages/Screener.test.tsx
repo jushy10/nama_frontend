@@ -21,6 +21,7 @@ const SEARCH_PAGE = {
       sector: 'technology',
       industry: 'semiconductors',
       market_cap: 3.2e12,
+      pe_ratio: 33.36,
       revenue_growth_yoy: 61.6,
       eps_growth_yoy: 587.4,
       in_sp500: true,
@@ -32,6 +33,7 @@ const SEARCH_PAGE = {
       sector: 'energy',
       industry: 'oil_gas_integrated',
       market_cap: 5.0e11,
+      pe_ratio: null,
       revenue_growth_yoy: -2.0,
       eps_growth_yoy: 3.1,
       in_sp500: true,
@@ -84,10 +86,22 @@ describe('Screener', () => {
     expect(await screen.findByText('NVDA')).toBeInTheDocument()
     expect(screen.getByText('Nvidia')).toBeInTheDocument()
     expect(screen.getByText('XOM')).toBeInTheDocument()
-    // Compact market cap, signed growth, and the total-count summary.
+    // Compact market cap, the P/E multiple, signed growth, and the total-count
+    // summary.
     expect(screen.getByText('$3.2T')).toBeInTheDocument()
+    expect(screen.getByText('33.36')).toBeInTheDocument()
     expect(screen.getByText('+61.6%')).toBeInTheDocument()
     expect(screen.getByText(/2 stocks/)).toBeInTheDocument()
+  })
+
+  it('applies no sort by default (omits the sort/order params)', async () => {
+    const calls = stubApi()
+    renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    const url = lastSearchUrl(calls)
+    expect(url).not.toMatch(/[?&]sort=/)
+    expect(url).not.toMatch(/[?&]order=/)
   })
 
   it('searches by name or ticker (debounced) via the q param', async () => {
@@ -138,6 +152,17 @@ describe('Screener', () => {
     expect(lastSearchUrl(calls)).toMatch(/order=desc/)
   })
 
+  it('sorts by P/E when its column header is clicked', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByText('P/E'))
+
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=pe(&|$)/))
+    expect(lastSearchUrl(calls)).toMatch(/order=desc/)
+  })
+
   it('sorts by a metric chosen from the mobile "Sort by" menu', async () => {
     const calls = stubApi()
     const { user } = renderWithProviders(<Screener />)
@@ -160,6 +185,10 @@ describe('Screener', () => {
     const { user } = renderWithProviders(<Screener />)
     await screen.findByText('NVDA')
 
+    // The direction toggle is inert until a sort is active, so pick one first.
+    await user.click(screen.getByText('Mkt Cap'))
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/order=desc/))
+
     // Default is descending; the toggle's label names the action it performs.
     await user.click(screen.getByRole('button', { name: /sort ascending/i }))
 
@@ -177,6 +206,25 @@ describe('Screener', () => {
     )
 
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=growth/))
+  })
+
+  it('clears an active sort back to none via the "None" option', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // Sort by something, then pick "None" to return to the unsorted default.
+    await user.click(screen.getByText('EPS Growth'))
+    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=eps_growth/))
+
+    await user.click(screen.getByRole('combobox', { name: /sort by/i }))
+    await user.click(await screen.findByRole('option', { name: 'None' }))
+
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).not.toMatch(/[?&]sort=/)
+      expect(url).not.toMatch(/[?&]order=/)
+    })
   })
 
   it('filters by a market-cap tier via the market_cap param', async () => {
