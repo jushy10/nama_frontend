@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
@@ -55,6 +55,7 @@ export default function Stocks() {
   // The ticker lives in the URL (?symbol=AAPL) so a snapshot is shareable and
   // links from elsewhere (e.g. the home-page screener) deep-link straight in.
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const urlSymbol = (searchParams.get('symbol') ?? '').trim().toUpperCase()
   const [symbol, setSymbol] = useState(urlSymbol)
   const [range, setRange] = useState<ChartRange>('6M')
@@ -80,6 +81,19 @@ export default function Stocks() {
   useEffect(() => {
     if (urlSymbol) setSymbol(urlSymbol)
   }, [urlSymbol])
+
+  // A ticker that's actually a fund belongs on the ETF page — bounce it there
+  // (replacing history so Back doesn't ping-pong), keyed off the card's
+  // asset_type. The stock content below is gated on this so its cards never
+  // flash for a fund mid-redirect.
+  const loadedIsEtf = stockQuery.data?.asset_type === 'etf'
+  useEffect(() => {
+    if (loadedIsEtf && loadedSymbol) {
+      navigate(`/etfs?symbol=${encodeURIComponent(loadedSymbol)}`, {
+        replace: true,
+      })
+    }
+  }, [loadedIsEtf, loadedSymbol, navigate])
 
   // Submitting just writes the ticker to the URL; the snapshot query keys off
   // that, so manual searches, deep links, and back/forward all run one path.
@@ -140,7 +154,7 @@ export default function Stocks() {
       </Stack>
 
       <Box sx={{ mt: 4 }}>
-        {loading && (
+        {(loading || loadedIsEtf) && (
           <Stack sx={{ alignItems: 'center', py: 2 }}>
             <CircularProgress />
           </Stack>
@@ -150,7 +164,7 @@ export default function Stocks() {
             {errorMessage(stockQuery.error)}
           </Alert>
         )}
-        {stock && (
+        {stock && !loadedIsEtf && (
           <Stack spacing={3}>
             {/* Snapshot rides beside the Performance + Profitability stack on
                 desktop (md+) and stacks on mobile; the price chart below keeps

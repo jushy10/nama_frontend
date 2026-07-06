@@ -22,6 +22,7 @@ import { useColorMode } from '@/ColorModeProvider'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
+import Etfs from '@/pages/Etfs'
 import Stocks from '@/pages/Stocks'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
@@ -215,6 +216,7 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/screener" element={<Screener />} />
           <Route path="/etf-screener" element={<EtfScreener />} />
+          <Route path="/etfs" element={<Etfs />} />
           <Route path="/mag7" element={<Mag7 />} />
           <Route path="/stocks" element={<Stocks />} />
           <Route path="/sectors" element={<Sectors />} />

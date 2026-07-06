@@ -69,6 +69,14 @@ export interface OptionsMetrics {
 }
 
 /**
+ * What kind of instrument a symbol is. `equity` is a common stock; `etf` is an
+ * exchange-traded fund (present in the screened ETF universe). Drives which
+ * detail page a ticker belongs on — the stock page (`/stocks`) redirects an
+ * `etf` to the fund page (`/etfs`), and vice versa.
+ */
+export type AssetType = 'equity' | 'etf'
+
+/**
  * The per-ticker card from `/stocks/ticker/{ticker}` — the app's one stock
  * snapshot: the live quote plus name, exchange, market cap, and the company's
  * `sector`/`industry` classification. The classification arrives as the
@@ -81,6 +89,8 @@ export interface TickerCard {
   ticker: string
   name: string | null
   exchange: string | null
+  /** `etf` when the ticker is in the ETF universe, else `equity`. */
+  asset_type: AssetType
   sector: string | null
   industry: string | null
   price: number
@@ -881,6 +891,79 @@ export async function getEtfCategories(
     throw new ApiError(res.status, 'Malformed ETF categories response')
   }
   return data
+}
+
+/**
+ * One line of a fund's portfolio: the held company's `ticker` and `name`, and
+ * its `weight` as a percent of net assets (`7.89` = 7.89%). Any field is null
+ * when the vendor omits it (an odd row can lack a `ticker`); link the ticker to
+ * its own stock page when present.
+ */
+export interface EtfHolding {
+  ticker: string | null
+  name: string | null
+  weight: number | null
+}
+
+/**
+ * A fund's exposure to one GICS sector, as a percent of net assets (`39.13` =
+ * 39.13%). `sector` is a snake_case slug (e.g. `technology`,
+ * `financial_services`) — humanize it with `humanizeClassification`.
+ */
+export interface EtfSectorWeight {
+  sector: string
+  weight: number
+}
+
+/**
+ * The per-fund detail from `GET /stocks/etf/{ticker}` — an ETF's live quote plus
+ * its fund profile: the stored screen facts (`category`, `net_assets`,
+ * `expense_ratio`) enriched with `fund_family`, `nav`, distribution
+ * `dividend_yield`, the trailing `ytd`/`three_year`/`five_year` returns, a
+ * `description`, and the `top_holdings` + `sector_weightings` breakdowns. Every
+ * percent is a human percent (`0.03` = 0.03%); best-effort enrichment fields are
+ * null (or `[]` for the breakdowns) when the vendor is down or omits them. The
+ * endpoint 404s for a ticker that isn't in the ETF universe.
+ */
+export interface EtfDetail {
+  ticker: string
+  name: string | null
+  exchange: string | null
+  asset_type: AssetType
+  price: number
+  change: number | null
+  change_percent: number | null
+  previous_close: number | null
+  as_of: string | null
+  category: string | null
+  fund_family: string | null
+  net_assets: number | null
+  expense_ratio: number | null
+  nav: number | null
+  dividend_yield: number | null
+  ytd_return: number | null
+  three_year_return: number | null
+  five_year_return: number | null
+  description: string | null
+  top_holdings: EtfHolding[]
+  sector_weightings: EtfSectorWeight[]
+}
+
+/**
+ * Fetch one fund's live detail (`GET /stocks/etf/{ticker}`). Throws an
+ * `ApiError` with status 404 when the ticker isn't a screened ETF — the fund
+ * page keys off that to bounce a stock symbol over to `/stocks`.
+ */
+export async function getEtfDetail(
+  ticker: string,
+  signal?: AbortSignal,
+): Promise<EtfDetail> {
+  const res = await fetch(
+    `${API_BASE}/stocks/etf/${encodeURIComponent(ticker)}`,
+    { signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as EtfDetail
 }
 
 /** True for minute/hour bars — the granularities where extended-hours windows appear. */
