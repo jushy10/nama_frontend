@@ -2,7 +2,7 @@ import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import { pegVerdict, type PegVerdict } from '@/lib/api'
 
 // Amber for the unremarkable 1–2 middle — matches the Profitability card's
-// cautionary tier and the RSI card's neutral call.
+// cautionary tier, the shared amber the verdict cards use for a neutral call.
 const FAIR_COLOR = '#fbbf24' // amber-400
 
 // The gauge spans 0 → 3×. PEG is only served for positive earnings and growth,
