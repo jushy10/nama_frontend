@@ -169,7 +169,7 @@ describe('EtfScreener', () => {
     const { user } = renderWithProviders(
       <Routes>
         <Route path="/" element={<EtfScreener />} />
-        <Route path="/etfs" element={<EtfStub />} />
+        <Route path="/search" element={<EtfStub />} />
       </Routes>,
     )
 

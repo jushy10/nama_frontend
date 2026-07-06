@@ -951,8 +951,8 @@ export interface EtfDetail {
 
 /**
  * Fetch one fund's live detail (`GET /stocks/etf/{ticker}`). Throws an
- * `ApiError` with status 404 when the ticker isn't a screened ETF — the fund
- * page keys off that to bounce a stock symbol over to `/stocks`.
+ * `ApiError` with status 404 when the ticker isn't a screened ETF — Search only
+ * hits this once a ticker is classified as a fund, so it normally resolves.
  */
 export async function getEtfDetail(
   ticker: string,

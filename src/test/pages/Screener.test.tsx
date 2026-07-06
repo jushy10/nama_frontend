@@ -255,7 +255,7 @@ describe('Screener', () => {
     const { user } = renderWithProviders(
       <Routes>
         <Route path="/" element={<Screener />} />
-        <Route path="/stocks" element={<StockStub />} />
+        <Route path="/search" element={<StockStub />} />
       </Routes>,
     )
 

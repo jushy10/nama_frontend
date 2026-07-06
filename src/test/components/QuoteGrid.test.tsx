@@ -42,7 +42,7 @@ describe('QuoteGrid', () => {
     const link = await screen.findByRole('link', {
       name: /view apple \(aapl\) details/i,
     })
-    expect(link).toHaveAttribute('href', '/stocks?symbol=AAPL')
+    expect(link).toHaveAttribute('href', '/search?symbol=AAPL')
 
     // The company logo is rendered from the logo endpoint.
     const logo = screen.getByRole('img', { name: /aapl logo/i })

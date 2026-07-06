@@ -11,23 +11,33 @@ describe('App routing', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders the screener page at /screener', async () => {
+  it('renders the stock screener page at /screener', async () => {
     const { user } = renderWithProviders(<App />)
 
-    await user.click(screen.getByRole('link', { name: /^screener$/i }))
+    await user.click(screen.getByRole('link', { name: /stock screener/i }))
 
     expect(
-      await screen.findByRole('heading', { name: /^screener$/i }),
+      await screen.findByRole('heading', { name: /stock screener/i }),
     ).toBeInTheDocument()
   })
 
   it('renders the ETF screener page at /etf-screener', async () => {
     const { user } = renderWithProviders(<App />)
 
-    await user.click(screen.getByRole('link', { name: /^etfs$/i }))
+    await user.click(screen.getByRole('link', { name: /etf screener/i }))
 
     expect(
       await screen.findByRole('heading', { name: /etf screener/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('renders the unified search page at /search', async () => {
+    const { user } = renderWithProviders(<App />)
+
+    await user.click(screen.getByRole('link', { name: /^search$/i }))
+
+    expect(
+      await screen.findByRole('heading', { name: /^search$/i }),
     ).toBeInTheDocument()
   })
 })

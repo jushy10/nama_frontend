@@ -22,17 +22,17 @@ import { useColorMode } from '@/ColorModeProvider'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
-import Etfs from '@/pages/Etfs'
-import Stocks from '@/pages/Stocks'
+import Search from '@/pages/Search'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
+import RedirectToSearch from '@/components/RedirectToSearch'
 
 const navItems = [
   { label: 'Home', to: '/', end: true },
-  { label: 'Screener', to: '/screener', end: false },
-  { label: 'ETFs', to: '/etf-screener', end: false },
+  { label: 'Search', to: '/search', end: false },
+  { label: 'Stock Screener', to: '/screener', end: false },
+  { label: 'ETF Screener', to: '/etf-screener', end: false },
   { label: 'Mag 7', to: '/mag7', end: false },
-  { label: 'Stocks', to: '/stocks', end: false },
   { label: 'Sectors', to: '/sectors', end: false },
 ]
 
@@ -214,12 +214,14 @@ function App() {
       <Box component="main" sx={{ flex: 1 }}>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/search" element={<Search />} />
           <Route path="/screener" element={<Screener />} />
           <Route path="/etf-screener" element={<EtfScreener />} />
-          <Route path="/etfs" element={<Etfs />} />
           <Route path="/mag7" element={<Mag7 />} />
-          <Route path="/stocks" element={<Stocks />} />
           <Route path="/sectors" element={<Sectors />} />
+          {/* Legacy detail URLs — the stock/fund views now live under /search. */}
+          <Route path="/stocks" element={<RedirectToSearch />} />
+          <Route path="/etfs" element={<RedirectToSearch />} />
         </Routes>
       </Box>
 

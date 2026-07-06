@@ -24,11 +24,11 @@ describe('TopHoldingsCard', () => {
     renderWithProviders(<TopHoldingsCard holdings={holdings} />)
     expect(screen.getByRole('link', { name: 'NVDA' })).toHaveAttribute(
       'href',
-      '/stocks?symbol=NVDA',
+      '/search?symbol=NVDA',
     )
     expect(screen.getByRole('link', { name: 'AAPL' })).toHaveAttribute(
       'href',
-      '/stocks?symbol=AAPL',
+      '/search?symbol=AAPL',
     )
   })
 
