@@ -651,13 +651,24 @@ export async function getScreener(
   return data
 }
 
+// A few vendor slugs don't follow the underscore convention, so the generic
+// split-and-title-case would mangle them (Yahoo's fund sector keys, e.g.
+// `realestate` → "Realestate"). Map those explicitly.
+const CLASSIFICATION_ALIASES: Record<string, string> = {
+  realestate: 'Real Estate',
+}
+
 /**
  * Turn a backend snake_case classification slug into a display label —
  * `"consumer_electronics"` → `"Consumer Electronics"`. Words split on
- * underscores and title-cased; anything already spaced passes through. Used for
- * the universe screener's sector/industry menus and rows, and the stock card.
+ * underscores and title-cased; anything already spaced passes through. A few
+ * non-underscore vendor slugs are aliased first (see `CLASSIFICATION_ALIASES`).
+ * Used for the universe screener's sector/industry menus and rows, the stock
+ * card, and the ETF sector-weighting breakdown.
  */
 export function humanizeClassification(slug: string): string {
+  const alias = CLASSIFICATION_ALIASES[slug.toLowerCase()]
+  if (alias) return alias
   return slug
     .split('_')
     .filter(Boolean)

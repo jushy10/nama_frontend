@@ -44,6 +44,11 @@ describe('humanizeClassification', () => {
     expect(humanizeClassification('_reit_')).toBe('Reit')
     expect(humanizeClassification('')).toBe('')
   })
+
+  it('aliases non-underscore vendor slugs (Yahoo fund sectors)', () => {
+    // Without the alias the generic title-case yields "Realestate".
+    expect(humanizeClassification('realestate')).toBe('Real Estate')
+  })
 })
 
 describe('clampToRegularHours', () => {
