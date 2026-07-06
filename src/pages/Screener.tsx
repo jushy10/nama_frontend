@@ -51,23 +51,31 @@ const HIDE_SM = { display: { xs: 'none', sm: 'table-cell' } } as const
 const HIDE_MD = { display: { xs: 'none', md: 'table-cell' } } as const
 const HIDE_LG = { display: { xs: 'none', lg: 'table-cell' } } as const
 
-// The three metric columns — all shown at every width so the metric you sort by is
+// The metric columns — all shown at every width so the metric you sort by is
 // always visible. Their headers double as sort toggles (see `onSort`).
 const METRIC_COLUMNS: { key: StockSearchSort; label: string }[] = [
   { key: 'market_cap', label: 'Mkt Cap' },
+  { key: 'pe', label: 'P/E' },
   { key: 'revenue_growth', label: 'Rev Growth' },
   { key: 'eps_growth', label: 'EPS Growth' },
 ]
 
-// The always-available "Sort by" menu — the three columns plus `growth`, the
+// The always-available "Sort by" menu — the four columns plus `growth`, the
 // server-side equal-weight blend of trailing revenue + EPS growth. `growth` has no
 // column of its own; it reorders the list by both figures at once.
 const SORT_OPTIONS: { key: StockSearchSort; label: string }[] = [
   { key: 'market_cap', label: 'Market cap' },
+  { key: 'pe', label: 'P/E ratio' },
   { key: 'revenue_growth', label: 'Revenue growth' },
   { key: 'eps_growth', label: 'EPS growth' },
   { key: 'growth', label: 'Growth (EPS + Rev)' },
 ]
+
+// Sentinel for the "Sort by" dropdown's no-sort choice — the page starts with no
+// sort applied and this is how you return to it. A `null` sort omits the API's
+// `sort`/`order` params, so rows arrive in the backend's own default order (it's
+// server-paginated, so ordering can't be a client-side concern).
+const NO_SORT = 'none'
 
 // The market-cap tier filter's options, each mapping to the API's `market_cap`
 // value; `all` clears the filter. Ranges are the API's half-open buckets.
@@ -80,7 +88,7 @@ const MARKET_CAP_TIERS: { value: MarketCapTier | 'all'; label: string }[] = [
 ]
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
-// industry, indices, + the three metrics.
+// industry, indices, + the metric columns.
 const COLSPAN = 4 + METRIC_COLUMNS.length
 
 /** Compact dollar magnitude, e.g. $3.21T / $845B / $12.4M. */
@@ -96,6 +104,10 @@ const fmtMoney = (n: number | null) =>
 /** Signed percent to one decimal — growth reads best with its direction. */
 const fmtPct = (n: number | null) =>
   n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`
+
+/** A bare P/E multiple to two decimals (matching the stock card's valuation
+ *  grid); a dash for a loss-maker or an uncovered name. */
+const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
 
 const growthColor = (n: number | null) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
@@ -213,6 +225,18 @@ function StockRow({
       >
         {fmtMoney(stock.market_cap)}
       </TableCell>
+      {/* P/E isn't directional (cheap isn't universally good), so it stays a
+          neutral figure — only the empty dash is dimmed, like the other cells. */}
+      <TableCell
+        align="right"
+        sx={{
+          color: stock.pe_ratio == null ? 'text.secondary' : 'text.primary',
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+        }}
+      >
+        {fmtMultiple(stock.pe_ratio)}
+      </TableCell>
       <TableCell
         align="right"
         sx={{
@@ -263,6 +287,9 @@ function SkeletonRow() {
         <Skeleton width={56} sx={{ ml: 'auto' }} />
       </TableCell>
       <TableCell align="right">
+        <Skeleton width={40} sx={{ ml: 'auto' }} />
+      </TableCell>
+      <TableCell align="right">
         <Skeleton width={48} sx={{ ml: 'auto' }} />
       </TableCell>
       <TableCell align="right">
@@ -274,9 +301,11 @@ function SkeletonRow() {
 
 /**
  * Screener page: search and filter the screened ≥$1B US universe by name/ticker,
- * sector, industry and index membership, sorted by market cap or trailing growth.
- * Rows are stored facts (no live price) served straight from the DB, so a page is
- * one cheap query; clicking a row opens that stock's live detail page.
+ * sector, industry and index membership. No sort is applied by default — rows
+ * come back in the backend's own order until you pick a metric to sort by (via a
+ * column header or the "Sort by" menu). Rows are stored facts (no live price)
+ * served straight from the DB, so a page is one cheap query; clicking a row opens
+ * that stock's live detail page.
  */
 export default function Screener() {
   const [searchInput, setSearchInput] = useState('')
@@ -286,7 +315,8 @@ export default function Screener() {
   const [sp500, setSp500] = useState(false)
   const [nasdaq100, setNasdaq100] = useState(false)
   const [marketCap, setMarketCap] = useState<MarketCapTier | 'all'>('all')
-  const [sort, setSort] = useState<StockSearchSort>('market_cap')
+  // Null = no sort applied (the default landing state); a metric key sorts.
+  const [sort, setSort] = useState<StockSearchSort | null>(null)
   const [order, setOrder] = useState<SortOrder>('desc')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
@@ -495,29 +525,37 @@ export default function Screener() {
             select
             size="small"
             label="Sort by"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as StockSearchSort)}
+            value={sort ?? NO_SORT}
+            onChange={(e) => {
+              const v = e.target.value
+              setSort(v === NO_SORT ? null : (v as StockSearchSort))
+            }}
             sx={{ minWidth: 150, flexGrow: 1 }}
           >
+            <MenuItem value={NO_SORT}>None</MenuItem>
             {SORT_OPTIONS.map((opt) => (
               <MenuItem key={opt.key} value={opt.key}>
                 {opt.label}
               </MenuItem>
             ))}
           </TextField>
+          {/* Direction only means something once a sort is chosen. */}
           <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
-            <IconButton
-              onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-              aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
-              sx={{ color: 'text.secondary' }}
-            >
-              <ArrowDownwardIcon
-                sx={{
-                  transition: 'transform 150ms ease',
-                  transform: order === 'asc' ? 'rotate(180deg)' : 'none',
-                }}
-              />
-            </IconButton>
+            <span>
+              <IconButton
+                onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                disabled={sort == null}
+                aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
+                sx={{ color: 'text.secondary' }}
+              >
+                <ArrowDownwardIcon
+                  sx={{
+                    transition: 'transform 150ms ease',
+                    transform: order === 'asc' ? 'rotate(180deg)' : 'none',
+                  }}
+                />
+              </IconButton>
+            </span>
           </Tooltip>
         </Stack>
 
