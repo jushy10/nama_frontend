@@ -278,7 +278,11 @@ export default function QuoteGrid({
 
   return (
     <Box
-      sx={{ display: 'grid', gridTemplateColumns: gridColumns(linkToStock), gap: 2 }}
+      sx={{
+        display: 'grid',
+        gridTemplateColumns: gridColumns(linkToStock),
+        gap: 2,
+      }}
     >
       {quotes == null
         ? items.map((def) => (
