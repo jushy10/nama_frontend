@@ -293,6 +293,9 @@ export interface StockSearchParams {
   order: SortOrder
   limit: number
   offset: number
+  /** Skip the request while false — e.g. a typeahead with an empty box, so no
+   *  default page loads to fall back on. Defaults to on. */
+  enabled?: boolean
 }
 
 /**
@@ -323,6 +326,7 @@ export function useStockSearch(
         signal,
       }),
     placeholderData: keepPreviousData,
+    enabled: params.enabled ?? true,
   })
 }
 
@@ -347,6 +351,9 @@ export interface EtfSearchParams {
   order: SortOrder
   limit: number
   offset: number
+  /** Skip the request while false — e.g. a typeahead with an empty box, so no
+   *  default page loads to fall back on. Defaults to on. */
+  enabled?: boolean
 }
 
 /**
@@ -371,6 +378,7 @@ export function useEtfSearch(
         signal,
       }),
     placeholderData: keepPreviousData,
+    enabled: params.enabled ?? true,
   })
 }
 
