@@ -5,7 +5,9 @@ import {
   Card,
   CardContent,
   CircularProgress,
+  FormControlLabel,
   Stack,
+  Switch,
   Typography,
 } from '@mui/material'
 import {
@@ -21,6 +23,7 @@ import {
   useFiveYearReturn,
   useQuarterlyEarnings,
   useRecommendations,
+  useSupportLevels,
   useTickerCard,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
@@ -54,6 +57,7 @@ const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
  */
 export default function StockDetail({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<ChartRange>('6M')
+  const [showSupport, setShowSupport] = useState(true)
   const cardQuery = useTickerCard(symbol, SNAPSHOT_BLOCKS)
   const stock = cardQuery.data
   // The chart, 5Y pill, ratings, and earnings ride the *loaded* ticker, so they
@@ -63,6 +67,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // annual series (best-effort) backs the card's Quarterly/Annual toggle.
   const loadedSymbol = stock?.ticker ?? null
   const candleQuery = useCandles(loadedSymbol, range)
+  // Support levels ride the loaded ticker, keyed by symbol only — a fixed 1Y
+  // scan that doesn't refetch as the range changes; the chart draws just the
+  // ones inside the visible price range.
+  const supportQuery = useSupportLevels(loadedSymbol)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
@@ -170,7 +178,30 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                 <RangeReturn candles={candleQuery.data.candles} />
               )}
             </Stack>
-            <ChartRangeToggle value={range} onChange={setRange} />
+            <Stack
+              direction="row"
+              spacing={1.5}
+              sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+            >
+              {(supportQuery.data?.levels.length ?? 0) > 0 && (
+                <FormControlLabel
+                  control={
+                    <Switch
+                      size="small"
+                      checked={showSupport}
+                      onChange={(e) => setShowSupport(e.target.checked)}
+                    />
+                  }
+                  label="Support levels"
+                  sx={{
+                    m: 0,
+                    color: 'text.secondary',
+                    '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                  }}
+                />
+              )}
+              <ChartRangeToggle value={range} onChange={setRange} />
+            </Stack>
           </Stack>
 
           {candleQuery.isLoading && (
@@ -193,6 +224,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             <CandleChart
               candles={candleQuery.data.candles}
               timeframe={candleQuery.data.timeframe}
+              supportLevels={
+                showSupport ? supportQuery.data?.levels : undefined
+              }
             />
           )}
         </CardContent>

@@ -6,7 +6,7 @@ import {
   type PointerEvent,
 } from 'react'
 import { Box, Stack, Typography, useTheme } from '@mui/material'
-import type { Candle } from '@/lib/api'
+import type { Candle, SupportLevel } from '@/lib/api'
 
 // The chart's viewBox width tracks the container's pixel width (measured below),
 // so one viewBox unit ≈ one CSS pixel and the in-SVG axis text stays legible on
@@ -18,6 +18,17 @@ const W_FALLBACK = 820
 const H = 360
 const PAD = { top: 14, right: 58, bottom: 26, left: 10 }
 const VOL_BAND = 54 // height reserved for the volume histogram at the bottom
+
+// Support-level line weight/opacity by strength — a level the price has turned
+// up from more often reads bolder.
+const SUPPORT_STRENGTH: Record<
+  SupportLevel['strength'],
+  { width: number; opacity: number }
+> = {
+  weak: { width: 1, opacity: 0.5 },
+  moderate: { width: 1.25, opacity: 0.68 },
+  strong: { width: 1.75, opacity: 0.9 },
+}
 
 const fmtPrice = (n: number) =>
   n.toLocaleString('en-US', {
@@ -56,6 +67,12 @@ interface Props {
   candles: Candle[]
   /** Granularity label, e.g. "1Day"; selects intraday vs. date axis labels. */
   timeframe?: string
+  /**
+   * Horizontal support levels to overlay. Only those whose price falls inside
+   * the chart's visible range are drawn, so long-term levels quietly drop off a
+   * zoomed-in view rather than distorting its scale.
+   */
+  supportLevels?: SupportLevel[]
 }
 
 /**
@@ -64,7 +81,11 @@ interface Props {
  * legend above the plot. Renders as a single responsive SVG whose viewBox width
  * tracks the container, so it stays sharp and legible down to phone widths.
  */
-export default function CandleChart({ candles, timeframe }: Props) {
+export default function CandleChart({
+  candles,
+  timeframe,
+  supportLevels,
+}: Props) {
   const theme = useTheme()
   const [hover, setHover] = useState<number | null>(null)
 
@@ -93,6 +114,8 @@ export default function CandleChart({ candles, timeframe }: Props) {
   const down = theme.palette.error.main
   const grid = theme.palette.divider
   const axis = theme.palette.text.secondary
+  const support = theme.palette.info.main
+  const supportText = theme.palette.info.contrastText
   const intraday = !!timeframe && /Min|Hour/.test(timeframe)
 
   const geo = useMemo(() => {
@@ -138,7 +161,7 @@ export default function CandleChart({ candles, timeframe }: Props) {
       Math.round((i * (n - 1)) / Math.max(dateN - 1, 1)),
     )
 
-    return { x, y, volY, volTop, slot, bodyW, priceTicks, dateIdx, n }
+    return { x, y, volY, volTop, slot, bodyW, priceTicks, dateIdx, n, min, max }
   }, [candles, W, intraday])
 
   if (candles.length === 0) {
@@ -149,7 +172,7 @@ export default function CandleChart({ candles, timeframe }: Props) {
     )
   }
 
-  const { x, y, volY, volTop, bodyW, priceTicks, dateIdx } = geo
+  const { x, y, volY, volTop, bodyW, priceTicks, dateIdx, min, max } = geo
   const active = hover ?? candles.length - 1
   const c = candles[active]
   const cUp = c.close >= c.open
@@ -332,6 +355,47 @@ export default function CandleChart({ candles, timeframe }: Props) {
                 height={h}
                 fill={color}
               />
+            </g>
+          )
+        })}
+
+        {/* support levels: dashed price lines (in view only) with an axis tag,
+            drawn over the candles but under the hover crosshair */}
+        {supportLevels?.map((lvl, i) => {
+          if (lvl.price < min || lvl.price > max) return null
+          const yy = y(lvl.price)
+          const s = SUPPORT_STRENGTH[lvl.strength] ?? SUPPORT_STRENGTH.weak
+          return (
+            <g key={`s${i}`} pointerEvents="none">
+              <line
+                x1={PAD.left}
+                x2={W - PAD.right}
+                y1={yy}
+                y2={yy}
+                stroke={support}
+                strokeWidth={s.width}
+                strokeDasharray="5 4"
+                opacity={s.opacity}
+              />
+              <rect
+                x={W - PAD.right + 1}
+                y={yy - 7}
+                width={PAD.right - 2}
+                height={14}
+                rx={2}
+                fill={support}
+                opacity={Math.min(1, s.opacity + 0.2)}
+              />
+              <text
+                x={W - PAD.right + (PAD.right - 1) / 2}
+                y={yy + 3.5}
+                fontSize={10}
+                fontWeight={600}
+                fill={supportText}
+                textAnchor="middle"
+              >
+                {fmtPrice(lvl.price)}
+              </text>
             </g>
           )
         })}

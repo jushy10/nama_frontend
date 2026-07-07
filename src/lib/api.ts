@@ -209,6 +209,37 @@ export interface RsiSeries {
   points: RsiPoint[]
 }
 
+/** How firmly a support level has held, by how many swing lows formed it. */
+export type SupportStrength = 'weak' | 'moderate' | 'strong'
+
+/**
+ * One horizontal support level — a price zone where the stock has repeatedly
+ * found buyers (clustered swing lows). `touches` is how many formed it,
+ * `last_touched` dates the most recent, and `distance_percent` is how far the
+ * level sits below the reference price (`<= 0`, since support is under the price).
+ */
+export interface SupportLevel {
+  price: number
+  touches: number
+  last_touched: string // ISO date (YYYY-MM-DD)
+  strength: SupportStrength
+  distance_percent: number
+}
+
+/**
+ * Detected support levels for a ticker, strongest-ranked and returned
+ * nearest-first. `reference_price` is the latest close the levels were measured
+ * against — what "below the current price" means here. `levels` is empty when
+ * there isn't enough history, or no swing low sits below the price, to find any.
+ */
+export interface SupportLevels {
+  symbol: string
+  timeframe: string
+  reference_price: number
+  count: number
+  levels: SupportLevel[]
+}
+
 /** A trading suggestion derived from RSI, from Strong Buy down to Strong Sell. */
 export type RsiAction = 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell'
 
@@ -1171,6 +1202,34 @@ export async function getRsi(
   const data = (await res.json()) as RsiSeries
   if (!Array.isArray(data?.points)) {
     throw new ApiError(res.status, 'Malformed RSI response')
+  }
+  return data
+}
+
+/**
+ * Fetch detected support levels for a ticker. Defaults to a 1-year daily scan —
+ * a fixed window independent of the chart's range, so the levels stay stable as
+ * the user zooms and only the ones inside the visible price range get drawn.
+ */
+export async function getSupportLevels(
+  symbol: string,
+  opts: {
+    range?: ChartRange
+    timeframe?: Timeframe
+    signal?: AbortSignal
+  } = {},
+): Promise<SupportLevels> {
+  const timeframe = opts.timeframe ?? '1Day'
+  const range = opts.range ?? '1Y'
+  const qs = new URLSearchParams({ timeframe, range })
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/support-levels?${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as SupportLevels
+  if (!Array.isArray(data?.levels)) {
+    throw new ApiError(res.status, 'Malformed support-levels response')
   }
   return data
 }

@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  getSupportLevels,
   humanizeClassification,
   lastSessionOnly,
   optionsLevel,
@@ -415,5 +416,74 @@ describe('getCandles 10Y window', () => {
     expect(requestedUrl).toContain('timeframe=1Week')
     expect(requestedUrl).toContain('start=')
     expect(requestedUrl).not.toContain('range=')
+  })
+})
+
+describe('getSupportLevels', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests a fixed 1Y daily scan and returns the parsed levels', async () => {
+    let requestedUrl = ''
+    const body = {
+      symbol: 'AAPL',
+      timeframe: '1Day',
+      reference_price: 208.4,
+      count: 2,
+      levels: [
+        {
+          price: 195.2,
+          touches: 3,
+          last_touched: '2026-05-14',
+          strength: 'strong',
+          distance_percent: -6.33,
+        },
+        {
+          price: 172.5,
+          touches: 2,
+          last_touched: '2026-02-03',
+          strength: 'moderate',
+          distance_percent: -17.23,
+        },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getSupportLevels('AAPL')
+
+    // A fixed 1Y daily window, independent of any chart range.
+    expect(requestedUrl).toContain('/stocks/AAPL/support-levels')
+    expect(requestedUrl).toContain('timeframe=1Day')
+    expect(requestedUrl).toContain('range=1Y')
+    expect(result.reference_price).toBe(208.4)
+    expect(result.levels.map((l) => l.strength)).toEqual(['strong', 'moderate'])
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () =>
+            Promise.resolve({
+              detail: "No stock data found for symbol 'ZZZZ'.",
+            }),
+        }),
+      ),
+    )
+    await expect(getSupportLevels('ZZZZ')).rejects.toThrow(
+      /No stock data found/,
+    )
   })
 })
