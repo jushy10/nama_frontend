@@ -17,6 +17,7 @@ import SectorWeightingsCard from '@/components/SectorWeightingsCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
+import EtfBenchmarkCard from '@/components/EtfBenchmarkCard'
 
 /**
  * The fund detail view — the ETF snapshot card, its YTD/3Y/5Y returns and an
@@ -156,6 +157,10 @@ export default function EtfDetail({ symbol }: { symbol: string }) {
               )}
             </CardContent>
           </Card>
+
+          {/* How the fund has tracked the S&P 500 over a chosen range — the
+              rebased overlay plus the out/under-performance gap. */}
+          <EtfBenchmarkCard symbol={etf.ticker} />
         </Stack>
       )}
     </Box>
