@@ -127,8 +127,8 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
         }}
       >
         <Stack
-          direction="row"
-          spacing={2.5}
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={{ xs: 2, sm: 2.5 }}
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
           <Stack
@@ -221,7 +221,7 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
               )}
             </Box>
           </Stack>
-          <Box sx={{ textAlign: 'right', flexShrink: 0 }}>
+          <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, flexShrink: 0 }}>
             <Typography
               sx={{
                 fontWeight: 700,
