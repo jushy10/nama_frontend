@@ -94,14 +94,14 @@ describe('Screener', () => {
     expect(screen.getByText(/2 stocks/)).toBeInTheDocument()
   })
 
-  it('applies no sort by default (omits the sort/order params)', async () => {
+  it('sorts by market cap (largest first) by default', async () => {
     const calls = stubApi()
     renderWithProviders(<Screener />)
     await screen.findByText('NVDA')
 
     const url = lastSearchUrl(calls)
-    expect(url).not.toMatch(/[?&]sort=/)
-    expect(url).not.toMatch(/[?&]order=/)
+    expect(url).toMatch(/[?&]sort=market_cap(&|$)/)
+    expect(url).toMatch(/[?&]order=desc(&|$)/)
   })
 
   it('searches by name or ticker (debounced) via the q param', async () => {
@@ -185,11 +185,8 @@ describe('Screener', () => {
     const { user } = renderWithProviders(<Screener />)
     await screen.findByText('NVDA')
 
-    // The direction toggle is inert until a sort is active, so pick one first.
-    await user.click(screen.getByText('Mkt Cap'))
-    await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/order=desc/))
-
-    // Default is descending; the toggle's label names the action it performs.
+    // A sort is active on landing (market cap, descending), so the direction
+    // toggle is live immediately; its label names the action it performs.
     await user.click(screen.getByRole('button', { name: /sort ascending/i }))
 
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/order=asc/))
