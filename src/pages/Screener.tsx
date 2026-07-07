@@ -71,10 +71,10 @@ const SORT_OPTIONS: { key: StockSearchSort; label: string }[] = [
   { key: 'growth', label: 'Growth (EPS + Rev)' },
 ]
 
-// Sentinel for the "Sort by" dropdown's no-sort choice — the page starts with no
-// sort applied and this is how you return to it. A `null` sort omits the API's
-// `sort`/`order` params, so rows arrive in the backend's own default order (it's
-// server-paginated, so ordering can't be a client-side concern).
+// Sentinel for the "Sort by" dropdown's no-sort choice. A `null` sort omits the
+// API's `sort`/`order` params, so rows arrive in the backend's own default order
+// (it's server-paginated, so ordering can't be a client-side concern). The page
+// lands on a market-cap sort; this is how you drop back to that unsorted order.
 const NO_SORT = 'none'
 
 // The market-cap tier filter's options, each mapping to the API's `market_cap`
@@ -301,9 +301,9 @@ function SkeletonRow() {
 
 /**
  * Screener page: search and filter the screened ≥$1B US universe by name/ticker,
- * sector, industry and index membership. No sort is applied by default — rows
- * come back in the backend's own order until you pick a metric to sort by (via a
- * column header or the "Sort by" menu). Rows are stored facts (no live price)
+ * sector, industry and index membership. Lands sorted by market cap (largest
+ * first); pick another metric — or "None" for the backend's own order — via a
+ * column header or the "Sort by" menu. Rows are stored facts (no live price)
  * served straight from the DB, so a page is one cheap query; clicking a row opens
  * that stock's live detail page.
  */
@@ -315,8 +315,9 @@ export default function Screener() {
   const [sp500, setSp500] = useState(false)
   const [nasdaq100, setNasdaq100] = useState(false)
   const [marketCap, setMarketCap] = useState<MarketCapTier | 'all'>('all')
-  // Null = no sort applied (the default landing state); a metric key sorts.
-  const [sort, setSort] = useState<StockSearchSort | null>(null)
+  // Default to market cap so the largest names lead on landing; "None" (null)
+  // drops to the backend's own order, any other key re-sorts.
+  const [sort, setSort] = useState<StockSearchSort | null>('market_cap')
   const [order, setOrder] = useState<SortOrder>('desc')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
