@@ -523,6 +523,34 @@ async function toApiError(res: Response): Promise<ApiError> {
 }
 
 /**
+ * A ticker's asset type from the lightweight classifier (`GET
+ * /stocks/type/{ticker}`) — `etf` for a screened fund, else `equity`. One cheap
+ * DB membership check, no quote or fundamentals; the Search page uses it to pick
+ * which detail to render before fetching it.
+ */
+export interface TickerType {
+  ticker: string
+  asset_type: AssetType
+}
+
+/**
+ * Classify a ticker as an equity or an ETF (`GET /stocks/type/{ticker}`) without
+ * pulling its whole card. Never 404s for a real symbol (an unknown ticker reads
+ * as an equity); a malformed symbol throws an `ApiError` 400.
+ */
+export async function getTickerType(
+  ticker: string,
+  signal?: AbortSignal,
+): Promise<TickerType> {
+  const res = await fetch(
+    `${API_BASE}/stocks/type/${encodeURIComponent(ticker)}`,
+    { signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as TickerType
+}
+
+/**
  * Fetch the quote card for one ticker (`/stocks/ticker/{ticker}`). Pass
  * `include` to attach the opt-in blocks — an unrequested block comes back
  * null and costs the backend no upstream call.

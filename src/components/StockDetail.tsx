@@ -12,7 +12,7 @@ import {
   quarterlyToEarningsHistory,
   quarterlyUpcoming,
   type ChartRange,
-  type TickerCard,
+  type TickerCardInclude,
 } from '@/lib/api'
 import {
   errorMessage,
@@ -21,6 +21,7 @@ import {
   useFiveYearReturn,
   useQuarterlyEarnings,
   useRecommendations,
+  useTickerCard,
 } from '@/lib/queries'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
@@ -34,26 +35,54 @@ import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 import ForwardPeCard from '@/components/ForwardPeCard'
 
+// The card carries everything the stock detail draws off in one request: the
+// snapshot's dividend, the performance windows, the metrics (profitability +
+// PEG), and the options read.
+const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
+  'dividend',
+  'performance',
+  'metrics',
+  'options_metrics',
+]
+
 /**
  * The stock detail view — the snapshot card plus the performance/profitability/
  * PEG/options reads, analyst ratings, the price chart, and the earnings +
- * forward-P/E row. Rendered by the Search page once a ticker resolves to an
- * equity; the caller passes the already-loaded ticker card (which carries the
- * dividend/performance/metrics/options blocks), and the chart, 5Y pill, ratings,
- * and earnings ride the loaded ticker.
+ * forward-P/E row. The Search page hands it a symbol once the classifier calls
+ * the ticker an equity; it fetches that ticker's card (with every block) itself,
+ * and the chart, 5Y pill, ratings, and earnings ride the loaded ticker.
  */
-export default function StockDetail({ stock }: { stock: TickerCard }) {
+export default function StockDetail({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<ChartRange>('6M')
-  const symbol = stock.ticker
-  const candleQuery = useCandles(symbol, range)
-  const fiveYearReturn = useFiveYearReturn(symbol)
-  const recommendationsQuery = useRecommendations(symbol)
-  // The earnings card runs entirely off the consolidated quarterly endpoint;
-  // the profitability and PEG reads ride on the ticker card's `metrics` block.
-  const quarterlyQuery = useQuarterlyEarnings(symbol)
-  // The yearly series behind the card's Quarterly/Annual toggle. Best-effort:
-  // if it fails the toggle simply doesn't appear, so no error state is shown.
-  const annualQuery = useAnnualEarnings(symbol)
+  const cardQuery = useTickerCard(symbol, SNAPSHOT_BLOCKS)
+  const stock = cardQuery.data
+  // The chart, 5Y pill, ratings, and earnings ride the *loaded* ticker, so they
+  // only fire once the card resolves — a bad symbol never kicks off more doomed
+  // requests. The earnings card runs off the consolidated quarterly endpoint;
+  // the profitability and PEG reads ride on the card's `metrics` block, and the
+  // annual series (best-effort) backs the card's Quarterly/Annual toggle.
+  const loadedSymbol = stock?.ticker ?? null
+  const candleQuery = useCandles(loadedSymbol, range)
+  const fiveYearReturn = useFiveYearReturn(loadedSymbol)
+  const recommendationsQuery = useRecommendations(loadedSymbol)
+  const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
+  const annualQuery = useAnnualEarnings(loadedSymbol)
+
+  if (cardQuery.isLoading) {
+    return (
+      <Stack sx={{ alignItems: 'center', py: 2 }}>
+        <CircularProgress />
+      </Stack>
+    )
+  }
+  if (cardQuery.isError) {
+    return (
+      <Alert severity="error" variant="outlined">
+        {errorMessage(cardQuery.error)}
+      </Alert>
+    )
+  }
+  if (!stock) return null
 
   return (
     <Stack spacing={3}>

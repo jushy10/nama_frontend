@@ -27,6 +27,7 @@ import {
   getSectors,
   getTickerCard,
   getTickerCards,
+  getTickerType,
   searchEtfs,
   searchStocks,
   type AnalystRecommendations,
@@ -49,6 +50,7 @@ import {
   type StockSearchSort,
   type TickerCard,
   type TickerCardInclude,
+  type TickerType,
 } from '@/lib/api'
 
 /**
@@ -76,6 +78,23 @@ export function useTickerCard(
     queryFn: ({ signal }) =>
       getTickerCard(ticker as string, { include, signal }),
     enabled: !!ticker,
+  })
+}
+
+/**
+ * The lightweight ETF/equity classification for one ticker (`GET
+ * /stocks/type/{ticker}`) — quote-free, so it's what the Search page keys off to
+ * pick which detail to render. Idle until `ticker` is set; membership rarely
+ * changes, so hold it fresh for an hour (matching the endpoint's own cache).
+ */
+export function useTickerType(
+  ticker: string | null | undefined,
+): UseQueryResult<TickerType> {
+  return useQuery({
+    queryKey: ['ticker-type', ticker],
+    queryFn: ({ signal }) => getTickerType(ticker as string, signal),
+    enabled: !!ticker,
+    staleTime: 60 * 60 * 1000,
   })
 }
 
