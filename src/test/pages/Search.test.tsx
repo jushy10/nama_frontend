@@ -129,24 +129,28 @@ const recommendations = {
   trends: [],
 }
 
-/** Route fetch by URL: the ETF detail, candles, earnings, ratings, else the
- *  ticker card. Pass `etfDetail` only for an ETF symbol. */
+/** Route fetch by URL: the type classifier (derived from `card`), the ETF
+ *  detail, candles, earnings, ratings, else the ticker card. Pass `etfDetail`
+ *  only for an ETF symbol. */
 function stubFetch(card: unknown, opts: { etfDetail?: unknown } = {}) {
+  const c = card as { ticker: string; asset_type: string }
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string | URL) => {
       const u = String(url)
-      const body = u.includes('/stocks/etf/')
-        ? (opts.etfDetail ?? { detail: 'not an ETF' })
-        : u.includes('/candles')
-          ? candles
-          : u.includes('/recommendations')
-            ? recommendations
-            : u.includes('/earnings/quarterly')
-              ? emptyQuarterly
-              : u.includes('/earnings/annual')
-                ? emptyAnnual
-                : card
+      const body = u.includes('/stocks/type/')
+        ? { ticker: c.ticker, asset_type: c.asset_type }
+        : u.includes('/stocks/etf/')
+          ? (opts.etfDetail ?? { detail: 'not an ETF' })
+          : u.includes('/candles')
+            ? candles
+            : u.includes('/recommendations')
+              ? recommendations
+              : u.includes('/earnings/quarterly')
+                ? emptyQuarterly
+                : u.includes('/earnings/annual')
+                  ? emptyAnnual
+                  : card
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -173,7 +177,12 @@ describe('Search (unified)', () => {
     expect(screen.getByText('$209.97')).toBeInTheDocument()
     expect(screen.getByText('Mkt Cap')).toBeInTheDocument()
     expect(screen.getByText('Performance')).toBeInTheDocument()
-    // Classified via the one ticker-card request with every block attached.
+    // Classified via the cheap type endpoint first...
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/type/NVDA'),
+      expect.anything(),
+    )
+    // ...then the stock detail fetches the card with every block attached.
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining(
         '/stocks/ticker/NVDA?include=dividend,performance,metrics,options_metrics',

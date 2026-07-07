@@ -10,37 +10,27 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { type TickerCardInclude } from '@/lib/api'
-import { errorMessage, useTickerCard } from '@/lib/queries'
+import { errorMessage, useTickerType } from '@/lib/queries'
 import StockDetail from '@/components/StockDetail'
 import EtfDetail from '@/components/EtfDetail'
 
-// Every opt-in block the ticker-card endpoint serves, fetched in one request —
-// enough to both classify the ticker (via `asset_type`) and drive the whole
-// stock detail (dividend, performance, metrics, options) with no second call.
-const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
-  'dividend',
-  'performance',
-  'metrics',
-  'options_metrics',
-]
-
 /**
  * The one search page for the whole app: type any ticker and get its live
- * detail, stock or fund. A single ticker-card request classifies the symbol by
- * `asset_type` — an equity renders the stock detail off that same card, a fund
- * hands off to the ETF detail (which fetches its holdings/sectors). The ticker
- * lives in the URL (`?symbol=`) so a result is shareable and every screener,
- * sector, and holdings link deep-links straight in.
+ * detail, stock or fund. A cheap classifier call (`GET /stocks/type/{ticker}`)
+ * decides which kind it is, then hands the symbol to the matching detail — the
+ * stock detail (which fetches the ticker card) or the ETF detail (which fetches
+ * the fund's holdings/sectors). The ticker lives in the URL (`?symbol=`) so a
+ * result is shareable and every screener, sector, and holdings link deep-links
+ * straight in.
  */
 export default function Search() {
   const [searchParams, setSearchParams] = useSearchParams()
   const urlSymbol = (searchParams.get('symbol') ?? '').trim().toUpperCase()
   const [symbol, setSymbol] = useState(urlSymbol)
 
-  // One request classifies the ticker and, for a stock, carries the whole
-  // snapshot. Idle until a ticker is set.
-  const cardQuery = useTickerCard(urlSymbol || null, SNAPSHOT_BLOCKS)
+  // A cheap classifier call decides stock vs fund; the matching detail fetches
+  // its own data. Idle until a ticker is set.
+  const typeQuery = useTickerType(urlSymbol || null)
 
   // Keep the search box in sync with the URL ticker on deep links / back-forward.
   useEffect(() => {
@@ -56,9 +46,9 @@ export default function Search() {
     setSearchParams(query ? { symbol: query } : {})
   }
 
-  const loading = cardQuery.isLoading
-  const card = cardQuery.data
-  const isEtf = card?.asset_type === 'etf'
+  const loading = typeQuery.isLoading
+  const type = typeQuery.data
+  const isEtf = type?.asset_type === 'etf'
 
   return (
     <Container maxWidth="xl" sx={{ py: 6 }}>
@@ -110,16 +100,16 @@ export default function Search() {
             <CircularProgress />
           </Stack>
         )}
-        {cardQuery.isError && (
+        {typeQuery.isError && (
           <Alert severity="error" variant="outlined">
-            {errorMessage(cardQuery.error)}
+            {errorMessage(typeQuery.error)}
           </Alert>
         )}
-        {card &&
+        {type &&
           (isEtf ? (
-            <EtfDetail symbol={card.ticker} />
+            <EtfDetail symbol={type.ticker} />
           ) : (
-            <StockDetail stock={card} />
+            <StockDetail symbol={type.ticker} />
           ))}
       </Box>
     </Container>
