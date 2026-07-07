@@ -25,6 +25,7 @@ import {
   getRsi,
   getScreener,
   getSectors,
+  getSupportLevels,
   getTickerCard,
   getTickerCards,
   getTickerType,
@@ -48,6 +49,7 @@ import {
   type StockIndex,
   type StockSearchResponse,
   type StockSearchSort,
+  type SupportLevels,
   type TickerCard,
   type TickerCardInclude,
   type TickerType,
@@ -182,6 +184,22 @@ export function useRsi(
   return useQuery({
     queryKey: ['rsi', symbol],
     queryFn: ({ signal }) => getRsi(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * Detected support levels for a ticker (a fixed 1-year daily scan). Keyed by
+ * symbol only, so changing the chart's range never refetches it — the levels are
+ * a property of the stock, and the chart just draws the ones in view. Idle until
+ * `symbol` is set.
+ */
+export function useSupportLevels(
+  symbol: string | null | undefined,
+): UseQueryResult<SupportLevels> {
+  return useQuery({
+    queryKey: ['support-levels', symbol],
+    queryFn: ({ signal }) => getSupportLevels(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }
