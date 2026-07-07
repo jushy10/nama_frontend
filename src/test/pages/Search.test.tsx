@@ -167,7 +167,7 @@ describe('Search (unified)', () => {
     stubFetch(stockCard)
     const { user } = renderWithProviders(<Search />)
 
-    await user.type(screen.getByLabelText(/ticker symbol/i), 'nvda')
+    await user.type(screen.getByLabelText(/name or ticker/i), 'nvda')
     await user.click(screen.getByRole('button', { name: /search/i }))
 
     // The stock snapshot renders (heading, price, market cap, performance).
@@ -219,6 +219,76 @@ describe('Search (unified)', () => {
     expect(screen.queryByText('Analyst Ratings')).not.toBeInTheDocument()
   })
 
+  it('suggests matches by company name or ticker as you type, stocks and ETFs', async () => {
+    const stockHit = {
+      ticker: 'NVDA',
+      name: 'NVIDIA Corporation',
+      sector: 'technology',
+      industry: 'semiconductors',
+      market_cap: 3_210_000_000_000,
+      pe_ratio: 46.5,
+      revenue_growth_yoy: 69.2,
+      eps_growth_yoy: 80.5,
+      in_sp500: true,
+      in_nasdaq100: true,
+    }
+    const etfHit = {
+      ticker: 'NVDL',
+      name: 'GraniteShares 2x Long NVDA Daily ETF',
+      exchange: 'NASDAQ',
+      net_assets: 5_000_000_000,
+      expense_ratio: 1.15,
+      category: 'trading_leveraged_equity',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        const u = String(url)
+        // The two universe searches (query string) vs. the per-ticker detail read.
+        const body = u.includes('/stocks/ticker?')
+          ? { total: 1, limit: 7, offset: 0, count: 1, results: [stockHit] }
+          : u.includes('/stocks/etfs?')
+            ? { total: 1, limit: 5, offset: 0, count: 1, results: [etfHit] }
+            : u.includes('/stocks/type/')
+              ? { ticker: 'NVDA', asset_type: 'equity' }
+              : u.includes('/candles')
+                ? candles
+                : u.includes('/recommendations')
+                  ? recommendations
+                  : u.includes('/earnings/quarterly')
+                    ? emptyQuarterly
+                    : u.includes('/earnings/annual')
+                      ? emptyAnnual
+                      : stockCard
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+    const { user } = renderWithProviders(<Search />)
+
+    // Typing a partial name surfaces the company, not just an exact ticker.
+    await user.type(screen.getByLabelText(/name or ticker/i), 'nv')
+    expect(await screen.findByText('NVIDIA Corporation')).toBeInTheDocument()
+    // The ETF universe is searched alongside stocks.
+    expect(
+      screen.getByText('GraniteShares 2x Long NVDA Daily ETF'),
+    ).toBeInTheDocument()
+    // The search hit by name/ticker substring, not the detail route.
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/ticker?q=nv'),
+      expect.anything(),
+    )
+
+    // Picking a suggestion loads its detail inline.
+    await user.click(screen.getByText('NVIDIA Corporation'))
+    expect(
+      await screen.findByRole('heading', { name: 'NVDA' }),
+    ).toBeInTheDocument()
+  })
+
   it('shows an error when the ticker is not found', async () => {
     vi.stubGlobal(
       'fetch',
@@ -230,7 +300,7 @@ describe('Search (unified)', () => {
     )
     const { user } = renderWithProviders(<Search />)
 
-    await user.type(screen.getByLabelText(/ticker symbol/i), 'ZZZZ')
+    await user.type(screen.getByLabelText(/name or ticker/i), 'ZZZZ')
     await user.click(screen.getByRole('button', { name: /search/i }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no data for/i)
