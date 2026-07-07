@@ -198,6 +198,22 @@ export default function CandleChart({
     if (e.pointerType === 'mouse') setHover(null)
   }
 
+  // Where a support line should begin: the candle of its most recent swing low
+  // (`last_touched`). The level only becomes support once that low forms, so the
+  // line starts there and runs right to the axis tag rather than spanning the
+  // whole plot. Levels last touched before the visible window begin at the left
+  // edge; an unparseable date also falls back to a full-width line.
+  const supportStartX = (lastTouched: string) => {
+    const t = Date.parse(lastTouched)
+    if (Number.isNaN(t)) return PAD.left
+    const sec = t / 1000
+    if (sec <= candles[0].time) return PAD.left
+    const lastIdx = candles.length - 1
+    if (sec >= candles[lastIdx].time) return x(lastIdx)
+    const idx = candles.findIndex((cd) => cd.time >= sec)
+    return x(idx < 0 ? lastIdx : idx)
+  }
+
   const legendCell = (label: string, value: string, color?: string) => (
     <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
       <Box component="span" sx={{ color: axis }}>
@@ -368,7 +384,7 @@ export default function CandleChart({
           return (
             <g key={`s${i}`} pointerEvents="none">
               <line
-                x1={PAD.left}
+                x1={supportStartX(lvl.last_touched)}
                 x2={W - PAD.right}
                 y1={yy}
                 y2={yy}

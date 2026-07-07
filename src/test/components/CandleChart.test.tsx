@@ -58,4 +58,39 @@ describe('CandleChart support levels', () => {
     renderWithProviders(<CandleChart candles={CANDLES} timeframe="1Day" />)
     expect(screen.queryByText('110.00')).not.toBeInTheDocument()
   })
+
+  it('starts each line at its last-touched candle, not the left edge', () => {
+    const { container } = renderWithProviders(
+      <CandleChart
+        candles={CANDLES} // daily candles on Jun 1–3, 2026
+        timeframe="1Day"
+        supportLevels={[
+          // Last touched mid-window → its line begins at that candle, not far left.
+          {
+            price: 110,
+            touches: 2,
+            last_touched: '2026-06-02',
+            strength: 'moderate',
+            distance_percent: -4,
+          },
+          // Last touched before the window → its line still spans from the left edge.
+          {
+            price: 105,
+            touches: 1,
+            last_touched: '2026-05-14',
+            strength: 'weak',
+            distance_percent: -8,
+          },
+        ]}
+      />,
+    )
+    // Support lines are the dashed "5 4" ones (the hover crosshair is "3 3").
+    const lines = container.querySelectorAll('line[stroke-dasharray="5 4"]')
+    expect(lines).toHaveLength(2)
+    const x1 = (el: Element) => Number(el.getAttribute('x1'))
+    // The mid-window level starts well right of the plot's left padding (10)…
+    expect(x1(lines[0])).toBeGreaterThan(300)
+    // …while a level last touched before the window still starts at the edge.
+    expect(x1(lines[1])).toBe(10)
+  })
 })
