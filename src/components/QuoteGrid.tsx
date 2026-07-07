@@ -226,15 +226,14 @@ function SkeletonTile({ linkToStock }: { linkToStock: boolean }) {
   )
 }
 
-const GRID_SX = {
-  display: 'grid',
-  gridTemplateColumns: {
-    xs: 'repeat(2, 1fr)',
-    sm: 'repeat(3, 1fr)',
-    md: 'repeat(4, 1fr)',
-  },
-  gap: 2,
-} as const
+// Company tiles (Mag 7) carry a logo and a full company name, which need the
+// whole row on a phone — a second column truncates "Microsoft" to "Micro…".
+// Index tiles have no logo and a short label, so they pack two-up comfortably.
+const gridColumns = (linkToStock: boolean) => ({
+  xs: linkToStock ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+  sm: 'repeat(3, minmax(0, 1fr))',
+  md: 'repeat(4, minmax(0, 1fr))',
+})
 
 /**
  * A self-refreshing grid of price tiles, one per `item`, each showing the day's
@@ -278,7 +277,9 @@ export default function QuoteGrid({
   }
 
   return (
-    <Box sx={GRID_SX}>
+    <Box
+      sx={{ display: 'grid', gridTemplateColumns: gridColumns(linkToStock), gap: 2 }}
+    >
       {quotes == null
         ? items.map((def) => (
             <SkeletonTile key={def.symbol} linkToStock={linkToStock} />
