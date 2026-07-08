@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  getEtfAnalysis,
   getIndustryValuation,
   getStockAnalysis,
   getSupportLevels,
@@ -565,6 +566,60 @@ describe('getStockAnalysis', () => {
       ),
     )
     await expect(getStockAnalysis('AAPL')).rejects.toThrow(
+      /analysis model call failed/,
+    )
+  })
+})
+
+describe('getEtfAnalysis', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the fund analysis endpoint and returns the parsed read', async () => {
+    let requestedUrl = ''
+    const body = {
+      ticker: 'VOO',
+      asset_type: 'etf',
+      recommendation: 'buy',
+      confidence: 'high',
+      thesis: 'A cheap, broad way to own the whole market.',
+      strengths: ['Very low yearly cost'],
+      risks: ['Concentrated in a few big tech names'],
+      disclaimer: 'Not financial advice.',
+      model: 'claude-haiku-4-5',
+      generated_at: '2026-07-08T00:00:00Z',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getEtfAnalysis('VOO')
+
+    expect(requestedUrl).toContain('/stocks/etf/VOO/analysis')
+    expect(result.recommendation).toBe('buy')
+    expect(result.strengths).toEqual(['Very low yearly cost'])
+    expect(result.risks).toEqual(['Concentrated in a few big tech names'])
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 502,
+          json: () => Promise.resolve({ detail: 'analysis model call failed' }),
+        }),
+      ),
+    )
+    await expect(getEtfAnalysis('VOO')).rejects.toThrow(
       /analysis model call failed/,
     )
   })
