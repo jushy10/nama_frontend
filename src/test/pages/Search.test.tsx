@@ -67,16 +67,22 @@ const etfDetail = {
   as_of: '2026-07-06T20:00:00Z',
   category: 'large_blend',
   fund_family: 'Vanguard',
-  net_assets: 1_701_513_003_008,
-  expense_ratio: 0.03,
-  nav: 684.9,
-  dividend_yield: 1.03,
-  ytd_return: 11.25,
-  three_year_return: 20.41,
-  five_year_return: 13.01,
   description: 'Tracks the S&P 500.',
   top_holdings: [{ ticker: 'NVDA', name: 'NVIDIA Corp', weight: 7.89 }],
   sector_weightings: [{ sector: 'technology', weight: 39.13 }],
+  // The opt-in blocks the detail view requests (metrics/dividends/performance).
+  metrics: { expense_ratio: 0.03, nav: 684.9, net_assets: 1_701_513_003_008 },
+  dividends: { yield_percentage: 1.03 },
+  performance: {
+    '1w': null,
+    '1m': null,
+    '3m': null,
+    '6m': null,
+    ytd: 11.25,
+    '1y': null,
+    three_year_return: 20.41,
+    five_year_return: 13.01,
+  },
 }
 
 const candles = {
@@ -128,6 +134,17 @@ const recommendations = {
   latest: null,
   trends: [],
 }
+const analysis = {
+  symbol: 'X',
+  recommendation: 'hold',
+  confidence: 'medium',
+  thesis: 'A balanced read on the stock.',
+  strengths: ['Strong brand'],
+  risks: ['Rich valuation'],
+  disclaimer: 'Not financial advice.',
+  model: 'claude-haiku-4-5',
+  generated_at: '2026-07-08T00:00:00Z',
+}
 
 /** Route fetch by URL: the type classifier (derived from `card`), the ETF
  *  detail, candles, earnings, ratings, else the ticker card. Pass `etfDetail`
@@ -150,7 +167,9 @@ function stubFetch(card: unknown, opts: { etfDetail?: unknown } = {}) {
                 ? emptyQuarterly
                 : u.includes('/earnings/annual')
                   ? emptyAnnual
-                  : card
+                  : u.includes('/analysis')
+                    ? analysis
+                    : card
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -189,6 +208,8 @@ describe('Search (unified)', () => {
       ),
       expect.anything(),
     )
+    // The AI analysis card loads on its own and appears once the read lands.
+    expect(await screen.findByText('AI Analysis')).toBeInTheDocument()
     // No ETF badge / holdings for a stock.
     expect(screen.queryByText('Top Holdings')).not.toBeInTheDocument()
   })
@@ -217,6 +238,7 @@ describe('Search (unified)', () => {
     )
     // Stock-only cards don't show for a fund.
     expect(screen.queryByText('Analyst Ratings')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI Analysis')).not.toBeInTheDocument()
   })
 
   it('suggests matches by company name or ticker as you type, stocks and ETFs', async () => {
@@ -259,7 +281,9 @@ describe('Search (unified)', () => {
                     ? emptyQuarterly
                     : u.includes('/earnings/annual')
                       ? emptyAnnual
-                      : stockCard
+                      : u.includes('/analysis')
+                        ? analysis
+                        : stockCard
         return Promise.resolve({
           ok: true,
           status: 200,

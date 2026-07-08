@@ -26,6 +26,7 @@ import {
   getRsi,
   getScreener,
   getSectors,
+  getStockAnalysis,
   getSupportLevels,
   getTickerCard,
   getTickerCards,
@@ -48,6 +49,7 @@ import {
   type ScreenerResult,
   type Sector,
   type SortOrder,
+  type StockAnalysis,
   type StockIndex,
   type StockSearchResponse,
   type StockSearchSort,
@@ -279,6 +281,23 @@ export function useRecommendations(
   })
 }
 
+/**
+ * The AI analysis for a ticker (`GET /stocks/{symbol}/analysis`) — a
+ * plain-language buy/hold/sell read the detail view shows in a card. It's the
+ * slowest of the stock reads (a live model call), so it loads on its own; the
+ * backend caches it briefly, so revisits paint from cache. Idle until `symbol`
+ * is set.
+ */
+export function useStockAnalysis(
+  symbol: string | null | undefined,
+): UseQueryResult<StockAnalysis> {
+  return useQuery({
+    queryKey: ['stock-analysis', symbol],
+    queryFn: ({ signal }) => getStockAnalysis(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
 /** The day's snapshot for every tracked market sector. */
 export function useSectors(): UseQueryResult<Sector[]> {
   return useQuery({
@@ -427,16 +446,23 @@ export function useEtfCategories(): UseQueryResult<EtfCategories> {
 }
 
 /**
- * One fund's live detail (quote + fund profile). Idle until `ticker` is set.
- * Errors with an `ApiError` 404 when the ticker isn't a screened ETF (Search
- * only renders the fund detail once a ticker classifies as one).
+ * One fund's live detail (quote + fund profile) with every opt-in block
+ * attached — the detail page shows the size/cost stats, yield and trailing
+ * returns, so it requests `metrics`, `dividends` and `performance`. Idle until
+ * `ticker` is set. Errors with an `ApiError` 404 when the ticker isn't a
+ * screened ETF (Search only renders the fund detail once a ticker classifies as
+ * one).
  */
 export function useEtfDetail(
   ticker: string | null | undefined,
 ): UseQueryResult<EtfDetail> {
   return useQuery({
     queryKey: ['etf-detail', ticker],
-    queryFn: ({ signal }) => getEtfDetail(ticker as string, signal),
+    queryFn: ({ signal }) =>
+      getEtfDetail(ticker as string, {
+        include: ['metrics', 'dividends', 'performance'],
+        signal,
+      }),
     enabled: !!ticker,
   })
 }

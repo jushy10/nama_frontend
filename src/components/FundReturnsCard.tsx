@@ -50,10 +50,13 @@ function ReturnPill({ label, value }: { label: string; value: number | null }) {
  * shows `—`.
  */
 export default function FundReturnsCard({ etf }: { etf: EtfDetail }) {
+  // All three ride the opt-in `performance` block (the detail page requests it):
+  // YTD is the trailing price-return window, 3Y/5Y the annualized averages.
+  const perf = etf.performance
   const entries: { label: string; value: number | null }[] = [
-    { label: 'YTD', value: etf.ytd_return },
-    { label: '3Y (ann.)', value: etf.three_year_return },
-    { label: '5Y (ann.)', value: etf.five_year_return },
+    { label: 'YTD', value: perf?.ytd ?? null },
+    { label: '3Y (ann.)', value: perf?.three_year_return ?? null },
+    { label: '5Y (ann.)', value: perf?.five_year_return ?? null },
   ]
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>

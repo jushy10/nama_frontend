@@ -285,10 +285,19 @@ export default function EtfCard({ etf }: { etf: EtfDetail }) {
             gap: 1,
           }}
         >
-          <Stat label="AUM" value={fmtMoney(etf.net_assets)} />
-          <Stat label="Expense Ratio" value={fmtPct(etf.expense_ratio)} />
-          <Stat label="Yield" value={fmtPct(etf.dividend_yield)} />
-          <Stat label="NAV" value={fmtDollars(etf.nav)} />
+          {/* The size/cost figures ride the opt-in `metrics`/`dividends` blocks
+              (the detail page requests them); each is `—` if its block or field
+              is absent. */}
+          <Stat label="AUM" value={fmtMoney(etf.metrics?.net_assets ?? null)} />
+          <Stat
+            label="Expense Ratio"
+            value={fmtPct(etf.metrics?.expense_ratio ?? null)}
+          />
+          <Stat
+            label="Yield"
+            value={fmtPct(etf.dividends?.yield_percentage ?? null)}
+          />
+          <Stat label="NAV" value={fmtDollars(etf.metrics?.nav ?? null)} />
         </Box>
       </CardContent>
     </Card>

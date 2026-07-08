@@ -993,14 +993,52 @@ export interface EtfSectorWeight {
   weight: number
 }
 
+/** Opt-in enrichment blocks the ETF detail endpoint can attach via `include`. */
+export type EtfDetailInclude = 'metrics' | 'dividends' | 'performance'
+
 /**
- * The per-fund detail from `GET /stocks/etf/{ticker}` — an ETF's live quote plus
- * its fund profile: the stored screen facts (`category`, `net_assets`,
- * `expense_ratio`) enriched with `fund_family`, `nav`, distribution
- * `dividend_yield`, the trailing `ytd`/`three_year`/`five_year` returns, a
- * `description`, and the `top_holdings` + `sector_weightings` breakdowns. Every
- * percent is a human percent (`0.03` = 0.03%); best-effort enrichment fields are
- * null (or `[]` for the breakdowns) when the vendor is down or omits them. The
+ * An ETF's size/cost metrics — the opt-in `metrics` block. `expense_ratio` is
+ * the annual fee as a human percent (`0.03` = 0.03%); `nav` is the net asset
+ * value per share; `net_assets` is assets under management in raw USD (the ETF
+ * analogue of a stock's market cap). Any field the vendor/table doesn't carry is
+ * null.
+ */
+export interface EtfMetrics {
+  expense_ratio: number | null
+  nav: number | null
+  net_assets: number | null
+}
+
+/**
+ * An ETF's distribution yield — the opt-in `dividends` block. `yield_percentage`
+ * is the trailing distribution yield as a human percent (`1.03` = 1.03%); null
+ * for a non-distributing fund or an uncovered field.
+ */
+export interface EtfDividends {
+  yield_percentage: number | null
+}
+
+/**
+ * An ETF's trailing returns — the opt-in `performance` block. The shared
+ * `1w`–`1y` price-return windows (the same gains a stock shows) plus the two
+ * longer horizons funds are judged on: `three_year_return` / `five_year_return`,
+ * annualized average returns. Every figure is a human percent; a window or
+ * horizon the vendor doesn't cover is null.
+ */
+export interface EtfPerformance extends StockPerformance {
+  three_year_return: number | null
+  five_year_return: number | null
+}
+
+/**
+ * The per-fund detail from `GET /stocks/etf/{ticker}` — an ETF's live quote and
+ * always-on fund profile (the stored `category`, plus best-effort `fund_family`,
+ * `description`, `top_holdings` and `sector_weightings`), with the size/cost,
+ * yield and trailing-return figures split into opt-in blocks requested via
+ * `include`. Each block is null unless requested — and the best-effort ones stay
+ * null when the vendor is down: `metrics` (expense ratio, NAV, net assets),
+ * `dividends` (yield), and `performance` (the trailing returns). Every percent is
+ * a human percent (`0.03` = 0.03%); the breakdowns are `[]` when unavailable. The
  * endpoint 404s for a ticker that isn't in the ETF universe.
  */
 export interface EtfDetail {
@@ -1015,30 +1053,31 @@ export interface EtfDetail {
   as_of: string | null
   category: string | null
   fund_family: string | null
-  net_assets: number | null
-  expense_ratio: number | null
-  nav: number | null
-  dividend_yield: number | null
-  ytd_return: number | null
-  three_year_return: number | null
-  five_year_return: number | null
   description: string | null
   top_holdings: EtfHolding[]
   sector_weightings: EtfSectorWeight[]
+  metrics: EtfMetrics | null
+  dividends: EtfDividends | null
+  performance: EtfPerformance | null
 }
 
 /**
- * Fetch one fund's live detail (`GET /stocks/etf/{ticker}`). Throws an
- * `ApiError` with status 404 when the ticker isn't a screened ETF — Search only
- * hits this once a ticker is classified as a fund, so it normally resolves.
+ * Fetch one fund's live detail (`GET /stocks/etf/{ticker}`). Pass `include` to
+ * attach the opt-in blocks (`metrics` / `dividends` / `performance`) — an
+ * unrequested block comes back null. Throws an `ApiError` with status 404 when
+ * the ticker isn't a screened ETF — Search only hits this once a ticker is
+ * classified as a fund, so it normally resolves.
  */
 export async function getEtfDetail(
   ticker: string,
-  signal?: AbortSignal,
+  opts: { include?: EtfDetailInclude[]; signal?: AbortSignal } = {},
 ): Promise<EtfDetail> {
+  const include = opts.include?.length
+    ? `?include=${opts.include.join(',')}`
+    : ''
   const res = await fetch(
-    `${API_BASE}/stocks/etf/${encodeURIComponent(ticker)}`,
-    { signal },
+    `${API_BASE}/stocks/etf/${encodeURIComponent(ticker)}${include}`,
+    { signal: opts.signal },
   )
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as EtfDetail
@@ -1046,16 +1085,20 @@ export async function getEtfDetail(
 
 /**
  * Fetch several ETF detail cards concurrently, preserving the order of
- * `tickers` — the ETF analogue of `getTickerCards`. A ticker that fails (not a
- * screened ETF, network blip) resolves to `null` instead of rejecting the whole
- * batch, so one dud never blanks the rest of the row.
+ * `tickers` — the ETF analogue of `getTickerCards`. These back the price tiles,
+ * which read only the quote fields, so no `include` blocks are requested (a tile
+ * costs the backend no extra upstream call). A ticker that fails (not a screened
+ * ETF, network blip) resolves to `null` instead of rejecting the whole batch, so
+ * one dud never blanks the rest of the row.
  */
 export async function getEtfCards(
   tickers: string[],
   opts: { signal?: AbortSignal } = {},
 ): Promise<(EtfDetail | null)[]> {
   return Promise.all(
-    tickers.map((t) => getEtfDetail(t, opts.signal).catch(() => null)),
+    tickers.map((t) =>
+      getEtfDetail(t, { signal: opts.signal }).catch(() => null),
+    ),
   )
 }
 
@@ -1601,6 +1644,64 @@ export async function getRecommendations(
   const data = (await res.json()) as AnalystRecommendations
   if (!Array.isArray(data?.trends)) {
     throw new ApiError(res.status, 'Malformed recommendations response')
+  }
+  return data
+}
+
+/**
+ * The AI analysis's headline call — a plain buy / hold / sell verdict. Lowercase
+ * to match the API's JSON, and deliberately distinct from the five-step sell-side
+ * `Recommendation` (Strong Buy … Strong Sell) so the AI read and the analyst
+ * consensus never get crossed.
+ */
+export type AnalysisRecommendation = 'buy' | 'hold' | 'sell'
+
+/** How firmly the AI analysis holds its call, given how much clear data it had. */
+export type AnalysisConfidence = 'low' | 'medium' | 'high'
+
+/**
+ * An AI-generated, plain-language read on a single stock
+ * (`GET /stocks/{symbol}/analysis`). `recommendation` is the headline
+ * buy/hold/sell call and `confidence` how firmly it's held; `thesis` is a few
+ * everyday-language sentences of reasoning, with `strengths` (the bull case) and
+ * `risks` (the bear case) as short bullet points. `disclaimer` is a fixed
+ * not-financial-advice reminder authored by the service — render it as a
+ * footnote — and `model`/`generated_at` record what produced the read and when.
+ * Reasoned only over the figures the other stock endpoints expose; descriptive,
+ * not advice, and regenerated at most every few minutes (the endpoint caches).
+ */
+export interface StockAnalysis {
+  symbol: string
+  recommendation: AnalysisRecommendation
+  confidence: AnalysisConfidence
+  thesis: string
+  strengths: string[]
+  risks: string[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Fetch the AI analysis for a ticker (`GET /stocks/{symbol}/analysis`). The
+ * backend runs a language model over the stock's own figures, so this is the
+ * slowest of the stock reads — seconds, not milliseconds — which is why the
+ * detail view fetches it on its own and shows the card once it lands. Throws an
+ * `ApiError` when the read is unavailable (a bad symbol, or the backend isn't
+ * configured for AI analysis).
+ */
+export async function getStockAnalysis(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<StockAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as StockAnalysis
+  if (!Array.isArray(data?.strengths) || !Array.isArray(data?.risks)) {
+    throw new ApiError(res.status, 'Malformed analysis response')
   }
   return data
 }

@@ -15,16 +15,13 @@ const voo: EtfDetail = {
   as_of: '2026-07-06T20:00:00Z',
   category: 'large_blend',
   fund_family: 'Vanguard',
-  net_assets: 1_701_513_003_008,
-  expense_ratio: 0.03,
-  nav: 684.9,
-  dividend_yield: 1.03,
-  ytd_return: 11.25,
-  three_year_return: 20.41,
-  five_year_return: 13.01,
   description: 'Tracks the S&P 500.',
   top_holdings: [],
   sector_weightings: [],
+  // The size/cost + yield stats ride the opt-in blocks the card reads.
+  metrics: { expense_ratio: 0.03, nav: 684.9, net_assets: 1_701_513_003_008 },
+  dividends: { yield_percentage: 1.03 },
+  performance: null, // not read by the snapshot card (FundReturnsCard shows it)
 }
 
 describe('EtfCard', () => {
@@ -54,16 +51,10 @@ describe('EtfCard', () => {
   })
 
   it('dashes stats the vendor does not cover', () => {
+    // Blocks absent entirely (a card fetched without them, or a blocked vendor):
+    // every stat falls back to a dash.
     renderWithProviders(
-      <EtfCard
-        etf={{
-          ...voo,
-          net_assets: null,
-          expense_ratio: null,
-          dividend_yield: null,
-          nav: null,
-        }}
-      />,
+      <EtfCard etf={{ ...voo, metrics: null, dividends: null }} />,
     )
     expect(screen.getAllByText('—')).toHaveLength(4)
   })
