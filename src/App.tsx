@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import {
   AppBar,
@@ -13,12 +13,19 @@ import {
   ListItemText,
   Stack,
   Toolbar,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
+import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded'
+import WbTwilightRoundedIcon from '@mui/icons-material/WbTwilightRounded'
+import NightsStayRoundedIcon from '@mui/icons-material/NightsStayRounded'
+import BedtimeRoundedIcon from '@mui/icons-material/BedtimeRounded'
+import type { SvgIconComponent } from '@mui/icons-material'
 import { useColorMode } from '@/ColorModeProvider'
+import { getMarketStatus, marketTooltip, type MarketPhase } from '@/lib/market'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
@@ -84,6 +91,58 @@ function Brand({ large = false }: { large?: boolean }) {
   )
 }
 
+/**
+ * How each trading phase reads at a glance — a warming-then-cooling arc: dawn
+ * amber → bright sun → dusk indigo → muted moon. Filled + coloured on purpose,
+ * so it never reads as a second copy of the outlined light/dark toggle.
+ */
+const PHASE_UI: Record<MarketPhase, { icon: SvgIconComponent; color: string }> =
+  {
+    pre: { icon: WbTwilightRoundedIcon, color: '#fbbf24' },
+    regular: { icon: WbSunnyRoundedIcon, color: '#f59e0b' },
+    after: { icon: NightsStayRoundedIcon, color: '#818cf8' },
+    closed: { icon: BedtimeRoundedIcon, color: 'text.secondary' },
+  }
+
+/** The current phase (drives the icon) plus its hover summary, kept in sync. */
+function useMarketStatus() {
+  const read = () => ({
+    phase: getMarketStatus(new Date()).phase,
+    tooltip: marketTooltip(new Date()),
+  })
+  const [state, setState] = useState(read)
+  useEffect(() => {
+    const tick = () => setState(read())
+    tick() // catch any drift between the initial render and mount
+    const id = window.setInterval(tick, 60_000)
+    return () => window.clearInterval(id)
+  }, [])
+  return state
+}
+
+/**
+ * Small status hint beside the brand: the market's current phase as a sun/moon
+ * that walks the trading day. A hint, not a control — no click. Hover shows a
+ * one-line read: the phase and how long until it flips (e.g. "Market Open ·
+ * Closes in 2h 14m"), or when it next opens when shut.
+ */
+function MarketStatus() {
+  const { phase, tooltip } = useMarketStatus()
+  const { icon: Icon, color } = PHASE_UI[phase]
+
+  return (
+    <Tooltip title={tooltip}>
+      <Box
+        role="img"
+        aria-label={tooltip}
+        sx={{ display: 'inline-flex', alignItems: 'center', color }}
+      >
+        <Icon sx={{ fontSize: 20 }} />
+      </Box>
+    </Tooltip>
+  )
+}
+
 /** Sun/moon icon button that flips the app between light and dark mode. */
 function ColorModeToggle() {
   const { mode, toggleColorMode } = useColorMode()
@@ -127,7 +186,10 @@ function App() {
       >
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            <Brand large />
+            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+              <Brand large />
+              <MarketStatus />
+            </Stack>
             {/* Desktop: inline nav. Mobile (xs–sm): collapses to a drawer. */}
             <Stack
               direction="row"
