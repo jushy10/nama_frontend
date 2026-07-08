@@ -26,6 +26,7 @@ import {
   getRsi,
   getScreener,
   getSectors,
+  getStockAnalysis,
   getSupportLevels,
   getTickerCard,
   getTickerCards,
@@ -48,6 +49,7 @@ import {
   type ScreenerResult,
   type Sector,
   type SortOrder,
+  type StockAnalysis,
   type StockIndex,
   type StockSearchResponse,
   type StockSearchSort,
@@ -275,6 +277,23 @@ export function useRecommendations(
   return useQuery({
     queryKey: ['recommendations', symbol],
     queryFn: ({ signal }) => getRecommendations(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * The AI analysis for a ticker (`GET /stocks/{symbol}/analysis`) — a
+ * plain-language buy/hold/sell read the detail view shows in a card. It's the
+ * slowest of the stock reads (a live model call), so it loads on its own; the
+ * backend caches it briefly, so revisits paint from cache. Idle until `symbol`
+ * is set.
+ */
+export function useStockAnalysis(
+  symbol: string | null | undefined,
+): UseQueryResult<StockAnalysis> {
+  return useQuery({
+    queryKey: ['stock-analysis', symbol],
+    queryFn: ({ signal }) => getStockAnalysis(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

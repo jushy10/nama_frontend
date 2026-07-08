@@ -23,9 +23,11 @@ import {
   useFiveYearReturn,
   useQuarterlyEarnings,
   useRecommendations,
+  useStockAnalysis,
   useSupportLevels,
   useTickerCard,
 } from '@/lib/queries'
+import AnalysisCard from '@/components/AnalysisCard'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
@@ -75,6 +77,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const recommendationsQuery = useRecommendations(loadedSymbol)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
+  // The AI take is the slowest read (a live model call), so it rides the loaded
+  // ticker on its own and the card fills in once it lands.
+  const analysisQuery = useStockAnalysis(loadedSymbol)
 
   if (cardQuery.isLoading) {
     return (
@@ -130,6 +135,30 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           )}
         </Stack>
       </Box>
+
+      {/* The AI take — a plain-language buy/hold/sell read — sits up top as the
+          headline. It's fetched on its own since the model call is the slowest
+          read, so the rest of the page paints while this card shows its own
+          spinner; a failed read (e.g. the model isn't configured) degrades to a
+          warning rather than sinking the page. */}
+      {analysisQuery.isLoading && (
+        <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+              <CircularProgress size={20} />
+              <Typography color="text.secondary">
+                Generating AI analysis…
+              </Typography>
+            </Stack>
+          </CardContent>
+        </Card>
+      )}
+      {analysisQuery.isError && (
+        <Alert severity="warning" variant="outlined">
+          {errorMessage(analysisQuery.error, 'Could not load the AI analysis.')}
+        </Alert>
+      )}
+      {analysisQuery.data && <AnalysisCard analysis={analysisQuery.data} />}
 
       {/* The growth-adjusted valuation read — "is the price fair for the
           growth?" — full width below the snapshot row, riding the card's
