@@ -104,6 +104,14 @@ export interface TickerCard {
 }
 
 /**
+ * The quote fields a price tile renders: the live price and the day's move.
+ * Both a stock's `TickerCard` and an ETF's `EtfDetail` satisfy it, so a tile can
+ * be fed from either the `/stocks/ticker/{ticker}` card or the
+ * `/stocks/etf/{ticker}` fund detail.
+ */
+export type Quote = Pick<TickerCard, 'price' | 'change' | 'change_percent'>
+
+/**
  * A market sector, tracked via its SPDR Select Sector ETF (XLK, XLF, …).
  * `change`/`change_percent` are the move for the current session; `performance`
  * holds the trailing returns over longer windows.
@@ -1034,6 +1042,21 @@ export async function getEtfDetail(
   )
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as EtfDetail
+}
+
+/**
+ * Fetch several ETF detail cards concurrently, preserving the order of
+ * `tickers` — the ETF analogue of `getTickerCards`. A ticker that fails (not a
+ * screened ETF, network blip) resolves to `null` instead of rejecting the whole
+ * batch, so one dud never blanks the rest of the row.
+ */
+export async function getEtfCards(
+  tickers: string[],
+  opts: { signal?: AbortSignal } = {},
+): Promise<(EtfDetail | null)[]> {
+  return Promise.all(
+    tickers.map((t) => getEtfDetail(t, opts.signal).catch(() => null)),
+  )
 }
 
 /** True for minute/hour bars — the granularities where extended-hours windows appear. */

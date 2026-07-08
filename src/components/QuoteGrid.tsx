@@ -2,8 +2,8 @@ import { Avatar, Box, Skeleton, Stack, Typography } from '@mui/material'
 import { Link as RouterLink } from 'react-router-dom'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
-import { stockLogoUrl, type TickerCard } from '@/lib/api'
-import { useTickerCards } from '@/lib/queries'
+import { stockLogoUrl, type Quote } from '@/lib/api'
+import { useQuoteCards } from '@/lib/queries'
 
 export type QuoteDef = {
   /** Friendly name shown to the user (index name or company). */
@@ -47,7 +47,7 @@ function QuoteTile({
   onSelect,
 }: {
   def: QuoteDef
-  stock: TickerCard | null
+  stock: Quote | null
   linkToStock: boolean
   selected: boolean
   onSelect?: (symbol: string) => void
@@ -248,22 +248,31 @@ const gridColumns = (linkToStock: boolean) => ({
  * With `onSelect`, each tile is instead a toggle button and the tile matching
  * `selectedSymbol` is highlighted — for the home page, where picking a tile
  * chooses which index the chart below shows.
+ *
+ * With `etf`, the tiles are quoted through the ETF endpoint
+ * (`/stocks/etf/{ticker}`) instead of the stock ticker card — for strips of
+ * funds, like the home page's index-ETF proxies.
  */
 export default function QuoteGrid({
   items,
   refreshMs = 60_000,
   linkToStock = false,
+  etf = false,
   selectedSymbol = null,
   onSelect,
 }: {
   items: QuoteDef[]
   refreshMs?: number
   linkToStock?: boolean
+  etf?: boolean
   selectedSymbol?: string | null
   onSelect?: (symbol: string) => void
 }) {
   const symbols = items.map((i) => i.symbol)
-  const { data } = useTickerCards(symbols, { refetchInterval: refreshMs })
+  const { data } = useQuoteCards(symbols, {
+    refetchInterval: refreshMs,
+    source: etf ? 'etf' : 'stock',
+  })
   const quotes = data ?? null
 
   const allFailed = quotes != null && quotes.every((q) => q == null)

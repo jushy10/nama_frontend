@@ -18,6 +18,7 @@ import {
   getAnnualEarnings,
   getCandles,
   getClassifications,
+  getEtfCards,
   getEtfCategories,
   getEtfDetail,
   getQuarterlyEarnings,
@@ -42,6 +43,7 @@ import {
   type EtfSearchSort,
   type MarketCapTier,
   type QuarterlyEarnings,
+  type Quote,
   type RsiSeries,
   type ScreenerResult,
   type Sector,
@@ -114,6 +116,35 @@ export function useTickerCards(
   return useQuery({
     queryKey: ['ticker-cards', tickers],
     queryFn: ({ signal }) => getTickerCards(tickers, { signal }),
+    enabled: opts.enabled ?? tickers.length > 0,
+    refetchInterval: opts.refetchInterval,
+  })
+}
+
+/**
+ * Lean quote cards for several tickers at once, order preserved — the data
+ * behind a `QuoteGrid` price strip. `source` picks the endpoint each card is
+ * quoted from: `'stock'` (default) reads the `/stocks/ticker/{ticker}` card,
+ * `'etf'` the `/stocks/etf/{ticker}` fund detail — so an index-ETF strip quotes
+ * through the proper ETF endpoint rather than the stock one. Either way a ticker
+ * that fails resolves to `null` rather than failing the batch, so the query
+ * effectively never errors. Pass `refetchInterval` for a self-refreshing strip.
+ */
+export function useQuoteCards(
+  tickers: string[],
+  opts: {
+    refetchInterval?: number
+    enabled?: boolean
+    source?: 'stock' | 'etf'
+  } = {},
+): UseQueryResult<(Quote | null)[]> {
+  const source = opts.source ?? 'stock'
+  return useQuery({
+    queryKey: ['quote-cards', source, tickers],
+    queryFn: ({ signal }): Promise<(Quote | null)[]> =>
+      source === 'etf'
+        ? getEtfCards(tickers, { signal })
+        : getTickerCards(tickers, { signal }),
     enabled: opts.enabled ?? tickers.length > 0,
     refetchInterval: opts.refetchInterval,
   })

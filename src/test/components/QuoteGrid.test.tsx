@@ -12,21 +12,23 @@ const BY_SYMBOL: Record<string, ReturnType<typeof quote>> = {
   SPY: quote('SPY', 731.88, -1.74, -0.24),
 }
 
-/** Answers each /stocks/ticker/SYMBOL request from BY_SYMBOL; 404s the rest. */
+/**
+ * Answers each /stocks/{ticker,etf}/SYMBOL request from BY_SYMBOL; 404s the rest.
+ * Returns the mock so a test can assert which endpoint a tile was quoted from.
+ */
 function stubFetch() {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string | URL) => {
-      const symbol = String(url).match(/\/stocks\/ticker\/([^/?]+)/)?.[1] ?? ''
-      const data = BY_SYMBOL[symbol]
-      return Promise.resolve({
-        ok: data != null,
-        status: data != null ? 200 : 404,
-        json: () =>
-          Promise.resolve(data ?? { detail: `No data for ${symbol}.` }),
-      })
-    }),
-  )
+  const mock = vi.fn((url: string | URL) => {
+    const symbol =
+      String(url).match(/\/stocks\/(?:ticker|etf)\/([^/?]+)/)?.[1] ?? ''
+    const data = BY_SYMBOL[symbol]
+    return Promise.resolve({
+      ok: data != null,
+      status: data != null ? 200 : 404,
+      json: () => Promise.resolve(data ?? { detail: `No data for ${symbol}.` }),
+    })
+  })
+  vi.stubGlobal('fetch', mock)
+  return mock
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -62,5 +64,18 @@ describe('QuoteGrid', () => {
     expect(await screen.findByText('$731.88')).toBeInTheDocument()
     expect(screen.queryByRole('link')).toBeNull()
     expect(screen.queryByRole('img')).toBeNull()
+  })
+
+  it('quotes tiles through the ETF endpoint when etf is set', async () => {
+    const fetchMock = stubFetch()
+    renderWithProviders(
+      <QuoteGrid items={[{ label: 'S&P 500', symbol: 'SPY' }]} etf />,
+    )
+
+    // Same rendered price, but sourced from the ETF detail endpoint.
+    expect(await screen.findByText('$731.88')).toBeInTheDocument()
+    const urls = fetchMock.mock.calls.map((c) => String(c[0]))
+    expect(urls.some((u) => /\/stocks\/etf\/SPY/.test(u))).toBe(true)
+    expect(urls.some((u) => /\/stocks\/ticker\//.test(u))).toBe(false)
   })
 })
