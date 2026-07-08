@@ -18,6 +18,7 @@ import {
   getAnnualEarnings,
   getCandles,
   getClassifications,
+  getEtfAnalysis,
   getEtfCards,
   getEtfCategories,
   getEtfDetail,
@@ -39,6 +40,7 @@ import {
   type CandleSeries,
   type ChartRange,
   type Classifications,
+  type EtfAnalysis,
   type EtfCategories,
   type EtfDetail,
   type EtfSearchResponse,
@@ -484,6 +486,23 @@ export function useEtfDetail(
         include: ['metrics', 'dividends', 'performance'],
         signal,
       }),
+    enabled: !!ticker,
+  })
+}
+
+/**
+ * The AI analysis for a fund (`GET /stocks/etf/{ticker}/analysis`) — the ETF
+ * sibling of `useStockAnalysis`, a plain-language buy/hold/sell read the fund
+ * detail view shows in a card. It's the slowest of the fund reads (a live model
+ * call), so it loads on its own; the backend caches it briefly, so revisits
+ * paint from cache. Idle until `ticker` is set.
+ */
+export function useEtfAnalysis(
+  ticker: string | null | undefined,
+): UseQueryResult<EtfAnalysis> {
+  return useQuery({
+    queryKey: ['etf-analysis', ticker],
+    queryFn: ({ signal }) => getEtfAnalysis(ticker as string, { signal }),
     enabled: !!ticker,
   })
 }

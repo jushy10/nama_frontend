@@ -7,7 +7,8 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { errorMessage, useEtfDetail } from '@/lib/queries'
+import { errorMessage, useEtfAnalysis, useEtfDetail } from '@/lib/queries'
+import AnalysisCard from '@/components/AnalysisCard'
 import EtfCard from '@/components/EtfCard'
 import FundReturnsCard from '@/components/FundReturnsCard'
 import TopHoldingsCard from '@/components/TopHoldingsCard'
@@ -25,6 +26,10 @@ import EtfBenchmarkCard from '@/components/EtfBenchmarkCard'
 export default function EtfDetail({ symbol }: { symbol: string }) {
   const etfQuery = useEtfDetail(symbol)
   const etf = etfQuery.data
+  // Ride the loaded fund's ticker (like StockDetail), so the analysis is keyed to
+  // the resolved symbol; it loads on its own since the model call is the slowest
+  // read here too.
+  const analysisQuery = useEtfAnalysis(etf?.ticker ?? null)
 
   return (
     <Box>
@@ -79,6 +84,37 @@ export default function EtfDetail({ symbol }: { symbol: string }) {
               )}
             </Stack>
           </Box>
+
+          {/* The AI take — a plain-language buy/hold/sell read — fetched on its
+              own since the model call is the slowest read, so the rest of the
+              page paints while this card shows its own spinner; a failed read
+              (e.g. the model isn't configured) degrades to a warning rather than
+              sinking the page. */}
+          {analysisQuery.isLoading && (
+            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+              <CardContent sx={{ p: 3 }}>
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  sx={{ alignItems: 'center' }}
+                >
+                  <CircularProgress size={20} />
+                  <Typography color="text.secondary">
+                    Generating AI analysis…
+                  </Typography>
+                </Stack>
+              </CardContent>
+            </Card>
+          )}
+          {analysisQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                analysisQuery.error,
+                'Could not load the AI analysis.',
+              )}
+            </Alert>
+          )}
+          {analysisQuery.data && <AnalysisCard analysis={analysisQuery.data} />}
 
           {/* Holdings + sector mix share a row on desktop; each self-hides when
               its breakdown is missing, so auto-fit lets whichever remains take

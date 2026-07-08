@@ -1728,18 +1728,17 @@ export type AnalysisRecommendation = 'buy' | 'hold' | 'sell'
 export type AnalysisConfidence = 'low' | 'medium' | 'high'
 
 /**
- * An AI-generated, plain-language read on a single stock
- * (`GET /stocks/{symbol}/analysis`). `recommendation` is the headline
- * buy/hold/sell call and `confidence` how firmly it's held; `thesis` is a few
- * everyday-language sentences of reasoning, with `strengths` (the bull case) and
- * `risks` (the bear case) as short bullet points. `disclaimer` is a fixed
- * not-financial-advice reminder authored by the service — render it as a
- * footnote — and `model`/`generated_at` record what produced the read and when.
- * Reasoned only over the figures the other stock endpoints expose; descriptive,
- * not advice, and regenerated at most every few minutes (the endpoint caches).
+ * The fields every AI analysis carries, whatever the asset it reads.
+ * `recommendation` is the headline buy/hold/sell call and `confidence` how
+ * firmly it's held; `thesis` is a few everyday-language sentences of reasoning,
+ * with `strengths` (the bull case) and `risks` (the bear case) as short bullet
+ * points. `disclaimer` is a fixed not-financial-advice reminder authored by the
+ * service — render it as a footnote — and `model`/`generated_at` record what
+ * produced the read and when. The presentational card renders only these; the
+ * per-asset identity (a stock's `symbol`, a fund's `ticker`) rides on the
+ * concrete types that extend this.
  */
-export interface StockAnalysis {
-  symbol: string
+export interface AnalysisBase {
   recommendation: AnalysisRecommendation
   confidence: AnalysisConfidence
   thesis: string
@@ -1748,6 +1747,16 @@ export interface StockAnalysis {
   disclaimer: string
   model: string
   generated_at: string
+}
+
+/**
+ * An AI-generated, plain-language read on a single stock
+ * (`GET /stocks/{symbol}/analysis`). Reasoned only over the figures the other
+ * stock endpoints expose; descriptive, not advice, and regenerated at most every
+ * few minutes (the endpoint caches).
+ */
+export interface StockAnalysis extends AnalysisBase {
+  symbol: string
 }
 
 /**
@@ -1768,6 +1777,41 @@ export async function getStockAnalysis(
   )
   if (!res.ok) throw await toApiError(res)
   const data = (await res.json()) as StockAnalysis
+  if (!Array.isArray(data?.strengths) || !Array.isArray(data?.risks)) {
+    throw new ApiError(res.status, 'Malformed analysis response')
+  }
+  return data
+}
+
+/**
+ * An AI-generated, plain-language read on a single fund
+ * (`GET /stocks/etf/{ticker}/analysis`) — the ETF sibling of `StockAnalysis`,
+ * the same shape but keyed on `ticker` with an `asset_type` marker. The backend
+ * reasons only over the fund's own figures (size, cost, yield, returns,
+ * holdings, sector mix). Descriptive, not advice.
+ */
+export interface EtfAnalysis extends AnalysisBase {
+  ticker: string
+  asset_type: AssetType
+}
+
+/**
+ * Fetch the AI analysis for a fund (`GET /stocks/etf/{ticker}/analysis`). Like
+ * the stock read this runs a live model call, so it's the slowest of the fund
+ * reads — the detail view fetches it on its own and shows the card once it
+ * lands. Throws an `ApiError` when the read is unavailable (not a screened ETF,
+ * or the backend isn't configured for AI analysis).
+ */
+export async function getEtfAnalysis(
+  ticker: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<EtfAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/etf/${encodeURIComponent(ticker)}/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EtfAnalysis
   if (!Array.isArray(data?.strengths) || !Array.isArray(data?.risks)) {
     throw new ApiError(res.status, 'Malformed analysis response')
   }

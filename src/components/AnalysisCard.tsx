@@ -4,9 +4,9 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import type { SvgIconComponent } from '@mui/icons-material'
 import type {
+  AnalysisBase,
   AnalysisConfidence,
   AnalysisRecommendation,
-  StockAnalysis,
 } from '@/lib/api'
 
 // Amber for the neutral "Hold" call — the theme defines only green (up) and red
@@ -89,17 +89,15 @@ function PointList({
 }
 
 /**
- * The AI analysis card — a plain-language buy/hold/sell read on the stock: the
- * headline verdict chip and confidence, a short thesis, and the bull/bear points
- * (strengths and risks), with the service's not-advice disclaimer as a footnote.
- * Purely presentational; the (slow) model call happens upstream in the detail
- * view, which shows this once it lands. Framed as an AI-generated overview.
+ * The AI analysis card — a plain-language buy/hold/sell read on a stock or fund:
+ * the headline verdict chip and confidence, a short thesis, and the bull/bear
+ * points (strengths and risks), with the service's not-advice disclaimer as a
+ * footnote. Purely presentational and asset-agnostic — it reads only the shared
+ * `AnalysisBase` fields, so both the stock and ETF analyses render through it.
+ * The (slow) model call happens upstream in the detail view, which shows this
+ * once it lands. Framed as an AI-generated overview.
  */
-export default function AnalysisCard({
-  analysis,
-}: {
-  analysis: StockAnalysis
-}) {
+export default function AnalysisCard({ analysis }: { analysis: AnalysisBase }) {
   const verdict = VERDICT[analysis.recommendation]
 
   return (
