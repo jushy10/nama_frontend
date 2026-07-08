@@ -23,6 +23,12 @@ env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
   # Vite inlines VITE_* at BUILD time, so the API URL is set before `npm run build`.
   VITE_API_URL: https://api.namainsights.com
+  # PostHog product analytics. The project key is a *publishable* client-side key
+  # (it ships in the bundle), so it's a repo Actions **variable**, not a secret —
+  # set it and analytics turns on; leave it unset and the build simply ships with
+  # analytics off. Host defaults to PostHog US cloud.
+  VITE_PUBLIC_POSTHOG_KEY: ${{ vars.VITE_PUBLIC_POSTHOG_KEY }}
+  VITE_PUBLIC_POSTHOG_HOST: ${{ vars.VITE_PUBLIC_POSTHOG_HOST || 'https://us.i.posthog.com' }}
 
 jobs:
   # On pull requests: just prove the bundle builds. No AWS credentials, no upload.

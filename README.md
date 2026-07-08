@@ -89,19 +89,49 @@ Resolving the targets at deploy time (rather than hardcoding the bucket suffix /
 distribution id) means a destroy+recreate of the infra doesn't break deploys.
 
 > **Build-time config:** Vite inlines `import.meta.env.VITE_*` at **build time**.
-> `VITE_API_URL` is set in `deploy.yml`'s `env:` and baked into the bundle;
-> reference it in code as `import.meta.env.VITE_API_URL`.
+> `VITE_API_URL` and the `VITE_PUBLIC_POSTHOG_*` analytics vars are set in
+> `deploy.yml`'s `env:` and baked into the bundle; reference them in code as
+> `import.meta.env.VITE_*`.
 
 ### What to set in this repo
 
 Under _Settings → Secrets and variables → Actions_:
 
-| Kind     | Name                    | Value                                                             |
-| -------- | ----------------------- | ----------------------------------------------------------------- |
-| Secret   | `AWS_ACCESS_KEY_ID`     | the `nama-ci` user's key (PowerUserAccess covers S3 + CloudFront) |
-| Secret   | `AWS_SECRET_ACCESS_KEY` | the `nama-ci` user's secret                                       |
-| Variable | `AWS_REGION`            | optional; defaults to `us-east-1`                                 |
+| Kind     | Name                       | Value                                                             |
+| -------- | -------------------------- | ----------------------------------------------------------------- |
+| Secret   | `AWS_ACCESS_KEY_ID`        | the `nama-ci` user's key (PowerUserAccess covers S3 + CloudFront) |
+| Secret   | `AWS_SECRET_ACCESS_KEY`    | the `nama-ci` user's secret                                       |
+| Variable | `AWS_REGION`               | optional; defaults to `us-east-1`                                 |
+| Variable | `VITE_PUBLIC_POSTHOG_KEY`  | optional; PostHog project API key — set it to turn analytics on   |
+| Variable | `VITE_PUBLIC_POSTHOG_HOST` | optional; PostHog host, defaults to `https://us.i.posthog.com`    |
 
 > **Backend CORS:** once the frontend is live, the FastAPI backend must include
 > `https://namainsights.com` and `https://www.namainsights.com` in its
 > `CORSMiddleware` `allow_origins`, or the browser will block API calls.
+
+## Analytics
+
+Product analytics run on [PostHog](https://posthog.com) — how many unique
+visitors, which pages they open, and what they do. Everyone is **anonymous**
+(no login, no accounts); "unique users" are counted by an anonymous per-browser
+id, and PostHog's dashboards break out new vs. returning and retention out of
+the box.
+
+The wiring lives in [`src/lib/analytics.tsx`](src/lib/analytics.tsx):
+
+- **Pageviews** — captured on every client-side route change (this is a Vite/React
+  SPA, so PostHog's automatic pageview would miss in-app navigation).
+- **Autocapture** — clicks and other generic interactions, no code needed.
+- **Custom events** — call `trackEvent(name, props)` for the actions worth naming
+  (the search page already fires `ticker_viewed` with the ticker + asset type).
+
+Analytics are **off unless `VITE_PUBLIC_POSTHOG_KEY` is set**, so `npm run dev`,
+the test run, and PR preview builds send nothing. To turn it on:
+
+1. Create a free project at [posthog.com](https://posthog.com) and copy its
+   **Project API key** (starts with `phc_`). It's a publishable client-side key —
+   safe to ship in the browser bundle.
+2. Add it as the `VITE_PUBLIC_POSTHOG_KEY` Actions **variable** (above). The next
+   deploy bakes it in and analytics starts flowing.
+3. If your project is on PostHog's EU cloud, also set `VITE_PUBLIC_POSTHOG_HOST`
+   to `https://eu.i.posthog.com`.

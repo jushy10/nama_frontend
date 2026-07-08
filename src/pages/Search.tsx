@@ -20,6 +20,7 @@ import {
   useStockSearch,
   useTickerType,
 } from '@/lib/queries'
+import { trackEvent } from '@/lib/analytics'
 import StockDetail from '@/components/StockDetail'
 import EtfDetail from '@/components/EtfDetail'
 
@@ -132,6 +133,20 @@ export default function Search() {
   useEffect(() => {
     if (urlSymbol) setInput(urlSymbol)
   }, [urlSymbol])
+
+  // Record which tickers actually get opened — fires once per resolved symbol
+  // (keyed off the classified result, so a half-typed search sends nothing).
+  // Autocapture covers clicks/pageviews; this names the app's core action so
+  // "most-viewed tickers" becomes answerable.
+  useEffect(() => {
+    const resolved = typeQuery.data
+    if (resolved) {
+      trackEvent('ticker_viewed', {
+        ticker: resolved.ticker,
+        asset_type: resolved.asset_type,
+      })
+    }
+  }, [typeQuery.data])
 
   // Route to a ticker: normalise and write it to the URL, which the detail below
   // keys off. Manual searches, picks, deep links, and back/forward all run this.
