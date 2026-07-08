@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  beatConsistency,
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
@@ -233,6 +234,21 @@ describe('profitabilityVerdict', () => {
 
   it('returns null when there is no margin to judge', () => {
     expect(profitabilityVerdict(null)).toBeNull()
+  })
+})
+
+describe('beatConsistency', () => {
+  it('grades a beat rate: 60%+ reliable, 40–60% mixed, below shaky', () => {
+    expect(beatConsistency(100)).toBe('reliable')
+    expect(beatConsistency(60)).toBe('reliable')
+    expect(beatConsistency(59.9)).toBe('mixed')
+    expect(beatConsistency(40)).toBe('mixed')
+    expect(beatConsistency(39.9)).toBe('shaky')
+    expect(beatConsistency(0)).toBe('shaky')
+  })
+
+  it('returns null when no quarter could be scored', () => {
+    expect(beatConsistency(null)).toBeNull()
   })
 })
 

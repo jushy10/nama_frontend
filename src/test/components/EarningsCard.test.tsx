@@ -599,4 +599,49 @@ describe('EarningsCard', () => {
       spy.mockRestore()
     }
   })
+
+  it('opens with a plain-language verdict for the latest quarter', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    // The newest quarter (Q1 '27) beat: a "Beat estimates" badge and a plain
+    // sentence naming the swing.
+    expect(screen.getByText('Beat estimates')).toBeInTheDocument()
+    expect(screen.getByText(/Latest quarter/)).toBeInTheDocument()
+    expect(screen.getByText('a 4.3% beat')).toBeInTheDocument()
+  })
+
+  it('summarizes the beat track record from the API totals', () => {
+    renderWithProviders(<EarningsCard earnings={base} />)
+    // beats 2 / scored 3, a 67% rate -> "reliable" -> "Beats consistently".
+    expect(screen.getByText('2 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Beats consistently')).toBeInTheDocument()
+  })
+
+  it('labels a missed latest quarter and a shaky track record', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={{
+          ...base,
+          // Newest reported quarter is the miss (surprise -2.5%).
+          quarters: [base.quarters[2]],
+          beats: 1,
+          scored: 3,
+          beat_rate: 33,
+        }}
+      />,
+    )
+    expect(screen.getByText('Missed estimates')).toBeInTheDocument()
+    expect(screen.getByText('a 2.5% miss')).toBeInTheDocument()
+    expect(screen.getByText('Often falls short')).toBeInTheDocument()
+  })
+
+  it('keeps the latest-quarter verdict visible in the annual view', async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard earnings={base} annual={annualSample} />,
+    )
+    expect(screen.getByText('Beat estimates')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+    // The verdict rides the quarterly beat history, so it stays put when the
+    // charts switch to fiscal years.
+    expect(screen.getByText('Beat estimates')).toBeInTheDocument()
+  })
 })
