@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import MarketIndices from '@/components/MarketIndices'
 
-/** Minimal ticker card — only the fields the index tiles read. */
+/** Minimal quote card — only the fields the index tiles read. */
 function quote(ticker: string, price: number, change: number, pct: number) {
   return {
     ticker,
@@ -42,16 +42,19 @@ function candleSeries(symbol: string) {
 }
 
 /**
- * Answers /stocks/SYMBOL/candles with a small series and /stocks/ticker/SYMBOL
- * from BY_SYMBOL; 404s the rest.
+ * Answers /stocks/SYMBOL/candles with a small series and the index-tile quotes
+ * from BY_SYMBOL. The tiles quote each fund through the ETF endpoint
+ * (/stocks/etf/SYMBOL), not the stock ticker card; 404s the rest.
  */
 function stubFetch() {
   const mock = vi.fn((url: string | URL) => {
+    const u = String(url)
+    const isCandles = u.includes('/candles')
     const symbol =
-      String(url).match(/\/stocks\/(?:ticker\/)?([^/?]+)/)?.[1] ?? ''
-    const data = String(url).includes('/candles')
-      ? candleSeries(symbol)
-      : BY_SYMBOL[symbol]
+      (isCandles
+        ? u.match(/\/stocks\/([^/?]+)\/candles/)
+        : u.match(/\/stocks\/etf\/([^/?]+)/))?.[1] ?? ''
+    const data = isCandles ? candleSeries(symbol) : BY_SYMBOL[symbol]
     return Promise.resolve({
       ok: data != null,
       status: data != null ? 200 : 404,

@@ -57,6 +57,7 @@ export default function MarketIndices() {
 
         <QuoteGrid
           items={INDICES}
+          etf
           selectedSymbol={selected}
           onSelect={setSelected}
         />
