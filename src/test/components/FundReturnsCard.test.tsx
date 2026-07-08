@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import FundReturnsCard from '@/components/FundReturnsCard'
-import type { EtfDetail } from '@/lib/api'
+import type { EtfDetail, EtfPerformance } from '@/lib/api'
+
+// The card reads YTD / 3Y / 5Y off the `performance` block (the 1w–6m/1y windows
+// go unused here). Extracted so the "missing window" test can null one field.
+const perf: EtfPerformance = {
+  '1w': null,
+  '1m': null,
+  '3m': null,
+  '6m': null,
+  ytd: 11.25,
+  '1y': null,
+  three_year_return: 20.41,
+  five_year_return: -3.4,
+}
 
 const base: EtfDetail = {
   ticker: 'VOO',
@@ -15,16 +28,12 @@ const base: EtfDetail = {
   as_of: null,
   category: 'large_blend',
   fund_family: 'Vanguard',
-  net_assets: 1e12,
-  expense_ratio: 0.03,
-  nav: 684.9,
-  dividend_yield: 1.03,
-  ytd_return: 11.25,
-  three_year_return: 20.41,
-  five_year_return: -3.4,
   description: null,
   top_holdings: [],
   sector_weightings: [],
+  metrics: null, // not read by the returns card
+  dividends: null,
+  performance: perf,
 }
 
 describe('FundReturnsCard', () => {
@@ -42,7 +51,9 @@ describe('FundReturnsCard', () => {
 
   it('dashes a window the vendor does not cover', () => {
     renderWithProviders(
-      <FundReturnsCard etf={{ ...base, three_year_return: null }} />,
+      <FundReturnsCard
+        etf={{ ...base, performance: { ...perf, three_year_return: null } }}
+      />,
     )
     expect(screen.getByText('—')).toBeInTheDocument()
   })
