@@ -67,16 +67,22 @@ const etfDetail = {
   as_of: '2026-07-06T20:00:00Z',
   category: 'large_blend',
   fund_family: 'Vanguard',
-  net_assets: 1_701_513_003_008,
-  expense_ratio: 0.03,
-  nav: 684.9,
-  dividend_yield: 1.03,
-  ytd_return: 11.25,
-  three_year_return: 20.41,
-  five_year_return: 13.01,
   description: 'Tracks the S&P 500.',
   top_holdings: [{ ticker: 'NVDA', name: 'NVIDIA Corp', weight: 7.89 }],
   sector_weightings: [{ sector: 'technology', weight: 39.13 }],
+  // The opt-in blocks the detail view requests (metrics/dividends/performance).
+  metrics: { expense_ratio: 0.03, nav: 684.9, net_assets: 1_701_513_003_008 },
+  dividends: { yield_percentage: 1.03 },
+  performance: {
+    '1w': null,
+    '1m': null,
+    '3m': null,
+    '6m': null,
+    ytd: 11.25,
+    '1y': null,
+    three_year_return: 20.41,
+    five_year_return: 13.01,
+  },
 }
 
 const candles = {

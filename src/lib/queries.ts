@@ -427,16 +427,23 @@ export function useEtfCategories(): UseQueryResult<EtfCategories> {
 }
 
 /**
- * One fund's live detail (quote + fund profile). Idle until `ticker` is set.
- * Errors with an `ApiError` 404 when the ticker isn't a screened ETF (Search
- * only renders the fund detail once a ticker classifies as one).
+ * One fund's live detail (quote + fund profile) with every opt-in block
+ * attached — the detail page shows the size/cost stats, yield and trailing
+ * returns, so it requests `metrics`, `dividends` and `performance`. Idle until
+ * `ticker` is set. Errors with an `ApiError` 404 when the ticker isn't a
+ * screened ETF (Search only renders the fund detail once a ticker classifies as
+ * one).
  */
 export function useEtfDetail(
   ticker: string | null | undefined,
 ): UseQueryResult<EtfDetail> {
   return useQuery({
     queryKey: ['etf-detail', ticker],
-    queryFn: ({ signal }) => getEtfDetail(ticker as string, signal),
+    queryFn: ({ signal }) =>
+      getEtfDetail(ticker as string, {
+        include: ['metrics', 'dividends', 'performance'],
+        signal,
+      }),
     enabled: !!ticker,
   })
 }
