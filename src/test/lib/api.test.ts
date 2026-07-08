@@ -3,9 +3,11 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  getIndustryValuation,
   getStockAnalysis,
   getSupportLevels,
   humanizeClassification,
+  industryPeStance,
   lastSessionOnly,
   optionsLevel,
   optionsSentiment,
@@ -50,6 +52,32 @@ describe('humanizeClassification', () => {
   it('aliases non-underscore vendor slugs (Yahoo fund sectors)', () => {
     // Without the alias the generic title-case yields "Realestate".
     expect(humanizeClassification('realestate')).toBe('Real Estate')
+  })
+})
+
+describe('industryPeStance', () => {
+  it('grades against the median with a ±10% dead-band', () => {
+    // 30 vs a 20 median → +50%, clearly above.
+    expect(industryPeStance(30, 20)).toBe('above')
+    // 12 vs 20 → -40%, clearly below.
+    expect(industryPeStance(12, 20)).toBe('below')
+    // Inside ±10% of the median reads in line.
+    expect(industryPeStance(21, 20)).toBe('in_line')
+    expect(industryPeStance(19, 20)).toBe('in_line')
+  })
+
+  it('treats the band edges as in line (0.9× and 1.1×)', () => {
+    expect(industryPeStance(18, 20)).toBe('below') // 0.9× exactly → below (<=)
+    expect(industryPeStance(22, 20)).toBe('above') // 1.1× exactly → above (>=)
+    expect(industryPeStance(18.2, 20)).toBe('in_line')
+    expect(industryPeStance(21.8, 20)).toBe('in_line')
+  })
+
+  it('is null without two positive multiples to compare', () => {
+    expect(industryPeStance(null, 20)).toBeNull()
+    expect(industryPeStance(25, null)).toBeNull()
+    expect(industryPeStance(-4, 20)).toBeNull() // a loss-maker has no gradeable P/E
+    expect(industryPeStance(25, 0)).toBeNull()
   })
 })
 
@@ -539,5 +567,60 @@ describe('getStockAnalysis', () => {
     await expect(getStockAnalysis('AAPL')).rejects.toThrow(
       /analysis model call failed/,
     )
+  })
+})
+
+describe('getIndustryValuation', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the industry endpoint and returns the parsed benchmark', async () => {
+    let requestedUrl = ''
+    const body = {
+      industry: 'semiconductors',
+      count: 34,
+      median_pe: 21,
+      p25_pe: 15.5,
+      p75_pe: 30.2,
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getIndustryValuation('semiconductors')
+
+    expect(requestedUrl).toContain('/stocks/industries/semiconductors/pe')
+    expect(result.median_pe).toBe(21)
+    expect(result.count).toBe(34)
+  })
+
+  it('returns a 200 with count 0 and null stats for an uncovered industry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              industry: 'nonesuch',
+              count: 0,
+              median_pe: null,
+              p25_pe: null,
+              p75_pe: null,
+            }),
+        }),
+      ),
+    )
+    const result = await getIndustryValuation('nonesuch')
+    expect(result.count).toBe(0)
+    expect(result.median_pe).toBeNull()
   })
 })

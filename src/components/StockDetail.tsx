@@ -21,6 +21,7 @@ import {
   useAnnualEarnings,
   useCandles,
   useFiveYearReturn,
+  useIndustryValuation,
   useQuarterlyEarnings,
   useRecommendations,
   useStockAnalysis,
@@ -32,6 +33,7 @@ import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import PegCard from '@/components/PegCard'
+import IndustryPeCard from '@/components/IndustryPeCard'
 import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
@@ -80,6 +82,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The AI take is the slowest read (a live model call), so it rides the loaded
   // ticker on its own and the card fills in once it lands.
   const analysisQuery = useStockAnalysis(loadedSymbol)
+  // The industry P/E benchmark rides the loaded card's own industry slug (idle
+  // until it resolves; never fires for an unclassified stock). Best-effort — it
+  // self-hides if the industry has no valued peers, so no loading/error UI.
+  const industryValuationQuery = useIndustryValuation(stock?.industry ?? null)
 
   if (cardQuery.isLoading) {
     return (
@@ -167,6 +173,16 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         <PegCard
           peg={stock.metrics.peg}
           forwardPeg={stock.metrics.forward_peg}
+        />
+      )}
+
+      {/* The peer-valuation read — "is the price rich or cheap for its
+          industry?" — pairs with the PEG card. Best-effort: self-hides when the
+          benchmark has no valued peers (the card returns null on a null median). */}
+      {industryValuationQuery.data && (
+        <IndustryPeCard
+          stockPe={stock.metrics?.pe ?? null}
+          valuation={industryValuationQuery.data}
         />
       )}
 

@@ -744,6 +744,64 @@ export function humanizeClassification(slug: string): string {
 }
 
 /**
+ * A per-industry trailing-P/E benchmark (`GET /stocks/industries/{industry}/pe`)
+ * over the screened universe — the median multiple its peers trade on plus the
+ * interquartile range (`p25_pe`/`p75_pe`, the middle-half band) and the peer
+ * `count`. It's the anchor that turns one stock's P/E from an absolute number
+ * into a relative one. All three stats are null when `count` is 0 (an unknown
+ * industry, or none of its members valued yet); `industry` echoes the normalized
+ * slug.
+ */
+export interface IndustryValuation {
+  industry: string
+  count: number
+  median_pe: number | null
+  p25_pe: number | null
+  p75_pe: number | null
+}
+
+/** Where a stock's trailing P/E sits versus its industry's median. */
+export type IndustryPeStance = 'below' | 'in_line' | 'above'
+
+/**
+ * Grade a stock's trailing P/E against its industry median: `below`
+ * (meaningfully cheaper), `above` (meaningfully pricier), or `in_line` within a
+ * ±10% dead-band that keeps small gaps from reading as a signal. Null when
+ * either figure is missing or non-positive — there's no gradeable comparison
+ * without two positive multiples.
+ */
+export function industryPeStance(
+  stockPe: number | null,
+  medianPe: number | null,
+): IndustryPeStance | null {
+  if (stockPe == null || medianPe == null || stockPe <= 0 || medianPe <= 0) {
+    return null
+  }
+  const ratio = stockPe / medianPe
+  if (ratio <= 0.9) return 'below'
+  if (ratio >= 1.1) return 'above'
+  return 'in_line'
+}
+
+/**
+ * The industry P/E benchmark for a symbol's own industry. Best-effort on the
+ * backend: an unscreened/unclassified symbol, or an industry with no valued
+ * peers, comes back with `count: 0` and null stats (a 200, not a 404). Throws an
+ * `ApiError` 400 only on a blank/malformed industry.
+ */
+export async function getIndustryValuation(
+  industry: string,
+  signal?: AbortSignal,
+): Promise<IndustryValuation> {
+  const res = await fetch(
+    `${API_BASE}/stocks/industries/${encodeURIComponent(industry)}/pe`,
+    { signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as IndustryValuation
+}
+
+/**
  * A sort key for the universe search — the four column metrics (market cap,
  * trailing P/E, and trailing revenue/EPS growth) plus `growth`, the
  * equal-weight blend of trailing revenue and EPS growth (server-computed) that

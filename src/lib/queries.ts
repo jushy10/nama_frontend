@@ -21,6 +21,7 @@ import {
   getEtfCards,
   getEtfCategories,
   getEtfDetail,
+  getIndustryValuation,
   getQuarterlyEarnings,
   getRecommendations,
   getRsi,
@@ -42,6 +43,7 @@ import {
   type EtfDetail,
   type EtfSearchResponse,
   type EtfSearchSort,
+  type IndustryValuation,
   type MarketCapTier,
   type QuarterlyEarnings,
   type Quote,
@@ -295,6 +297,25 @@ export function useStockAnalysis(
     queryKey: ['stock-analysis', symbol],
     queryFn: ({ signal }) => getStockAnalysis(symbol as string, { signal }),
     enabled: !!symbol,
+  })
+}
+
+/**
+ * The industry P/E benchmark for a stock's own industry (`GET
+ * /stocks/industries/{industry}/pe`) — the median multiple its peers trade on
+ * plus the interquartile range, the anchor the detail view compares the stock's
+ * own P/E against. Idle until `industry` is set (the caller passes the loaded
+ * card's `industry` slug, so an unclassified stock never fires it). The benchmark
+ * moves slowly (a daily universe sweep), so it's held fresh for ten minutes.
+ */
+export function useIndustryValuation(
+  industry: string | null | undefined,
+): UseQueryResult<IndustryValuation> {
+  return useQuery({
+    queryKey: ['industry-valuation', industry],
+    queryFn: ({ signal }) => getIndustryValuation(industry as string, signal),
+    enabled: !!industry,
+    staleTime: 10 * 60 * 1000,
   })
 }
 
