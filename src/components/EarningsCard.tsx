@@ -15,10 +15,12 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import type { SxProps, Theme } from '@mui/material/styles'
-import { annualReported, annualUpcoming } from '@/lib/api'
+import { annualReported, annualUpcoming, beatConsistency } from '@/lib/api'
 import type {
   AnnualEarnings,
+  BeatConsistency,
   EarningsHistory,
   EarningsSurprise,
   NextEarnings,
@@ -842,6 +844,173 @@ function TrailingGrowth({
   )
 }
 
+/** The plain-language read for each consistency call: a short verdict word and
+ *  the colour it's shown in — dependable green, hit-or-miss amber, shaky red. */
+const CONSISTENCY: Record<BeatConsistency, { label: string; color: string }> = {
+  reliable: { label: 'Beats consistently', color: 'success.main' },
+  mixed: { label: 'Hit or miss', color: '#fbbf24' }, // amber, matching sibling cards
+  shaky: { label: 'Often falls short', color: 'error.main' },
+}
+
+/**
+ * A plain-language verdict that opens the card, so the "how are they doing?"
+ * read lands before the charts: how the latest quarter came in (beat, missed,
+ * or simply reported — with the figures spelled out in a sentence) and the
+ * recent track record as a beat/miss dot strip beside the share of quarters
+ * that cleared consensus. Rides the `beats`/`scored`/`beat_rate` summary the
+ * API already computes plus the newest reported quarter — always the quarterly
+ * beat history, independent of the Quarterly/Annual chart toggle.
+ */
+function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
+  const theme = useTheme()
+  const up = theme.palette.success.main
+  const down = theme.palette.error.main
+  const { quarters, beats, scored, beat_rate } = earnings
+
+  // The headline quarter: the newest one scored against a consensus (both an
+  // actual and an estimate), falling back to the newest with any reported figure
+  // so a just-reported quarter still leads before its estimate is matched up.
+  const scoredQ = quarters.find((q) => q.actual != null && q.estimate != null)
+  const reported = scoredQ ?? quarters.find((q) => q.actual != null) ?? null
+  if (!reported) return null
+
+  const beat = scoredQ?.beat ?? null
+  // Two-word verdict so the badge never collides with the single-word "Beat" /
+  // "Missed" chart-legend labels (which the annual view drops).
+  const verdict =
+    beat == null ? 'Reported' : beat ? 'Beat estimates' : 'Missed estimates'
+  const verdictColor =
+    beat == null ? theme.palette.text.secondary : beat ? up : down
+  const surprise = scoredQ?.surprise_percent ?? null
+
+  // "a 4.3% beat" / "a 2.5% miss" — magnitude plus the direction word, so the
+  // sign lives in the word and the colour rather than a stray minus.
+  const swing =
+    beat != null && surprise != null
+      ? `a ${Math.abs(surprise).toFixed(1)}% ${beat ? 'beat' : 'miss'}`
+      : null
+
+  // Recent quarters as beat/miss/unscored dots, oldest → newest to match the
+  // charts below.
+  const dots = [...quarters].reverse()
+  const tone = beatConsistency(beat_rate)
+
+  return (
+    <Box
+      sx={{
+        mt: 2.5,
+        p: 2,
+        borderRadius: 1.5,
+        bgcolor: 'action.hover',
+        border: '1px solid',
+        borderColor: 'divider',
+      }}
+    >
+      {/* Latest quarter — the plain-language headline */}
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
+        <Box
+          component="span"
+          sx={{
+            px: 1,
+            py: 0.25,
+            borderRadius: 1,
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: verdictColor,
+            bgcolor: alpha(verdictColor, 0.15),
+          }}
+        >
+          {verdict}
+        </Box>
+        <Typography variant="caption" color="text.secondary">
+          Latest quarter · {quarterLabel(reported)}
+        </Typography>
+      </Stack>
+
+      <Typography sx={{ fontSize: '0.95rem', lineHeight: 1.5 }}>
+        Reported{' '}
+        <Box component="span" sx={{ fontWeight: 700 }}>
+          {fmtEps(reported.actual as number)}
+        </Box>{' '}
+        per share
+        {scoredQ?.estimate != null && (
+          <> vs. the {fmtEps(scoredQ.estimate)} expected</>
+        )}
+        {swing && (
+          <>
+            {' — '}
+            <Box component="span" sx={{ fontWeight: 700, color: verdictColor }}>
+              {swing}
+            </Box>
+          </>
+        )}
+        .
+      </Typography>
+
+      {/* Track record — a beat/miss dot strip beside the beat share */}
+      {scored > 0 && beat_rate != null && (
+        <Stack
+          direction="row"
+          useFlexGap
+          sx={{
+            flexWrap: 'wrap',
+            alignItems: 'center',
+            columnGap: 1.5,
+            rowGap: 0.75,
+            mt: 1.5,
+            pt: 1.5,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+            {dots.map((q, i) => (
+              <Box
+                key={q.period ?? i}
+                component="span"
+                title={`${quarterLabel(q)} — ${
+                  q.beat == null ? 'no estimate' : q.beat ? 'Beat' : 'Missed'
+                }`}
+                sx={{
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  bgcolor:
+                    q.beat == null ? theme.palette.divider : q.beat ? up : down,
+                }}
+              />
+            ))}
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Beat estimates in{' '}
+            <Box
+              component="span"
+              sx={{ fontWeight: 700, color: 'text.primary' }}
+            >
+              {beats} of {scored}
+            </Box>{' '}
+            recent quarters
+          </Typography>
+          {tone && (
+            <Box
+              component="span"
+              sx={{
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                color: CONSISTENCY[tone].color,
+              }}
+            >
+              {CONSISTENCY[tone].label}
+            </Box>
+          )}
+        </Stack>
+      )}
+    </Box>
+  )
+}
+
 export default function EarningsCard({
   earnings,
   upcoming = null,
@@ -993,6 +1162,8 @@ export default function EarningsCard({
             </Box>
           )}
         </Stack>
+
+        <EarningsSummary earnings={earnings} />
 
         {hasAnnual && (
           <ToggleButtonGroup

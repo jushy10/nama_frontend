@@ -1465,6 +1465,28 @@ export interface EarningsHistory {
 }
 
 /**
+ * A plain-language read on how dependable a company's results are, from the
+ * share of recent quarters that met or beat consensus (`beat_rate`, 0–100):
+ * `reliable` clears the bar most quarters, `mixed` is hit-or-miss, `shaky`
+ * falls short more often than not. Drives the earnings summary's wording and
+ * colour so the track record reads at a glance. Broad rule of thumb over a
+ * short run of quarters, not a forecast. Null when no quarter could be scored.
+ */
+export type BeatConsistency = 'reliable' | 'mixed' | 'shaky'
+
+/** Map a beat rate (percent of scored quarters that met/beat) to a consistency
+ *  call. ≥ 60% reads reliable, 40–60% mixed, below 40% shaky; null passes
+ *  through (no scored quarters to judge). */
+export function beatConsistency(
+  beatRate: number | null,
+): BeatConsistency | null {
+  if (beatRate == null) return null
+  if (beatRate >= 60) return 'reliable'
+  if (beatRate >= 40) return 'mixed'
+  return 'shaky'
+}
+
+/**
  * One quarter from the consolidated quarterly-earnings series — reported and
  * upcoming quarters in a single list. A reported quarter (`is_reported`) carries
  * the actual EPS/revenue and the surprise vs. the consensus going in; an
