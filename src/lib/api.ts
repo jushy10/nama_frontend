@@ -132,6 +132,37 @@ export interface SectorsResponse {
   sectors: Sector[]
 }
 
+/** The market's risk posture the day's sector rotation implies. */
+export type MarketTone = 'risk_on' | 'risk_off' | 'mixed'
+
+/**
+ * One sector called out in the AI sector analysis. `change_percent` is the
+ * sector proxy's real move on the day (joined from the board, not authored by
+ * the model); `note` is the model's one-line read on why it stands out.
+ */
+export interface SectorHighlight {
+  sector: string
+  symbol: string
+  change_percent: number | null
+  note: string
+}
+
+/**
+ * An AI-generated read of how the market's sectors are moving today: a plain
+ * `summary`, the risk posture (`tone`), and the standout `leaders`/`laggards`
+ * with a one-line note each. `disclaimer` is service-authored — descriptive,
+ * not financial advice. `model`/`generated_at` record what produced it and when.
+ */
+export interface SectorAnalysis {
+  summary: string
+  tone: MarketTone
+  leaders: SectorHighlight[]
+  laggards: SectorHighlight[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
 /** Trailing-return windows in display order, for selectors and strips. */
 export const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
   { key: '1w', label: '1W' },
@@ -632,6 +663,15 @@ export async function getSectors(signal?: AbortSignal): Promise<Sector[]> {
     throw new ApiError(res.status, 'Malformed sectors response')
   }
   return data.sectors
+}
+
+/** Fetch the AI read of today's sectors (which are leading and which lagging). */
+export async function getSectorAnalysis(
+  signal?: AbortSignal,
+): Promise<SectorAnalysis> {
+  const res = await fetch(`${API_BASE}/sectors/analysis`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as SectorAnalysis
 }
 
 /** Index universe the screener can narrow to. */
