@@ -84,7 +84,8 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const analysisQuery = useStockAnalysis(loadedSymbol)
   // The industry P/E benchmark rides the loaded card's own industry slug (idle
   // until it resolves; never fires for an unclassified stock). Best-effort — it
-  // self-hides if the industry has no valued peers, so no loading/error UI.
+  // self-hides if the industry has too few valued peers to stand as a
+  // benchmark, so no loading/error UI.
   const industryValuationQuery = useIndustryValuation(stock?.industry ?? null)
 
   if (cardQuery.isLoading) {
@@ -177,8 +178,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       )}
 
       {/* The peer-valuation read — "is the price rich or cheap for its
-          industry?" — pairs with the PEG card. Best-effort: self-hides when the
-          benchmark has no valued peers (the card returns null on a null median). */}
+          industry?" — pairs with the PEG card. Best-effort: self-hides when
+          fewer than MIN_INDUSTRY_PEERS back the benchmark (the card returns
+          null), so a sole-peer "median" never renders as a verdict. */}
       {industryValuationQuery.data && (
         <IndustryPeCard
           stockPe={stock.metrics?.pe ?? null}

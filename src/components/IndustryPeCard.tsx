@@ -2,6 +2,7 @@ import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import {
   humanizeClassification,
   industryPeStance,
+  MIN_INDUSTRY_PEERS,
   type IndustryPeStance,
   type IndustryValuation,
 } from '@/lib/api'
@@ -318,8 +319,10 @@ function RangeBar({
  * peers. An absolute multiple says little on its own — this is the anchor that
  * makes it "rich" or "cheap" *for its industry*. A verdict chip grades the
  * stance, a bar plots the stock against the peer band, and a plain-language line
- * spells out the gap. Renders nothing without a median (an industry with no
- * valued peers) — the parent gates on that too.
+ * spells out the gap. Renders nothing without a median, or when fewer than
+ * `MIN_INDUSTRY_PEERS` peers back it — a "median" over one or two names is
+ * those companies' own multiples, not an industry anchor, so no card beats a
+ * noise verdict.
  */
 export default function IndustryPeCard({
   stockPe,
@@ -329,7 +332,7 @@ export default function IndustryPeCard({
   valuation: IndustryValuation
 }) {
   const { median_pe, p25_pe, p75_pe, count, industry } = valuation
-  if (median_pe == null) return null
+  if (median_pe == null || count < MIN_INDUSTRY_PEERS) return null
 
   const label = humanizeClassification(industry)
   const stance = industryPeStance(stockPe, median_pe)
