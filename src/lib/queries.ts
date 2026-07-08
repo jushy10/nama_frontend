@@ -27,6 +27,7 @@ import {
   getRecommendations,
   getRsi,
   getScreener,
+  getSectorAnalysis,
   getSectors,
   getStockAnalysis,
   getSupportLevels,
@@ -52,6 +53,7 @@ import {
   type RsiSeries,
   type ScreenerResult,
   type Sector,
+  type SectorAnalysis,
   type SortOrder,
   type StockAnalysis,
   type StockIndex,
@@ -326,6 +328,21 @@ export function useSectors(): UseQueryResult<Sector[]> {
   return useQuery({
     queryKey: ['sectors'],
     queryFn: ({ signal }) => getSectors(signal),
+  })
+}
+
+/**
+ * The AI read of today's sector board (which sectors lead/lag + the market's
+ * tone). The backend regenerates it at most every ~15 min and the call is
+ * metered, so keep it stale-tolerant and don't retry — a 502/503 (model briefly
+ * unavailable or not configured) just leaves the widget hidden.
+ */
+export function useSectorAnalysis(): UseQueryResult<SectorAnalysis> {
+  return useQuery({
+    queryKey: ['sector-analysis'],
+    queryFn: ({ signal }) => getSectorAnalysis(signal),
+    staleTime: 15 * 60 * 1000,
+    retry: false,
   })
 }
 
