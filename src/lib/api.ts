@@ -1647,3 +1647,61 @@ export async function getRecommendations(
   }
   return data
 }
+
+/**
+ * The AI analysis's headline call — a plain buy / hold / sell verdict. Lowercase
+ * to match the API's JSON, and deliberately distinct from the five-step sell-side
+ * `Recommendation` (Strong Buy … Strong Sell) so the AI read and the analyst
+ * consensus never get crossed.
+ */
+export type AnalysisRecommendation = 'buy' | 'hold' | 'sell'
+
+/** How firmly the AI analysis holds its call, given how much clear data it had. */
+export type AnalysisConfidence = 'low' | 'medium' | 'high'
+
+/**
+ * An AI-generated, plain-language read on a single stock
+ * (`GET /stocks/{symbol}/analysis`). `recommendation` is the headline
+ * buy/hold/sell call and `confidence` how firmly it's held; `thesis` is a few
+ * everyday-language sentences of reasoning, with `strengths` (the bull case) and
+ * `risks` (the bear case) as short bullet points. `disclaimer` is a fixed
+ * not-financial-advice reminder authored by the service — render it as a
+ * footnote — and `model`/`generated_at` record what produced the read and when.
+ * Reasoned only over the figures the other stock endpoints expose; descriptive,
+ * not advice, and regenerated at most every few minutes (the endpoint caches).
+ */
+export interface StockAnalysis {
+  symbol: string
+  recommendation: AnalysisRecommendation
+  confidence: AnalysisConfidence
+  thesis: string
+  strengths: string[]
+  risks: string[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Fetch the AI analysis for a ticker (`GET /stocks/{symbol}/analysis`). The
+ * backend runs a language model over the stock's own figures, so this is the
+ * slowest of the stock reads — seconds, not milliseconds — which is why the
+ * detail view fetches it on its own and shows the card once it lands. Throws an
+ * `ApiError` when the read is unavailable (a bad symbol, or the backend isn't
+ * configured for AI analysis).
+ */
+export async function getStockAnalysis(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<StockAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as StockAnalysis
+  if (!Array.isArray(data?.strengths) || !Array.isArray(data?.risks)) {
+    throw new ApiError(res.status, 'Malformed analysis response')
+  }
+  return data
+}

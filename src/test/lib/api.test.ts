@@ -3,6 +3,7 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  getStockAnalysis,
   getSupportLevels,
   humanizeClassification,
   lastSessionOnly,
@@ -484,6 +485,59 @@ describe('getSupportLevels', () => {
     )
     await expect(getSupportLevels('ZZZZ')).rejects.toThrow(
       /No stock data found/,
+    )
+  })
+})
+
+describe('getStockAnalysis', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the analysis endpoint and returns the parsed read', async () => {
+    let requestedUrl = ''
+    const body = {
+      symbol: 'AAPL',
+      recommendation: 'buy',
+      confidence: 'high',
+      thesis: 'Solid profits at a fair price.',
+      strengths: ['High margins'],
+      risks: ['Rich valuation'],
+      disclaimer: 'Not financial advice.',
+      model: 'claude-haiku-4-5',
+      generated_at: '2026-07-08T00:00:00Z',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getStockAnalysis('AAPL')
+
+    expect(requestedUrl).toContain('/stocks/AAPL/analysis')
+    expect(result.recommendation).toBe('buy')
+    expect(result.strengths).toEqual(['High margins'])
+    expect(result.risks).toEqual(['Rich valuation'])
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 502,
+          json: () => Promise.resolve({ detail: 'analysis model call failed' }),
+        }),
+      ),
+    )
+    await expect(getStockAnalysis('AAPL')).rejects.toThrow(
+      /analysis model call failed/,
     )
   })
 })
