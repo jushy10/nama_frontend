@@ -68,18 +68,25 @@ describe('IndustryPeCard', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('omits the range bar when the industry has a single valued peer', () => {
+  it('renders nothing when too few peers back the benchmark', () => {
+    // A sole-peer industry's "median" is that one stock's own multiple, and a
+    // handful of peers isn't an industry — below MIN_INDUSTRY_PEERS the card
+    // self-hides even though the stats are present.
+    for (const count of [1, 4]) {
+      const { container, unmount } = renderWithProviders(
+        <IndustryPeCard stockPe={25} valuation={valuation({ count })} />,
+      )
+      expect(container).toBeEmptyDOMElement()
+      unmount()
+    }
+  })
+
+  it('renders at exactly the minimum peer count', () => {
+    // The boundary: five peers is the smallest sample the gate lets through.
     renderWithProviders(
-      <IndustryPeCard
-        stockPe={25}
-        valuation={valuation({ count: 1, p25_pe: null, p75_pe: null })}
-      />,
+      <IndustryPeCard stockPe={30} valuation={valuation({ count: 5 })} />,
     )
-    // Median still reads and the stance is graded, but there's no IQR band.
     expect(screen.getByText('Above Peers')).toBeInTheDocument()
-    expect(screen.queryByText('25th')).not.toBeInTheDocument()
-    expect(screen.queryByText('75th')).not.toBeInTheDocument()
-    // The footnote singularizes the peer count.
-    expect(screen.getByText(/across 1 peer with/i)).toBeInTheDocument()
+    expect(screen.getByText(/across 5 peers with/i)).toBeInTheDocument()
   })
 })

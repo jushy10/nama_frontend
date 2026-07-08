@@ -760,6 +760,16 @@ export interface IndustryValuation {
   p75_pe: number | null
 }
 
+/**
+ * The smallest peer sample an industry benchmark can rest on and still stand
+ * for the *industry* rather than one or two companies — sole-peer industries
+ * exist in the live universe, where the "median" is just that stock's own
+ * multiple. Below this the card self-hides: a median over a couple of names is
+ * noise, not an anchor. Mirrors the backend's
+ * `IndustryValuation.MIN_REPRESENTATIVE_PEERS` gate on the AI-analysis context.
+ */
+export const MIN_INDUSTRY_PEERS = 5
+
 /** Where a stock's trailing P/E sits versus its industry's median. */
 export type IndustryPeStance = 'below' | 'in_line' | 'above'
 
