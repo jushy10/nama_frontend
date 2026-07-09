@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Container,
   Divider,
   Skeleton,
   Stack,
@@ -193,27 +192,25 @@ export default function MarketSummary() {
   const { data, isLoading, isError } = useMarketSummary()
   if (isError) return null
   return (
-    <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-              Market summary
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            An AI read of how the US market — the S&amp;P 500 and the Nasdaq —
-            has moved over the past year, month, and week.
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+            Market summary
           </Typography>
-        </Box>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          An AI read of how the US market — the S&amp;P 500 and the Nasdaq — has
+          moved over the past year, month, and week.
+        </Typography>
+      </Box>
 
-        <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-            {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
-          </CardContent>
-        </Card>
-      </Container>
+      <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+          {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
+        </CardContent>
+      </Card>
     </Box>
   )
 }

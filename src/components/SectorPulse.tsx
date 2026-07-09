@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Container,
   Divider,
   Skeleton,
   Stack,
@@ -150,8 +149,8 @@ function Loaded({ data }: { data: SectorAnalysis }) {
       <Box
         sx={{
           display: 'grid',
-          gap: { xs: 3, md: 4 },
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 3,
+          gridTemplateColumns: '1fr',
         }}
       >
         <HighlightColumn
@@ -190,8 +189,8 @@ function LoadingState() {
       <Box
         sx={{
           display: 'grid',
-          gap: { xs: 3, md: 4 },
-          gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+          gap: 3,
+          gridTemplateColumns: '1fr',
         }}
       >
         {[0, 1].map((c) => (
@@ -217,27 +216,25 @@ export default function SectorPulse() {
   const { data, isLoading, isError } = useSectorAnalysis()
   if (isError) return null
   return (
-    <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-              Sector pulse
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            An AI read of which corners of the market are leading and lagging
-            today.
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
+          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
+            Sector pulse
           </Typography>
-        </Box>
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          An AI read of which corners of the market are leading and lagging
+          today.
+        </Typography>
+      </Box>
 
-        <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-            {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
-          </CardContent>
-        </Card>
-      </Container>
+      <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+          {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
+        </CardContent>
+      </Card>
     </Box>
   )
 }
