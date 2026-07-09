@@ -46,7 +46,7 @@ function emaLine(period: number, days: number[]): EmaLine {
   return {
     period,
     count: points.length,
-    latest: points.at(-1)?.value ?? null,
+    latest: points.length ? points[points.length - 1].value : null,
     points,
   }
 }
