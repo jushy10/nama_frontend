@@ -2,8 +2,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import { Box, Button, Container, Stack, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import TableRowsIcon from '@mui/icons-material/TableRows'
-import { getMarketStatus, marketLabel } from '@/lib/market'
-import MarketStatusDot from '@/components/MarketStatusDot'
+import { marketLabel } from '@/lib/market'
 
 /** Today, spelled out (e.g. "Thursday, July 9") for the hero eyebrow. */
 function todayLabel(now: Date): string {
@@ -23,7 +22,6 @@ function todayLabel(now: Date): string {
  */
 export default function HomeHero() {
   const now = new Date()
-  const phase = getMarketStatus(now).phase
 
   return (
     <Box
@@ -40,14 +38,13 @@ export default function HomeHero() {
     >
       <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 8 } }}>
         <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 720 }}>
-          {/* Live status eyebrow: a phase dot that gently pulses while the
-              regular session is open, the phase label, then the date. */}
+          {/* Live status eyebrow: the phase label, then today's date. The
+              live status dot now lives in the app bar. */}
           <Stack
             direction="row"
             spacing={1}
             sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
           >
-            <MarketStatusDot phase={phase} />
             <Typography
               variant="caption"
               sx={{

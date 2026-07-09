@@ -238,7 +238,7 @@ function App() {
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             <Stack
               direction="row"
-              spacing={{ xs: 0.75, sm: 2, md: 3 }}
+              spacing={{ xs: 1, sm: 3, md: 5 }}
               sx={{ alignItems: 'center' }}
             >
               <Brand large />
