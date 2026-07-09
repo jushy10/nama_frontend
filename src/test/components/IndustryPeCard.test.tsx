@@ -18,7 +18,9 @@ describe('IndustryPeCard', () => {
   it('grades a rich multiple Above Peers with the humanized industry', () => {
     renderWithProviders(<IndustryPeCard stockPe={30} valuation={valuation()} />)
     expect(screen.getByText('Industry P/E')).toBeInTheDocument()
-    expect(screen.getByText(/vs\. Semiconductors peers/i)).toBeInTheDocument()
+    expect(
+      screen.getByText(/vs\. 34 Semiconductors peers/i),
+    ).toBeInTheDocument()
     expect(screen.getByText('Above Peers')).toBeInTheDocument()
     // 30 vs a 20 median → about 50% above, spelled out in plain words.
     expect(screen.getByText(/about 50% above/i)).toBeInTheDocument()
@@ -87,6 +89,6 @@ describe('IndustryPeCard', () => {
       <IndustryPeCard stockPe={30} valuation={valuation({ count: 5 })} />,
     )
     expect(screen.getByText('Above Peers')).toBeInTheDocument()
-    expect(screen.getByText(/across 5 peers with/i)).toBeInTheDocument()
+    expect(screen.getByText(/vs\. 5 Semiconductors peers/i)).toBeInTheDocument()
   })
 })
