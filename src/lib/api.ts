@@ -852,11 +852,12 @@ export async function getIndustryValuation(
 }
 
 /**
- * A sort key for the universe search — the four column metrics (market cap,
- * trailing P/E, and trailing revenue/EPS growth) plus `growth`, the
- * equal-weight blend of trailing revenue and EPS growth (server-computed) that
- * ranks the fastest all-round growers from one control and has no column of its
- * own.
+ * A sort key for the universe search — the column metrics (market cap, trailing
+ * P/E, trailing revenue/EPS growth, and their forward FY1→FY2 analyst-consensus
+ * counterparts) plus two server-computed blends that have no column of their own:
+ * `growth` (the equal-weight blend of trailing revenue + EPS growth) and
+ * `forward_growth` (the same blend of the forward pair), each ranking the fastest
+ * all-round growers — realized or expected — from one control.
  */
 export type StockSearchSort =
   | 'market_cap'
@@ -864,6 +865,9 @@ export type StockSearchSort =
   | 'revenue_growth'
   | 'eps_growth'
   | 'growth'
+  | 'forward_revenue_growth'
+  | 'forward_eps_growth'
+  | 'forward_growth'
 /** Sort direction, shared by any sortable list. */
 export type SortOrder = 'asc' | 'desc'
 
@@ -879,10 +883,13 @@ export type MarketCapTier = 'mega' | 'large' | 'mid' | 'small'
  * stored facts, with no live price (the search is a single DB read; open the row
  * for a live quote). `market_cap` is raw USD; `pe_ratio` is the trailing
  * price-to-earnings multiple (price over trailing EPS), null for a loss-maker or
- * an uncovered name; the two `*_growth_yoy` are the latest trailing
- * year-over-year growth (percent, EPS on the analyst-consensus basis).
- * `in_sp500`/`in_nasdaq100` are definite booleans; everything else may be null
- * until the enriching sync reaches the stock.
+ * an uncovered name; the two trailing `*_growth_yoy` are the latest reported
+ * year-over-year growth and the two `forward_*_growth_yoy` their forward
+ * (next fiscal year to the one after, analyst consensus) counterparts (all
+ * percent, EPS on the analyst-consensus basis). `in_sp500`/`in_nasdaq100` are
+ * definite booleans; everything else may be null until the enriching sync
+ * reaches the stock — the forward pair the most often, since it needs two
+ * upcoming years of estimates.
  */
 export interface StockSearchResult {
   ticker: string
@@ -893,6 +900,8 @@ export interface StockSearchResult {
   pe_ratio: number | null
   revenue_growth_yoy: number | null
   eps_growth_yoy: number | null
+  forward_revenue_growth_yoy: number | null
+  forward_eps_growth_yoy: number | null
   in_sp500: boolean
   in_nasdaq100: boolean
 }
@@ -916,9 +925,10 @@ export interface StockSearchResponse {
  * surfaces Nvidia and NVDA; `sector`/`industry` take a classification slug (or a
  * raw label — the API slugifies it); `inSp500`/`inNasdaq100` narrow to index
  * members; `marketCap` narrows to one cap tier (mega/large/mid/small). `sort`
- * (default market cap, or `growth` for the blended rank) and `order` (default desc)
- * order the page; `limit`/`offset` window it. Only screened stocks are returned, so
- * every row carries a market cap.
+ * (default market cap, a trailing or forward growth metric, or a `growth`/
+ * `forward_growth` blend) and `order` (default desc) order the page;
+ * `limit`/`offset` window it. Only screened stocks are returned, so every row
+ * carries a market cap.
  */
 export async function searchStocks(
   opts: {
