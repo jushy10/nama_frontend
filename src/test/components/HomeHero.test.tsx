@@ -3,7 +3,7 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import HomeHero from '@/components/HomeHero'
 
 describe('HomeHero', () => {
-  it('renders the headline, a live market-status eyebrow, and the two jumps', () => {
+  it("renders the headline, today's date eyebrow, and the two jumps", () => {
     renderWithProviders(<HomeHero />)
 
     // The two-tone headline (its accent phrase is a separate span, so match the
@@ -12,9 +12,11 @@ describe('HomeHero', () => {
       screen.getByRole('heading', { level: 1, name: /read by ai/i }),
     ).toBeInTheDocument()
 
-    // A phase label from the market clock — always one of these four.
+    // The eyebrow is today's spelled-out date, e.g. "Thursday, July 9".
     expect(
-      screen.getByText(/market open|market closed|pre-market|after hours/i),
+      screen.getByText(
+        /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday),/i,
+      ),
     ).toBeInTheDocument()
 
     // The CTAs link into the app.
