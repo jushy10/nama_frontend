@@ -1357,7 +1357,7 @@ async function getLastSessionCandles(
   const start = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
   const qs = new URLSearchParams({ timeframe, start })
   const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/candles?${qs}`,
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/candles?${qs}`,
     { signal },
   )
   if (!res.ok) throw await toApiError(res)
@@ -1400,7 +1400,7 @@ export async function getCandles(
     qs.set('range', range)
   }
   const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/candles?${qs}`,
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/candles?${qs}`,
     { signal: opts.signal },
   )
   if (!res.ok) {
@@ -1465,7 +1465,7 @@ export async function getSupportLevels(
   const range = opts.range ?? '1Y'
   const qs = new URLSearchParams({ timeframe, range })
   const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/support-levels?${qs}`,
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/support-levels?${qs}`,
     { signal: opts.signal },
   )
   if (!res.ok) throw await toApiError(res)

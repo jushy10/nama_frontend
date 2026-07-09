@@ -42,7 +42,7 @@ function candleSeries(symbol: string) {
 }
 
 /**
- * Answers /stocks/SYMBOL/candles with a small series and the index-tile quotes
+ * Answers /stocks/ticker/SYMBOL/candles with a small series and the index-tile quotes
  * from BY_SYMBOL. The tiles quote each fund through the ETF endpoint
  * (/stocks/etf/SYMBOL), not the stock ticker card; 404s the rest.
  */
@@ -52,7 +52,7 @@ function stubFetch() {
     const isCandles = u.includes('/candles')
     const symbol =
       (isCandles
-        ? u.match(/\/stocks\/([^/?]+)\/candles/)
+        ? u.match(/\/stocks\/ticker\/([^/?]+)\/candles/)
         : u.match(/\/stocks\/etf\/([^/?]+)/))?.[1] ?? ''
     const data = isCandles ? candleSeries(symbol) : BY_SYMBOL[symbol]
     return Promise.resolve({
@@ -108,7 +108,7 @@ describe('MarketIndices', () => {
       screen.getByRole('heading', { name: /S&P 500 · SPY/ }),
     ).toBeInTheDocument()
     expect(mock).toHaveBeenCalledWith(
-      expect.stringContaining('/stocks/SPY/candles'),
+      expect.stringContaining('/stocks/ticker/SPY/candles'),
       expect.anything(),
     )
 
@@ -131,7 +131,7 @@ describe('MarketIndices', () => {
     )
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
-        expect.stringContaining('/stocks/QQQ/candles'),
+        expect.stringContaining('/stocks/ticker/QQQ/candles'),
         expect.anything(),
       ),
     )
@@ -148,7 +148,7 @@ describe('MarketIndices', () => {
     await user.click(screen.getByRole('button', { name: '5D' }))
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
-        expect.stringMatching(/\/stocks\/SPY\/candles\?.*range=5D/),
+        expect.stringMatching(/\/stocks\/ticker\/SPY\/candles\?.*range=5D/),
         expect.anything(),
       ),
     )

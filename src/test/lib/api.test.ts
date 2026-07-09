@@ -402,7 +402,7 @@ describe('getCandles 1D fallback', () => {
 
     // The retry asks for a trailing window via `start`, not a range.
     const retryUrl = String(mock.mock.calls[1][0])
-    expect(retryUrl).toContain('/stocks/SPY/candles')
+    expect(retryUrl).toContain('/stocks/ticker/SPY/candles')
     expect(retryUrl).toContain('timeframe=5Min')
     expect(retryUrl).toContain('start=')
     expect(retryUrl).not.toContain('range=')
@@ -458,7 +458,7 @@ describe('getCandles 10Y window', () => {
 
     // 10Y is served via an explicit `start` (like MAX) rather than `range=10Y`,
     // which the backend would reject, on weekly bars.
-    expect(requestedUrl).toContain('/stocks/SPY/candles')
+    expect(requestedUrl).toContain('/stocks/ticker/SPY/candles')
     expect(requestedUrl).toContain('timeframe=1Week')
     expect(requestedUrl).toContain('start=')
     expect(requestedUrl).not.toContain('range=')
@@ -507,7 +507,7 @@ describe('getSupportLevels', () => {
     const result = await getSupportLevels('AAPL')
 
     // A fixed 1Y daily window, independent of any chart range.
-    expect(requestedUrl).toContain('/stocks/AAPL/support-levels')
+    expect(requestedUrl).toContain('/stocks/ticker/AAPL/support-levels')
     expect(requestedUrl).toContain('timeframe=1Day')
     expect(requestedUrl).toContain('range=1Y')
     expect(result.reference_price).toBe(208.4)
