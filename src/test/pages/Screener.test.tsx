@@ -24,6 +24,8 @@ const SEARCH_PAGE = {
       pe_ratio: 33.36,
       revenue_growth_yoy: 61.6,
       eps_growth_yoy: 587.4,
+      forward_revenue_growth_yoy: 45.2,
+      forward_eps_growth_yoy: 52.8,
       in_sp500: true,
       in_nasdaq100: true,
     },
@@ -36,6 +38,8 @@ const SEARCH_PAGE = {
       pe_ratio: null,
       revenue_growth_yoy: -2.0,
       eps_growth_yoy: 3.1,
+      forward_revenue_growth_yoy: null,
+      forward_eps_growth_yoy: 4.0,
       in_sp500: true,
       in_nasdaq100: false,
     },
@@ -79,19 +83,24 @@ const lastSearchUrl = (calls: string[]) =>
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Screener', () => {
-  it('lists the screened universe with market cap and growth', async () => {
+  it('lists the screened universe with market cap, valuation and growth', async () => {
     stubApi()
     renderWithProviders(<Screener />)
 
     expect(await screen.findByText('NVDA')).toBeInTheDocument()
     expect(screen.getByText('Nvidia')).toBeInTheDocument()
     expect(screen.getByText('XOM')).toBeInTheDocument()
-    // Compact market cap, the P/E multiple, signed growth, and the total-count
-    // summary.
+    // Compact market cap, the P/E multiple, signed trailing growth, and the
+    // total-count summary.
     expect(screen.getByText('$3.2T')).toBeInTheDocument()
     expect(screen.getByText('33.36')).toBeInTheDocument()
     expect(screen.getByText('+61.6%')).toBeInTheDocument()
     expect(screen.getByText(/2 stocks/)).toBeInTheDocument()
+    // The forward-growth columns render their own FY1→FY2 consensus figures.
+    expect(screen.getByText('Fwd Rev')).toBeInTheDocument()
+    expect(screen.getByText('Fwd EPS')).toBeInTheDocument()
+    expect(screen.getByText('+45.2%')).toBeInTheDocument()
+    expect(screen.getByText('+52.8%')).toBeInTheDocument()
   })
 
   it('sorts by market cap (largest first) by default', async () => {
@@ -203,6 +212,34 @@ describe('Screener', () => {
     )
 
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/sort=growth/))
+  })
+
+  it('sorts by forward revenue growth via its column header', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByText('Fwd Rev'))
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/sort=forward_revenue_growth/),
+    )
+    expect(lastSearchUrl(calls)).toMatch(/order=desc/)
+  })
+
+  it('sorts by the forward growth blend from the "Sort by" menu', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(screen.getByRole('combobox', { name: /sort by/i }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Forward growth (EPS + Rev)' }),
+    )
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/sort=forward_growth/),
+    )
   })
 
   it('clears an active sort back to none via the "None" option', async () => {
