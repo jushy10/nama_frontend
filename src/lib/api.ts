@@ -320,6 +320,39 @@ export interface SupportLevels {
   levels: SupportLevel[]
 }
 
+/** One EMA reading. `time` is UNIX epoch seconds (UTC) — the same clock the
+ * candles use, so a point lines up with the bar sharing its `time`. `value` is
+ * the moving average in the quote currency (an overlay on the price axis). */
+export interface EmaPoint {
+  time: number
+  timestamp: string
+  value: number
+}
+
+/**
+ * One exponential-moving-average line at a single lookback `period` (e.g. the
+ * 50-EMA). `latest` is the final value; `points` starts once there's enough
+ * history to seed the average, so a short window can leave it empty (and a
+ * deep period like 200 needs a long range to appear at all).
+ */
+export interface EmaLine {
+  period: number
+  count: number
+  latest: number | null
+  points: EmaPoint[]
+}
+
+/**
+ * The EMA overlay for a ticker — one line per requested period (the classic
+ * 20/50/200), drawn on the candle chart's price axis. `lines` is in the order
+ * the periods were requested.
+ */
+export interface EmaSeries {
+  symbol: string
+  timeframe: string
+  lines: EmaLine[]
+}
+
 /** A trading suggestion derived from RSI, from Strong Buy down to Strong Sell. */
 export type RsiAction = 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell'
 
@@ -1521,6 +1554,53 @@ export async function getSupportLevels(
   const data = (await res.json()) as SupportLevels
   if (!Array.isArray(data?.levels)) {
     throw new ApiError(res.status, 'Malformed support-levels response')
+  }
+  return data
+}
+
+/** The default EMA overlay: the classic 20 / 50 / 200-period moving averages. */
+export const DEFAULT_EMA_PERIODS = [20, 50, 200] as const
+
+/**
+ * Fetch the EMA overlay for a ticker. Mirrors `getCandles`' window handling
+ * (same `range` → same `timeframe` → same bars), so every EMA point shares a
+ * `time` with a candle and the lines register exactly under the price. One or
+ * more `periods` come back as their own lines; a deep period (200) only appears
+ * once the range carries enough history to warm it up. Best-effort on the chart:
+ * a caller treats a failure as "no overlay", never a broken price chart.
+ */
+export async function getEma(
+  symbol: string,
+  opts: {
+    range?: ChartRange
+    timeframe?: Timeframe
+    periods?: readonly number[]
+    signal?: AbortSignal
+  } = {},
+): Promise<EmaSeries> {
+  const range = opts.range ?? '6M'
+  const timeframe = opts.timeframe ?? defaultTimeframe(range)
+  const periods = opts.periods ?? DEFAULT_EMA_PERIODS
+  const qs = new URLSearchParams({ timeframe })
+  for (const p of periods) qs.append('period', String(p))
+  // Match getCandles' window handling so the EMA points share the candles' bars.
+  if (range === 'MAX') {
+    qs.set('start', '2000-01-01T00:00:00Z')
+  } else if (range === '10Y') {
+    const start = new Date()
+    start.setFullYear(start.getFullYear() - 10)
+    qs.set('start', start.toISOString())
+  } else {
+    qs.set('range', range)
+  }
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/ema?${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EmaSeries
+  if (!Array.isArray(data?.lines)) {
+    throw new ApiError(res.status, 'Malformed EMA response')
   }
   return data
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import CandleChart from '@/components/CandleChart'
-import type { Candle, SupportLevel } from '@/lib/api'
+import type { Candle, EmaLine, SupportLevel } from '@/lib/api'
 
 // Three flat daily candles (low 100, high 120) — so the chart's padded visible
 // range works out to ~[99, 121]. Support tags render prices via a 2-decimal
@@ -35,6 +35,53 @@ function level(
   }
 }
 
+// An EMA line whose points land on the given candle days (values within the
+// visible range), so the overlay maps onto real bars and its legend renders.
+function emaLine(period: number, days: number[]): EmaLine {
+  const points = days.map((day) => ({
+    time: Date.UTC(2026, 5, day) / 1000,
+    timestamp: `2026-06-0${day}T00:00:00.000Z`,
+    value: 112,
+  }))
+  return {
+    period,
+    count: points.length,
+    latest: points.length ? points[points.length - 1].value : null,
+    points,
+  }
+}
+
+describe('CandleChart EMA overlay', () => {
+  it('draws a line and legend chip for an EMA with in-window points', () => {
+    const { container } = renderWithProviders(
+      <CandleChart
+        candles={CANDLES}
+        timeframe="1Day"
+        emaLines={[emaLine(20, [1, 2, 3])]}
+      />,
+    )
+    expect(screen.getByText('EMA 20')).toBeInTheDocument()
+    // The overlay path carries the first EMA colour.
+    expect(container.querySelector('path[stroke="#f2a63b"]')).not.toBeNull()
+  })
+
+  it('skips a line that has no points (a deep period on a short range)', () => {
+    renderWithProviders(
+      <CandleChart
+        candles={CANDLES}
+        timeframe="1Day"
+        emaLines={[emaLine(200, [])]}
+      />,
+    )
+    expect(screen.queryByText('EMA 200')).not.toBeInTheDocument()
+  })
+
+  it('draws no EMA legend when none are supplied', () => {
+    renderWithProviders(<CandleChart candles={CANDLES} timeframe="1Day" />)
+    expect(screen.queryByText(/^EMA /)).not.toBeInTheDocument()
+  })
+})
+
 describe('CandleChart support levels', () => {
   it('draws only the levels inside the visible price range', () => {
     renderWithProviders(
@@ -57,6 +104,19 @@ describe('CandleChart support levels', () => {
   it('draws no support tags when none are supplied', () => {
     renderWithProviders(<CandleChart candles={CANDLES} timeframe="1Day" />)
     expect(screen.queryByText('110.00')).not.toBeInTheDocument()
+  })
+
+  it('renders alongside an EMA overlay without disturbing support tags', () => {
+    renderWithProviders(
+      <CandleChart
+        candles={CANDLES}
+        timeframe="1Day"
+        supportLevels={[level(110, 'strong')]}
+        emaLines={[emaLine(20, [1, 2, 3])]}
+      />,
+    )
+    expect(screen.getByText('110.00')).toBeInTheDocument()
+    expect(screen.getByText('EMA 20')).toBeInTheDocument()
   })
 
   it('starts each line at its last-touched candle, not the left edge', () => {

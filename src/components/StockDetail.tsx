@@ -23,6 +23,7 @@ import {
   useAnnualEarnings,
   useCandles,
   useEarningsAnalysis,
+  useEma,
   useFiveYearReturn,
   useIndustryValuation,
   useQuarterlyEarnings,
@@ -77,6 +78,7 @@ type StockDetailTab =
 export default function StockDetail({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<ChartRange>('6M')
   const [showSupport, setShowSupport] = useState(true)
+  const [showEma, setShowEma] = useState(true)
   const [tab, setTab] = useState<StockDetailTab>('overview')
   const cardQuery = useTickerCard(symbol, SNAPSHOT_BLOCKS)
   const stock = cardQuery.data
@@ -91,6 +93,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // scan that doesn't refetch as the range changes; the chart draws just the
   // ones inside the visible price range.
   const supportQuery = useSupportLevels(loadedSymbol)
+  // EMA overlay follows the chart's range (so the lines sit under the same bars)
+  // and is only fetched while the toggle is on. Best-effort: a failure just
+  // leaves the overlay off, never disturbs the price chart.
+  const emaQuery = useEma(loadedSymbol, range, showEma)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
@@ -231,6 +237,21 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                   spacing={1.5}
                   sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
                 >
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={showEma}
+                        onChange={(e) => setShowEma(e.target.checked)}
+                      />
+                    }
+                    label="Moving averages"
+                    sx={{
+                      m: 0,
+                      color: 'text.secondary',
+                      '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                    }}
+                  />
                   {(supportQuery.data?.levels.length ?? 0) > 0 && (
                     <FormControlLabel
                       control={
@@ -278,6 +299,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                   supportLevels={
                     showSupport ? supportQuery.data?.levels : undefined
                   }
+                  emaLines={showEma ? emaQuery.data?.lines : undefined}
                 />
               )}
             </CardContent>

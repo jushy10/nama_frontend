@@ -6,7 +6,7 @@ import {
   type PointerEvent,
 } from 'react'
 import { Box, Stack, Typography, useTheme } from '@mui/material'
-import type { Candle, SupportLevel } from '@/lib/api'
+import type { Candle, EmaLine, SupportLevel } from '@/lib/api'
 
 // The chart's viewBox width tracks the container's pixel width (measured below),
 // so one viewBox unit ≈ one CSS pixel and the in-SVG axis text stays legible on
@@ -29,6 +29,11 @@ const SUPPORT_STRENGTH: Record<
   moderate: { width: 1.25, opacity: 0.68 },
   strong: { width: 1.75, opacity: 0.9 },
 }
+
+// EMA overlay line colours, assigned by the line's order (20/50/200). Chosen to
+// stay distinct from the up/down candle greens/reds and the info-blue support
+// lines, and to read on both the light and dark chart backgrounds.
+const EMA_COLORS = ['#f2a63b', '#8b5cf6', '#e0529c', '#2dd4bf', '#eab308']
 
 const fmtPrice = (n: number) =>
   n.toLocaleString('en-US', {
@@ -73,6 +78,12 @@ interface Props {
    * zoomed-in view rather than distorting its scale.
    */
   supportLevels?: SupportLevel[]
+  /**
+   * EMA overlay lines (e.g. 20/50/200) to draw on the price axis. Each point is
+   * matched to the candle sharing its `time`, so points outside the visible
+   * window are simply skipped — a line only draws where the candles exist.
+   */
+  emaLines?: EmaLine[]
 }
 
 /**
@@ -85,6 +96,7 @@ export default function CandleChart({
   candles,
   timeframe,
   supportLevels,
+  emaLines,
 }: Props) {
   const theme = useTheme()
   const [hover, setHover] = useState<number | null>(null)
@@ -182,6 +194,21 @@ export default function CandleChart({
       ).toFixed(2)},${volTop.toFixed(2)}Z`
     }
 
+    // EMA overlays: map each point onto the candle sharing its `time` and stitch
+    // a polyline across the price axis. Points with no matching candle (outside
+    // the visible window) are skipped, so a line starts at the first bar it can.
+    const timeToIndex = new Map<number, number>()
+    candles.forEach((cd, i) => timeToIndex.set(cd.time, i))
+    const emaPaths = (emaLines ?? []).map((line) => {
+      const pts: string[] = []
+      for (const p of line.points) {
+        const i = timeToIndex.get(p.time)
+        if (i === undefined) continue
+        pts.push(`${x(i).toFixed(2)},${y(p.value).toFixed(2)}`)
+      }
+      return { period: line.period, d: pts.length ? `M${pts.join('L')}` : '' }
+    })
+
     return {
       x,
       y,
@@ -199,8 +226,9 @@ export default function CandleChart({
       linePath,
       areaPath,
       trendUp,
+      emaPaths,
     }
-  }, [candles, W, intraday])
+  }, [candles, W, intraday, emaLines])
 
   if (candles.length === 0) {
     return (
@@ -225,6 +253,7 @@ export default function CandleChart({
     linePath,
     areaPath,
     trendUp,
+    emaPaths,
   } = geo
   const active = hover ?? candles.length - 1
   const c = candles[active]
@@ -311,6 +340,21 @@ export default function CandleChart({
           cUp ? up : down,
         )}
         {legendCell('Vol', fmtVol(c.volume))}
+        {emaLines?.map((line, i) =>
+          line.points.length ? (
+            <Box
+              key={`emaleg${line.period}`}
+              component="span"
+              sx={{
+                whiteSpace: 'nowrap',
+                color: EMA_COLORS[i % EMA_COLORS.length],
+                fontWeight: 600,
+              }}
+            >
+              EMA {line.period}
+            </Box>
+          ) : null,
+        )}
       </Stack>
 
       <Box
@@ -435,6 +479,24 @@ export default function CandleChart({
               </g>
             )
           })
+        )}
+
+        {/* EMA overlay lines, drawn over the price series but under the support
+            tags and crosshair. Non-interactive so they never steal the pointer. */}
+        {emaPaths.map((e, i) =>
+          e.d ? (
+            <path
+              key={`ema${e.period}`}
+              d={e.d}
+              fill="none"
+              stroke={EMA_COLORS[i % EMA_COLORS.length]}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              opacity={0.9}
+              pointerEvents="none"
+            />
+          ) : null,
         )}
 
         {/* support levels: dashed price lines (in view only) with an axis tag,

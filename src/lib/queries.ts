@@ -18,6 +18,7 @@ import {
   getAnnualEarnings,
   getCandles,
   getClassifications,
+  getEma,
   getEtfAnalysis,
   getEtfCards,
   getEtfCategories,
@@ -45,6 +46,7 @@ import {
   type ChartRange,
   type Classifications,
   type EarningsAnalysis,
+  type EmaSeries,
   type EtfAnalysis,
   type EtfCategories,
   type EtfDetail,
@@ -246,6 +248,24 @@ export function useSupportLevels(
     queryKey: ['support-levels', symbol],
     queryFn: ({ signal }) => getSupportLevels(symbol as string, { signal }),
     enabled: !!symbol,
+  })
+}
+
+/**
+ * EMA overlay (the 20/50/200 lines) for a ticker over the chart's range. Keyed
+ * by symbol *and* range so the lines are fetched on the same window as the
+ * candles they sit under (unlike support levels, which are range-independent).
+ * `enabled` lets the caller pay for it only while the overlay is switched on.
+ */
+export function useEma(
+  symbol: string | null | undefined,
+  range: ChartRange,
+  enabled = true,
+): UseQueryResult<EmaSeries> {
+  return useQuery({
+    queryKey: ['ema', symbol, range],
+    queryFn: ({ signal }) => getEma(symbol as string, { range, signal }),
+    enabled: !!symbol && enabled,
   })
 }
 
