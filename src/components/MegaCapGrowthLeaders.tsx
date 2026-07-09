@@ -180,9 +180,16 @@ function LeaderRow({
  *  the list doesn't reflow when the data arrives. */
 function SkeletonRow() {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.85 }}>
+    <Box
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.85 }}
+    >
       <Skeleton variant="text" width={RANK_W - 6} sx={{ flexShrink: 0 }} />
-      <Skeleton variant="rounded" width={28} height={28} sx={{ flexShrink: 0 }} />
+      <Skeleton
+        variant="rounded"
+        width={28}
+        height={28}
+        sx={{ flexShrink: 0 }}
+      />
       <Box sx={{ flex: 1 }}>
         <Skeleton width={52} />
         <Skeleton width={120} />
@@ -197,7 +204,9 @@ function SkeletonRow() {
  *  metric columns. */
 function ColumnHeader({ metrics }: { metrics: [Metric, Metric] }) {
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, pb: 0.5 }}>
+    <Box
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, pb: 0.5 }}
+    >
       <Box sx={{ flex: 1 }} />
       {metrics.map((m) => (
         <Typography
