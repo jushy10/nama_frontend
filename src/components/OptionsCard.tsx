@@ -201,13 +201,9 @@ export default function OptionsCard({
   // Concrete price bounds for the expected move — symmetric around today's
   // price — so "±6.4%" reads as real levels the stock could reach by the expiry.
   const emLow =
-    move != null && price != null && price > 0
-      ? price * (1 - move / 100)
-      : null
+    move != null && price != null && price > 0 ? price * (1 - move / 100) : null
   const emHigh =
-    move != null && price != null && price > 0
-      ? price * (1 + move / 100)
-      : null
+    move != null && price != null && price > 0 ? price * (1 + move / 100) : null
   const showRange = emLow != null && emHigh != null
 
   return (
@@ -379,7 +375,11 @@ export default function OptionsCard({
                   />
                   {/* upside half (toward the high) */}
                   <Box
-                    sx={{ width: '50%', bgcolor: 'success.main', opacity: 0.25 }}
+                    sx={{
+                      width: '50%',
+                      bgcolor: 'success.main',
+                      opacity: 0.25,
+                    }}
                   />
                   {/* today's price, centred */}
                   <Box
