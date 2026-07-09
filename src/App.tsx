@@ -32,6 +32,7 @@ import EtfScreener from '@/pages/EtfScreener'
 import Search from '@/pages/Search'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
+import HeatMapPage from '@/pages/HeatMap'
 import RedirectToSearch from '@/components/RedirectToSearch'
 import MarketStatusDot from '@/components/MarketStatusDot'
 
@@ -42,6 +43,7 @@ const navItems = [
   { label: 'ETF Screener', to: '/etf-screener', end: false },
   { label: 'Mag 7', to: '/mag7', end: false },
   { label: 'Sectors', to: '/sectors', end: false },
+  { label: 'Heat Map', to: '/heatmap', end: false },
 ]
 
 /** `large` is for the top banner; the drawer keeps the compact size so the
@@ -335,6 +337,7 @@ function App() {
           <Route path="/etf-screener" element={<EtfScreener />} />
           <Route path="/mag7" element={<Mag7 />} />
           <Route path="/sectors" element={<Sectors />} />
+          <Route path="/heatmap" element={<HeatMapPage />} />
           {/* Legacy detail URLs — the stock/fund views now live under /search. */}
           <Route path="/stocks" element={<RedirectToSearch />} />
           <Route path="/etfs" element={<RedirectToSearch />} />

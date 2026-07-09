@@ -727,6 +727,55 @@ export async function getMarketSummary(
 /** Index universe the screener can narrow to. */
 export type StockIndex = 'sp500' | 'nasdaq100'
 
+/** One stock tile in the heat map: sized by `market_cap`, coloured by
+ *  `change_percent` (null = no live quote today → an uncoloured tile). */
+export interface HeatMapStock {
+  ticker: string
+  name: string | null
+  market_cap: number
+  change_percent: number | null
+}
+
+/** An industry group within a sector — its stocks and their combined cap.
+ *  `industry` is null for a sector's not-yet-classified names. */
+export interface HeatMapIndustry {
+  industry: string | null
+  market_cap: number
+  stocks: HeatMapStock[]
+}
+
+/** A sector group — its industry sub-groups and their combined cap. */
+export interface HeatMapSector {
+  sector: string
+  market_cap: number
+  industries: HeatMapIndustry[]
+}
+
+/** The whole board: which index it covers, the tile count, and the sector tree
+ *  (largest sector first). Structure + tile size come from the stored universe;
+ *  the colours are live quotes, so a tile with no quote today is left null. */
+export interface HeatMap {
+  scope: string
+  count: number
+  sectors: HeatMapSector[]
+}
+
+/**
+ * Fetch the market heat map for an index (`GET /market/heatmap`). A Finviz-style
+ * treemap: every stock a tile sized by market cap and coloured by the day's move,
+ * grouped sector → industry → stock. Defaults to the S&P 500.
+ */
+export async function getHeatMap(
+  index: StockIndex = 'sp500',
+  signal?: AbortSignal,
+): Promise<HeatMap> {
+  const res = await fetch(`${API_BASE}/market/heatmap?index=${index}`, {
+    signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as HeatMap
+}
+
 /** One name in the screener's gainers/losers lists. */
 export interface ScreenedStock {
   symbol: string

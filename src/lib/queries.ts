@@ -24,6 +24,7 @@ import {
   getEtfDetail,
   getIndustryValuation,
   getQuarterlyEarnings,
+  getHeatMap,
   getMarketSummary,
   getRecommendations,
   getRsi,
@@ -51,6 +52,7 @@ import {
   type EtfSearchSort,
   type IndustryValuation,
   type MarketCapTier,
+  type HeatMap,
   type MarketSummary,
   type QuarterlyEarnings,
   type Quote,
@@ -379,6 +381,22 @@ export function useMarketSummary(): UseQueryResult<MarketSummary> {
     queryFn: ({ signal }) => getMarketSummary(signal),
     staleTime: 15 * 60 * 1000,
     retry: false,
+  })
+}
+
+/**
+ * The market heat map for an index (S&P 500 / Nasdaq-100) — the sector →
+ * industry → stock treemap. Structure and tile sizes come from the stored
+ * universe; the colours are live quotes, and the backend caches the board ~1 min,
+ * so keep it briefly stale-tolerant. `keepPreviousData` holds the old board on
+ * screen while flipping the index toggle, so it doesn't blank between fetches.
+ */
+export function useHeatMap(index: StockIndex): UseQueryResult<HeatMap> {
+  return useQuery({
+    queryKey: ['heat-map', index],
+    queryFn: ({ signal }) => getHeatMap(index, signal),
+    staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
