@@ -18,7 +18,7 @@ import type {
 // height is fixed, and W_FALLBACK covers jsdom / pre-measure.
 const W_FALLBACK = 820
 const H = 220
-const PAD = { top: 30, right: 8, bottom: 26, left: 8 }
+const PAD = { top: 30, right: 44, bottom: 26, left: 8 }
 
 /** A P/E multiple — two decimals, no unit (matches the valuation grid). */
 const fmtMultiple = (n: number) => n.toFixed(2)
@@ -141,7 +141,7 @@ function fiscalYearSteps(
     }))
 }
 
-/** One column of the by-quarter chart. `estimated` styles it as a forecast. */
+/** One point of the P/E trend chart. `estimated` styles it as a forecast. */
 interface PeBar {
   key: string
   label: string
@@ -190,18 +190,26 @@ function rollingQuarterSteps(
 }
 
 /**
- * A simple bar chart of P/E multiples, one column per period: the anchor and
- * "Now" bars solid, the estimate-driven ones in the same
- * faint-accent-plus-dashed-outline dress the earnings charts use for
- * forecasts, with the multiple above each bar and the period beneath. All
- * bars share a zero baseline so the falling heights read as the multiple
- * compressing.
+ * A trend line of the P/E multiples, one point per period: the reported anchor
+ * and "Now" ride a solid line, the estimate-driven forward steps continue as a
+ * dashed line into hollow points — the same reported-then-forecast dress the
+ * earnings charts use. The multiple sits above each point, the period beneath,
+ * on a 0-based scale so the line's descent honestly reads as the multiple
+ * compressing into forward earnings.
  */
-function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
+function PeTrendChart({
+  bars,
+  ariaLabel,
+}: {
+  bars: PeBar[]
+  ariaLabel: string
+}) {
   const theme = useTheme()
   const axis = theme.palette.text.secondary
+  const grid = theme.palette.divider
   const nowColor = theme.palette.secondary.main
   const estColor = theme.palette.primary.main
+  const surface = theme.palette.background.paper
 
   // Track the rendered width so the viewBox matches it 1:1 (see the earnings
   // charts) — keeps labels legible instead of shrinking on narrow screens.
@@ -223,11 +231,11 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
   const W = cw
 
   // Display-only responsiveness from the measured width (not a media query):
-  // on a phone-width canvas, cap the columns and give the rotated period labels
+  // on a phone-width canvas, cap the points and give the rotated period labels
   // room. The data is untouched — only what the narrow chart draws changes.
   const narrow = W < 420
   const pad = useMemo(
-    () => (narrow ? { ...PAD, left: 6, right: 6, bottom: 40 } : PAD),
+    () => (narrow ? { ...PAD, left: 6, right: 40, bottom: 40 } : PAD),
     [narrow],
   )
   const viewBars = useMemo(
@@ -235,28 +243,40 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
     [narrow, bars],
   )
 
-  const { cx, y, barW, slot } = useMemo(() => {
+  const { cx, y, slot, ticks } = useMemo(() => {
     const plotW = W - pad.left - pad.right
     const plotH = H - pad.top - pad.bottom
-    // P/E bars are all positive (loss windows are filtered out), so the scale
+    // P/E points are all positive (loss windows are filtered out), so the scale
     // runs 0 → max with headroom for the value labels.
-    const max = Math.max(...viewBars.map((b) => b.pe)) * 1.15 || 1
+    const max = Math.max(...viewBars.map((b) => b.pe), 1) * 1.15
     const slot = plotW / Math.max(viewBars.length, 1)
+    const tickN = 3
     return {
       cx: (i: number) => pad.left + slot * (i + 0.5),
       y: (v: number) => pad.top + (1 - v / max) * plotH,
-      barW: Math.min(slot * 0.55, 64),
       slot,
+      ticks: Array.from({ length: tickN + 1 }, (_, i) => (max * i) / tickN),
     }
   }, [viewBars, pad, W])
 
   const baseY = H - pad.bottom
-  // Dashed divider before the first estimate column — just after the "Now" bar
-  // (or the reported anchor, when no Current P/E is served) — echoing the
-  // reported-vs-forecast split on the earnings charts.
+  // The reported/now points lead; the first estimate begins the forward run. A
+  // dashed divider marks the split, echoing the earnings charts.
   const splitAt = viewBars.findIndex((b) => b.estimated)
-  // Rotate the period labels once the columns get too tight to read them flat.
   const rotateLabels = slot < 44
+
+  // Solid line through the reported/now points; a dashed line through the
+  // forward run, bridged from the last solid point so the two read continuous.
+  const solidPts = (splitAt < 0 ? viewBars : viewBars.slice(0, splitAt)).map(
+    (b, i) => ({ x: cx(i), y: y(b.pe) }),
+  )
+  const dashStart = splitAt < 0 ? -1 : Math.max(0, splitAt - 1)
+  const dashedPts =
+    splitAt < 0
+      ? []
+      : viewBars
+          .slice(dashStart)
+          .map((b, k) => ({ x: cx(dashStart + k), y: y(b.pe) }))
 
   return (
     <Box ref={wrapRef}>
@@ -268,15 +288,22 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
         aria-label={ariaLabel}
         sx={{ width: '100%', height: 'auto', display: 'block' }}
       >
-        <line
-          x1={pad.left}
-          x2={W - pad.right}
-          y1={baseY}
-          y2={baseY}
-          stroke={axis}
-          strokeWidth={1}
-          opacity={0.5}
-        />
+        {/* gridlines + value axis labels (right) */}
+        {ticks.map((t, i) => (
+          <g key={`t${i}`}>
+            <line
+              x1={pad.left}
+              x2={W - pad.right}
+              y1={y(t)}
+              y2={y(t)}
+              stroke={grid}
+              strokeWidth={1}
+            />
+            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={11} fill={axis}>
+              {fmtMultiple(t)}
+            </text>
+          </g>
+        ))}
         {splitAt > 0 && (
           <line
             x1={pad.left + slot * splitAt}
@@ -289,40 +316,57 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
             opacity={0.4}
           />
         )}
+        {solidPts.length > 1 && (
+          <polyline
+            points={solidPts.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={nowColor}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        )}
+        {dashedPts.length > 1 && (
+          <polyline
+            points={dashedPts.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={estColor}
+            strokeWidth={2.5}
+            strokeDasharray="6 5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.85}
+          />
+        )}
         {viewBars.map((b, i) => {
           const center = cx(i)
-          const top = y(b.pe)
-          const h = Math.max(1, baseY - top)
+          const py = y(b.pe)
           const color = b.estimated ? estColor : nowColor
           return (
             <g key={b.key}>
               {b.estimated ? (
-                <rect
-                  x={center - barW / 2}
-                  y={top}
-                  width={barW}
-                  height={h}
-                  rx={2}
-                  fill={estColor}
-                  fillOpacity={0.18}
+                <circle
+                  cx={center}
+                  cy={py}
+                  r={5.5}
+                  fill={surface}
                   stroke={estColor}
-                  strokeWidth={1.25}
-                  strokeDasharray="3 2"
+                  strokeWidth={2.5}
                 />
               ) : (
-                <rect
-                  x={center - barW / 2}
-                  y={top}
-                  width={barW}
-                  height={h}
-                  rx={2}
+                <circle
+                  cx={center}
+                  cy={py}
+                  r={6}
                   fill={nowColor}
+                  stroke={surface}
+                  strokeWidth={2.5}
                 />
               )}
               <text
                 x={center}
-                y={top - 8}
-                fontSize={11}
+                y={py - 12}
+                fontSize={14}
                 fontWeight={600}
                 fill={color}
                 textAnchor="middle"
@@ -332,7 +376,7 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
               <text
                 x={center}
                 y={H - 8}
-                fontSize={11}
+                fontSize={13}
                 fill={b.estimated ? estColor : axis}
                 textAnchor={rotateLabels ? 'end' : 'middle'}
                 transform={
@@ -672,11 +716,11 @@ export function ForwardPeSection({
             })),
           ]}
         />
-        {/* The walk again as columns — worth drawing only when there are at
-            least two bars to compare (a lone step already reads on its tile). */}
+        {/* The walk again as a trend line — worth drawing only when there are
+            at least two points to compare (a lone step reads on its tile). */}
         {fyBars.length >= 2 && (
           <Box sx={{ mt: 2 }}>
-            <PeBarChart
+            <PeTrendChart
               bars={fyBars}
               ariaLabel="Forward price-to-earnings by fiscal year"
             />
@@ -762,11 +806,11 @@ export function ForwardPeSection({
           })),
         ]}
       />
-      {/* Loss windows chart no bar, so draw the columns only when at least two
+      {/* Loss windows plot no point, so draw the line only when at least two
           multiples remain to compare. */}
       {quarterBars.length >= 2 && (
         <Box sx={{ mt: 2 }}>
-          <PeBarChart
+          <PeTrendChart
             bars={quarterBars}
             ariaLabel="Forward price-to-earnings by quarter"
           />
