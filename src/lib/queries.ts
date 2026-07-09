@@ -335,15 +335,24 @@ export function useStockAnalysis(
  * (`GET /stocks/{symbol}/earnings/analysis`) — a plain-language read of the
  * company's earnings story the earnings tab shows in a card above the charts.
  * Like `useStockAnalysis` it's a live model call, so it loads on its own and the
- * backend caches it briefly. Idle until `symbol` is set.
+ * backend caches it briefly. Idle until `symbol` is set *and* `enabled` is true —
+ * the detail view passes whether the earnings tab is open, so this (slow, paid)
+ * call only fires once the user visits that tab, not on every detail-page load.
+ * The result stays cached across tab switches, so returning to the tab is instant.
  */
 export function useEarningsAnalysis(
   symbol: string | null | undefined,
+  enabled = true,
 ): UseQueryResult<EarningsAnalysis> {
   return useQuery({
     queryKey: ['earnings-analysis', symbol],
     queryFn: ({ signal }) => getEarningsAnalysis(symbol as string, { signal }),
-    enabled: !!symbol,
+    enabled: !!symbol && enabled,
+    // Held fresh for five minutes — matches the endpoint's own Cache-Control,
+    // so toggling away from the Earnings tab and back doesn't re-fire this slow,
+    // paid model call (a disabled-then-re-enabled query would otherwise refetch
+    // the moment it's stale, which with the default staleTime is immediately).
+    staleTime: 5 * 60 * 1000,
   })
 }
 
