@@ -1766,17 +1766,48 @@ export interface RecommendationTrend {
 }
 
 /**
+ * The sell-side's consensus 12-month price target — the `mean`/`median` view and
+ * the `high`/`low` range across analysts. Every field is null when the source
+ * serves none, and the whole block is null with no coverage. There's no upside
+ * figure here: pair `mean` with a live quote to compute one (see
+ * `priceTargetUpside`).
+ */
+export interface AnalystPriceTargets {
+  mean: number | null
+  high: number | null
+  low: number | null
+  median: number | null
+}
+
+/**
  * Analyst recommendation trends for a symbol, newest snapshot first. `latest`
  * is the current month's split and `direction` how the consensus shifted from
  * the prior month (null until there are two snapshots to compare) — the
- * forward-looking part. An empty `trends` means no analyst covers the symbol.
+ * forward-looking part. `price_targets` is the current consensus 12-month target
+ * block (null when the source serves none). An empty `trends` means no analyst
+ * covers the symbol.
  */
 export interface AnalystRecommendations {
   symbol: string
   count: number
   direction: RecommendationDirection | null
   latest: RecommendationTrend | null
+  price_targets: AnalystPriceTargets | null
   trends: RecommendationTrend[]
+}
+
+/**
+ * Percent upside (or downside) from `price` to the consensus `mean` target —
+ * `(mean - price) / price * 100`, the headline read of a price target. Null
+ * without a mean target or a positive price to anchor on.
+ */
+export function priceTargetUpside(
+  targets: AnalystPriceTargets | null,
+  price: number | null,
+): number | null {
+  if (!targets || targets.mean == null || price == null || price <= 0)
+    return null
+  return ((targets.mean - price) / price) * 100
 }
 
 /** Fetch analyst recommendation trends for a ticker (newest snapshot first). */
