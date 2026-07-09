@@ -46,6 +46,7 @@ import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
 import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
+import AnalysisLoadingCard from '@/components/AnalysisLoadingCard'
 
 // The card carries everything the stock detail draws off in one request: the
 // snapshot's dividend, the performance windows, the metrics (profitability +
@@ -184,20 +185,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               its own spinner; a failed read (e.g. the model isn't configured)
               degrades to a warning rather than sinking the page. */}
           {analysisQuery.isLoading && (
-            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: 'center' }}
-                >
-                  <CircularProgress size={20} />
-                  <Typography color="text.secondary">
-                    Generating AI analysis…
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
+            <AnalysisLoadingCard title="AI Analysis" />
           )}
           {analysisQuery.isError && (
             <Alert severity="warning" variant="outlined">
@@ -409,16 +397,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               error (it's supplementary to the charts below, and the endpoint
               404s for a symbol it can't read). */}
           {earningsAnalysisQuery.isLoading && (
-            <Stack
-              direction="row"
-              spacing={1.5}
-              sx={{ alignItems: 'center', px: 0.5 }}
-            >
-              <CircularProgress size={20} />
-              <Typography color="text.secondary">
-                Generating earnings analysis…
-              </Typography>
-            </Stack>
+            <AnalysisLoadingCard
+              title="Earnings Analysis"
+              subtitle="Reading the earnings story"
+              points={4}
+            />
           )}
           {earningsAnalysisQuery.data && (
             <EarningsAnalysisCard analysis={earningsAnalysisQuery.data} />
