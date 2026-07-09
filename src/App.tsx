@@ -1,4 +1,4 @@
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import {
   AppBar,
@@ -33,7 +33,7 @@ import Search from '@/pages/Search'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
 import RedirectToSearch from '@/components/RedirectToSearch'
-import { MoonIcon, SunIcon } from '@/components/MarketIcons'
+import MarketStatusDot from '@/components/MarketStatusDot'
 
 const navItems = [
   { label: 'Home', to: '/', end: true },
@@ -105,26 +105,8 @@ function Brand({ large = false }: { large?: boolean }) {
   )
 }
 
-/**
- * Two hand-drawn, universally-read glyphs — a Sun over the daytime half of the
- * market (pre-market into the regular session) and a Moon over the evening/
- * overnight half (after-hours into closed). The colour carries the finer read
- * across a warming-then-cooling arc: dawn amber → bright sun → dusk blue →
- * muted moon. Filled + coloured, so they never read as a second copy of the
- * outlined light/dark toggle sitting at the other end of the bar.
- */
-const PHASE_UI: Record<
-  MarketPhase,
-  { icon: ComponentType<{ size?: number }>; color: string }
-> = {
-  pre: { icon: SunIcon, color: '#fbbf24' },
-  regular: { icon: SunIcon, color: '#f59e0b' },
-  after: { icon: MoonIcon, color: '#7aa5f2' },
-  closed: { icon: MoonIcon, color: 'text.secondary' },
-}
-
 /** Compact phase wording for the tightest (xs) phones, where the full label
- *  won't fit beside the wordmark; the icon and tooltip carry the rest. */
+ *  won't fit beside the wordmark; the dot and tooltip carry the rest. */
 const SHORT_LABEL: Record<MarketPhase, string> = {
   pre: 'Pre',
   regular: 'Open',
@@ -132,7 +114,7 @@ const SHORT_LABEL: Record<MarketPhase, string> = {
   closed: 'Closed',
 }
 
-/** The current phase (drives the icon), its short label, and hover summary. */
+/** The current phase (drives the dot), its short label, and hover summary. */
 function useMarketStatus() {
   const read = () => ({
     phase: getMarketStatus(new Date()).phase,
@@ -150,17 +132,18 @@ function useMarketStatus() {
 }
 
 /**
- * Small status hint beside the brand: the market's current phase as a sun/moon
- * that walks the trading day, with an always-visible label ("Market Open",
+ * Small status hint beside the brand: the market's current phase as a coloured
+ * dot — emerald and gently pulsing while the regular session is open, cooling
+ * to amber/blue/grey off-hours — with an always-visible label ("Market Open",
  * "After Hours", …) so the status reads without a hover. A hint, not a control
  * — no click. Hover still adds the countdown (e.g. "Market Open · Closes in 2h
  * 14m"). On the tightest (xs) phones the label shrinks to a compact form
  * ("Open" / "After" / "Closed") rather than folding away, so touch — which
- * can't hover — still reads the phase.
+ * can't hover — still reads the phase. Shares MarketStatusDot with the home
+ * hero so the live "heartbeat" reads the same in both places.
  */
 function MarketStatus() {
   const { phase, label, tooltip } = useMarketStatus()
-  const { icon: Icon, color } = PHASE_UI[phase]
   const shortLabel = SHORT_LABEL[phase]
 
   return (
@@ -172,16 +155,9 @@ function MarketStatus() {
           display: 'inline-flex',
           alignItems: 'center',
           gap: 1,
-          // Optical centering: Roboto's caps sit ~0.06em below their line-box
-          // centre, so a straight center-align leaves the icon reading high
-          // against the wordmark. Nudge the unit down onto the letterforms.
-          position: 'relative',
-          top: '2px',
         }}
       >
-        <Box component="span" sx={{ display: 'inline-flex', color }}>
-          <Icon size={24} />
-        </Box>
+        <MarketStatusDot phase={phase} />
         {/* Compact wording on xs; the full label from sm up. Both are static
             so the phase reads on touch, where the tooltip is out of reach. */}
         <Typography
@@ -262,7 +238,7 @@ function App() {
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             <Stack
               direction="row"
-              spacing={{ xs: 0.75, sm: 2, md: 3 }}
+              spacing={{ xs: 1, sm: 3, md: 5 }}
               sx={{ alignItems: 'center' }}
             >
               <Brand large />
