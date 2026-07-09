@@ -7,6 +7,7 @@ import {
   getEma,
   getEtfAnalysis,
   getIndustryValuation,
+  getPeHistory,
   getStockAnalysis,
   getSupportLevels,
   humanizeClassification,
@@ -749,5 +750,54 @@ describe('getIndustryValuation', () => {
     const result = await getIndustryValuation('nonesuch')
     expect(result.count).toBe(0)
     expect(result.median_pe).toBeNull()
+  })
+})
+
+describe('getPeHistory', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the pe-history endpoint and returns the parsed series', async () => {
+    let requestedUrl = ''
+    const body = {
+      ticker: 'AAPL',
+      count: 2,
+      points: [
+        { date: '2024-02-01', price: 185.12, ttm_eps: 6.43, pe: 28.78 },
+        { date: '2024-05-01', price: 190.0, ttm_eps: 6.5, pe: 29.23 },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getPeHistory('aapl')
+
+    expect(requestedUrl).toContain('/stocks/ticker/aapl/pe-history')
+    expect(result.count).toBe(2)
+    expect(result.points[0].pe).toBe(28.78)
+  })
+
+  it('returns a 200 with an empty series for an uncovered symbol', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ ticker: 'ZZZZ', count: 0, points: [] }),
+        }),
+      ),
+    )
+    const result = await getPeHistory('ZZZZ')
+    expect(result.count).toBe(0)
+    expect(result.points).toEqual([])
   })
 })

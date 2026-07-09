@@ -24,6 +24,7 @@ import {
   getEtfCategories,
   getEtfDetail,
   getIndustryValuation,
+  getPeHistory,
   getQuarterlyEarnings,
   getHeatMap,
   getMarketSummary,
@@ -53,6 +54,7 @@ import {
   type EtfSearchResponse,
   type EtfSearchSort,
   type IndustryValuation,
+  type PeHistory,
   type MarketCapTier,
   type HeatMap,
   type MarketSummary,
@@ -371,6 +373,25 @@ export function useIndustryValuation(
     queryKey: ['industry-valuation', industry],
     queryFn: ({ signal }) => getIndustryValuation(industry as string, signal),
     enabled: !!industry,
+    staleTime: 10 * 60 * 1000,
+  })
+}
+
+/**
+ * A stock's trailing-P/E history (`GET /stocks/ticker/{ticker}/pe-history`) — one
+ * P/E per past earnings release, the backward-looking companion to the detail
+ * card's live multiple. Idle until `symbol` is set (rides the loaded ticker).
+ * Best-effort: an uncovered symbol resolves to an empty series and the card
+ * self-hides. Held fresh for ten minutes — the series only extends when a new
+ * quarter reports.
+ */
+export function usePeHistory(
+  symbol: string | null | undefined,
+): UseQueryResult<PeHistory> {
+  return useQuery({
+    queryKey: ['pe-history', symbol],
+    queryFn: ({ signal }) => getPeHistory(symbol as string, signal),
+    enabled: !!symbol,
     staleTime: 10 * 60 * 1000,
   })
 }

@@ -728,6 +728,45 @@ export async function getTickerCards(
   )
 }
 
+/** One point on a stock's trailing-P/E history: the P/E at a past earnings release. */
+export interface PeHistoryPoint {
+  /** The announcement date the P/E is anchored on (ISO `yyyy-mm-dd`). */
+  date: string
+  /** The close on/near that date. */
+  price: number
+  /** The trailing-twelve-month reported EPS the market knew then. */
+  ttm_eps: number
+  /** `price / ttm_eps` — the trailing multiple at that release. */
+  pe: number
+}
+
+/** A stock's trailing P/E over time — one point per reported quarter, oldest first. */
+export interface PeHistory {
+  ticker: string
+  /** Number of points (may be fewer than the reported quarters). */
+  count: number
+  points: PeHistoryPoint[]
+}
+
+/**
+ * A stock's trailing-P/E history (`GET /stocks/ticker/{ticker}/pe-history`) — the
+ * closing price at each past earnings release over the trailing-twelve-month
+ * reported EPS then known, the backward-looking companion to the card's live
+ * `metrics.pe`. Best-effort on the backend: an uncovered or upstream-blocked symbol
+ * comes back with an empty `points` (a 200, not a 404), so the card self-hides.
+ */
+export async function getPeHistory(
+  ticker: string,
+  signal?: AbortSignal,
+): Promise<PeHistory> {
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(ticker)}/pe-history`,
+    { signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as PeHistory
+}
+
 /** Fetch the day's snapshot for every tracked market sector. */
 export async function getSectors(signal?: AbortSignal): Promise<Sector[]> {
   const res = await fetch(`${API_BASE}/sectors`, { signal })
