@@ -13,12 +13,14 @@ import type {
   QuarterlyEarningsQuarter,
 } from '@/lib/api'
 
-// Chart geometry mirrors the earnings charts: the viewBox width tracks the
-// measured container (1 unit ≈ 1px so labels keep their native size), the
-// height is fixed, and W_FALLBACK covers jsdom / pre-measure.
+// Chart geometry mirrors the earnings charts exactly — same width tracking (the
+// viewBox tracks the measured container 1 unit ≈ 1px so labels keep their native
+// size), the same fixed height, and the same gutters — so the forward-P/E trend
+// reads as a sibling of the reported history above it. W_FALLBACK covers jsdom /
+// pre-measure.
 const W_FALLBACK = 820
-const H = 220
-const PAD = { top: 30, right: 44, bottom: 26, left: 8 }
+const H = 300
+const PAD = { top: 30, right: 56, bottom: 46, left: 12 }
 
 /** A P/E multiple — two decimals, no unit (matches the valuation grid). */
 const fmtMultiple = (n: number) => n.toFixed(2)
@@ -147,6 +149,12 @@ interface PeBar {
   label: string
   pe: number
   estimated: boolean
+  /** A forward point's move versus the walk's anchor multiple, in percent —
+   *  annotated beneath the point the way the earnings charts annotate a
+   *  forecast's implied growth. A negative value (the multiple compressing as
+   *  earnings grow into the price) reads green; null on the reported/now points,
+   *  which carry no such delta. */
+  deltaPct?: number | null
 }
 
 /** One step of the quarterly walk: the rolling forward P/E for an upcoming
@@ -210,6 +218,10 @@ function PeTrendChart({
   const nowColor = theme.palette.secondary.main
   const estColor = theme.palette.primary.main
   const surface = theme.palette.background.paper
+  // A compressing multiple (earnings growing into the price) is the good read,
+  // so a negative delta is green and a positive one red — matching the walk tiles.
+  const up = theme.palette.success.main
+  const down = theme.palette.error.main
 
   // Track the rendered width so the viewBox matches it 1:1 (see the earnings
   // charts) — keeps labels legible instead of shrinking on narrow screens.
@@ -235,13 +247,19 @@ function PeTrendChart({
   // room. The data is untouched — only what the narrow chart draws changes.
   const narrow = W < 420
   const pad = useMemo(
-    () => (narrow ? { ...PAD, left: 6, right: 40, bottom: 40 } : PAD),
+    () => (narrow ? { ...PAD, left: 8, right: 40, bottom: 46 } : PAD),
     [narrow],
   )
   const viewBars = useMemo(
     () => (narrow ? bars.slice(0, 6) : bars),
     [narrow, bars],
   )
+
+  // A forward point can annotate its move vs the anchor beneath its period
+  // label, mirroring the earnings charts' growth row. That row rides in 14 extra
+  // viewBox units, so a walk with no deltas keeps the plain height.
+  const deltaRow = viewBars.some((b) => b.deltaPct != null)
+  const vbH = deltaRow ? H + 14 : H
 
   const { cx, y, slot, ticks } = useMemo(() => {
     const plotW = W - pad.left - pad.right
@@ -282,7 +300,7 @@ function PeTrendChart({
     <Box ref={wrapRef}>
       <Box
         component="svg"
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${W} ${vbH}`}
         preserveAspectRatio="none"
         role="img"
         aria-label={ariaLabel}
@@ -299,11 +317,22 @@ function PeTrendChart({
               stroke={grid}
               strokeWidth={1}
             />
-            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={11} fill={axis}>
+            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={13} fill={axis}>
               {fmtMultiple(t)}
             </text>
           </g>
         ))}
+        {/* zero baseline, a touch stronger than the gridlines — the 0-based scale
+            is what lets the line's descent read as the multiple compressing */}
+        <line
+          x1={pad.left}
+          x2={W - pad.right}
+          y1={y(0)}
+          y2={y(0)}
+          stroke={axis}
+          strokeWidth={1}
+          opacity={0.5}
+        />
         {splitAt > 0 && (
           <line
             x1={pad.left + slot * splitAt}
@@ -375,21 +404,60 @@ function PeTrendChart({
               </text>
               <text
                 x={center}
-                y={H - 8}
+                y={H - 12}
                 fontSize={13}
                 fill={b.estimated ? estColor : axis}
                 textAnchor={rotateLabels ? 'end' : 'middle'}
                 transform={
-                  rotateLabels ? `rotate(-40 ${center} ${H - 8})` : undefined
+                  rotateLabels ? `rotate(-40 ${center} ${H - 12})` : undefined
                 }
               >
                 {b.label}
               </text>
+              {/* the move vs the anchor multiple, beneath a forward point's
+                  label — green as the multiple compresses into growth */}
+              {b.deltaPct != null && !rotateLabels && (
+                <text
+                  x={center}
+                  y={H + 2}
+                  fontSize={11}
+                  fontWeight={500}
+                  fill={b.deltaPct <= 0 ? up : down}
+                  textAnchor="middle"
+                >
+                  {fmtPct(b.deltaPct)}
+                </text>
+              )}
             </g>
           )
         })}
       </Box>
     </Box>
+  )
+}
+
+/** The trend chart's legend — a gold swatch for the reported/now multiples and a
+ *  blue one for the forward estimates, mirroring the earnings charts' legend so
+ *  the two read as one family. */
+function PeLegend() {
+  const swatch = (color: string, label: string) => (
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+      <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: color }} />
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
+    </Stack>
+  )
+  return (
+    <Stack
+      direction="row"
+      spacing={2}
+      useFlexGap
+      sx={{ flexWrap: 'wrap', mt: 1 }}
+    >
+      {swatch('secondary.main', 'Reported & now')}
+      {swatch('primary.main', 'Upcoming (est.)')}
+    </Stack>
   )
 }
 
@@ -687,6 +755,10 @@ export function ForwardPeSection({
           label: s.label,
           pe: s.pe as number,
           estimated: true,
+          deltaPct:
+            fyAnchor?.pe != null
+              ? ((s.pe as number) / fyAnchor.pe - 1) * 100
+              : null,
         })),
     ]
     return withDivider(
@@ -724,6 +796,7 @@ export function ForwardPeSection({
               bars={fyBars}
               ariaLabel="Forward price-to-earnings by fiscal year"
             />
+            <PeLegend />
           </Box>
         )}
         <Typography
@@ -784,6 +857,10 @@ export function ForwardPeSection({
         label: s.label,
         pe: s.pe as number,
         estimated: true,
+        deltaPct:
+          qAnchor?.pe != null
+            ? ((s.pe as number) / qAnchor.pe - 1) * 100
+            : null,
       })),
   ]
   return withDivider(
@@ -814,6 +891,7 @@ export function ForwardPeSection({
             bars={quarterBars}
             ariaLabel="Forward price-to-earnings by quarter"
           />
+          <PeLegend />
         </Box>
       )}
       <Typography
