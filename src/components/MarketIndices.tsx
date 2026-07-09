@@ -44,7 +44,7 @@ export default function MarketIndices() {
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: 6 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
         <Box sx={{ mb: 3 }}>
           <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
             Markets today

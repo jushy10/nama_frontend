@@ -60,6 +60,10 @@ function HoldingRow({
               variant="body2"
               color="text.secondary"
               sx={{
+                // A flex child only truncates when it can shrink below its
+                // content — without minWidth:0 the nowrap name keeps its full
+                // width and overflows the weight column on narrow screens.
+                minWidth: 0,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -113,7 +117,7 @@ export default function TopHoldingsCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider', height: '100%' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
           direction="row"
           spacing={1}

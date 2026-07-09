@@ -60,7 +60,7 @@ export default function FundReturnsCard({ etf }: { etf: EtfDetail }) {
   ]
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
           Returns
         </Typography>
@@ -68,7 +68,9 @@ export default function FundReturnsCard({ etf }: { etf: EtfDetail }) {
           sx={{
             mt: 2,
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            // minmax(0,1fr) lets the three pills shrink evenly on narrow
+            // phones instead of a 3-digit return forcing a track wider than 1fr.
+            gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
             gap: 1,
           }}
         >

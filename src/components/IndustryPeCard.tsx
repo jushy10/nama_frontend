@@ -90,6 +90,7 @@ function Figure({
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           fontSize: '0.65rem',
+          overflowWrap: 'anywhere',
         }}
       >
         {label}
@@ -342,7 +343,7 @@ export default function IndustryPeCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
           direction="row"
           spacing={2}
@@ -396,7 +397,7 @@ export default function IndustryPeCard({
           sx={{
             mt: 2,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             columnGap: 2,
           }}
         >

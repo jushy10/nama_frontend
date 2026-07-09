@@ -186,9 +186,9 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
-          direction="row"
+          direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
@@ -203,7 +203,13 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
           </Box>
 
           {signal && call && (
-            <Box sx={{ textAlign: 'right' }}>
+            <Box
+              sx={{
+                textAlign: 'right',
+                flexShrink: 0,
+                alignSelf: { xs: 'flex-start' },
+              }}
+            >
               <Typography
                 variant="caption"
                 sx={{
@@ -227,8 +233,9 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
                   color: call.color,
                   bgcolor: 'action.hover',
                   fontWeight: 700,
-                  fontSize: '1rem',
+                  fontSize: { xs: '0.8rem', sm: '1rem' },
                   letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {signal}
@@ -248,8 +255,8 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
                 mt: 3,
                 display: 'grid',
                 gridTemplateColumns: {
-                  xs: '1fr 1fr',
-                  sm: 'repeat(4, 1fr)',
+                  xs: 'repeat(2, minmax(0, 1fr))',
+                  sm: 'repeat(4, minmax(0, 1fr))',
                 },
                 gap: 2.5,
               }}

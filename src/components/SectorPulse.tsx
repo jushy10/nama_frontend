@@ -127,9 +127,13 @@ function Loaded({ data }: { data: SectorAnalysis }) {
     <Stack spacing={2.5}>
       <Box>
         <Stack
-          direction="row"
+          direction={{ xs: 'column', sm: 'row' }}
           spacing={1.5}
-          sx={{ alignItems: 'center', justifyContent: 'space-between', mb: 1 }}
+          sx={{
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            justifyContent: 'space-between',
+            mb: 1,
+          }}
         >
           <Chip label={tone.label} color={tone.color} size="small" />
           <Typography variant="caption" color="text.secondary">
@@ -214,7 +218,7 @@ export default function SectorPulse() {
   if (isError) return null
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="lg" sx={{ py: 6 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
         <Box sx={{ mb: 3 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />

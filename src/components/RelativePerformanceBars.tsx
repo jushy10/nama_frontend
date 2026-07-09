@@ -64,10 +64,12 @@ export default function RelativePerformanceBars({
               sx={{
                 display: 'grid',
                 // Tighten the fixed columns and gap on phones so the diverging
-                // bar keeps room to read; the value column still fits a 4-digit
-                // return (e.g. NVDA over 5Y). Roomier on sm+.
+                // bar keeps room to read: on xs the value column drops the muted
+                // absolute-return parenthetical (below) and shows just the spread
+                // headline, so it needs far less room. Roomier on sm+, where the
+                // full "+spread% (+total%)" reads.
                 gridTemplateColumns: {
-                  xs: '60px 1fr 134px',
+                  xs: '60px 1fr 84px',
                   sm: '60px 1fr 150px',
                 },
                 alignItems: 'center',
@@ -171,7 +173,11 @@ export default function RelativePerformanceBars({
                       component="span"
                       variant="caption"
                       color="text.secondary"
-                      sx={{ ml: 0.75, fontVariantNumeric: 'tabular-nums' }}
+                      sx={{
+                        display: { xs: 'none', sm: 'inline' },
+                        ml: 0.75,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}
                     >
                       ({fmtPct(r.totalPct)})
                     </Typography>

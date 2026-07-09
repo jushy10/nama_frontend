@@ -79,7 +79,8 @@ function Stat({ label, value }: { label: string; value: string }) {
         sx={{
           m: 0,
           fontWeight: 700,
-          fontSize: '1.5rem',
+          // Step the figure down on xs so a 4-digit NAV/AUM stays inside its cell.
+          fontSize: { xs: '1.35rem', sm: '1.5rem' },
           lineHeight: 1.15,
           letterSpacing: '-0.01em',
           fontVariantNumeric: 'tabular-nums',
@@ -115,7 +116,12 @@ export default function EtfCard({ etf }: { etf: EtfDetail }) {
       }}
     >
       <CardContent
-        sx={{ p: 3, flexGrow: 1, display: 'flex', flexDirection: 'column' }}
+        sx={{
+          p: { xs: 2, sm: 3 },
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+        }}
       >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
@@ -223,7 +229,8 @@ export default function EtfCard({ etf }: { etf: EtfDetail }) {
             <Typography
               sx={{
                 fontWeight: 700,
-                fontSize: '2.25rem',
+                // Ease the price down on xs so long quotes don't crowd the row.
+                fontSize: { xs: '1.9rem', sm: '2.25rem' },
                 fontVariantNumeric: 'tabular-nums',
                 lineHeight: 1.05,
                 letterSpacing: '-0.01em',
@@ -280,7 +287,9 @@ export default function EtfCard({ etf }: { etf: EtfDetail }) {
             m: 0,
             flexGrow: 1,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            // minmax(0,1fr) keeps the two columns even and lets a wide value
+            // (a 4-digit NAV) stay contained rather than blowing the track out.
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gridAutoRows: '1fr',
             gap: 1,
           }}

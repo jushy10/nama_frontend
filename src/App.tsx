@@ -65,8 +65,8 @@ function Brand({ large = false }: { large?: boolean }) {
         src="/nama-icon.png"
         alt="Nama Insights logo"
         sx={{
-          height: large ? { xs: 48, md: 64 } : 48,
-          width: large ? { xs: 48, md: 64 } : 48,
+          height: large ? { xs: 40, md: 64 } : 48,
+          width: large ? { xs: 40, md: 64 } : 48,
           display: 'block',
           flexShrink: 0,
         }}
@@ -80,7 +80,9 @@ function Brand({ large = false }: { large?: boolean }) {
           fontWeight: 700,
           letterSpacing: '-0.01em',
           whiteSpace: 'nowrap',
-          ...(large && { fontSize: { xs: '1.5rem', md: '2.125rem' } }),
+          ...(large && {
+            fontSize: { xs: '1.25rem', sm: '1.75rem', md: '2.125rem' },
+          }),
         }}
       >
         Nama{' '}
@@ -110,6 +112,15 @@ const PHASE_UI: Record<
   closed: { icon: MoonIcon, color: 'text.secondary' },
 }
 
+/** Compact phase wording for the tightest (xs) phones, where the full label
+ *  won't fit beside the wordmark; the icon and tooltip carry the rest. */
+const SHORT_LABEL: Record<MarketPhase, string> = {
+  pre: 'Pre',
+  regular: 'Open',
+  after: 'After',
+  closed: 'Closed',
+}
+
 /** The current phase (drives the icon), its short label, and hover summary. */
 function useMarketStatus() {
   const read = () => ({
@@ -132,11 +143,14 @@ function useMarketStatus() {
  * that walks the trading day, with an always-visible label ("Market Open",
  * "After Hours", …) so the status reads without a hover. A hint, not a control
  * — no click. Hover still adds the countdown (e.g. "Market Open · Closes in 2h
- * 14m"). The label folds away on the tightest (xs) screens, leaving the icon.
+ * 14m"). On the tightest (xs) phones the label shrinks to a compact form
+ * ("Open" / "After" / "Closed") rather than folding away, so touch — which
+ * can't hover — still reads the phase.
  */
 function MarketStatus() {
   const { phase, label, tooltip } = useMarketStatus()
   const { icon: Icon, color } = PHASE_UI[phase]
+  const shortLabel = SHORT_LABEL[phase]
 
   return (
     <Tooltip title={tooltip}>
@@ -157,6 +171,22 @@ function MarketStatus() {
         <Box component="span" sx={{ display: 'inline-flex', color }}>
           <Icon size={20} />
         </Box>
+        {/* Compact wording on xs; the full label from sm up. Both are static
+            so the phase reads on touch, where the tooltip is out of reach. */}
+        <Typography
+          component="span"
+          sx={{
+            display: { xs: 'block', sm: 'none' },
+            fontSize: '0.6875rem',
+            fontWeight: 600,
+            lineHeight: 1,
+            letterSpacing: '0.01em',
+            color: 'text.secondary',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {shortLabel}
+        </Typography>
         <Typography
           component="span"
           sx={{
@@ -219,7 +249,11 @@ function App() {
       >
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+            <Stack
+              direction="row"
+              spacing={{ xs: 0.75, sm: 1.25 }}
+              sx={{ alignItems: 'center' }}
+            >
               <Brand large />
               <MarketStatus />
             </Stack>
