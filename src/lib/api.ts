@@ -1139,13 +1139,13 @@ export interface EtfDividends {
 /**
  * An ETF's trailing returns — the opt-in `performance` block. The shared
  * `1w`–`1y` price-return windows (the same gains a stock shows) plus the two
- * longer horizons funds are judged on: `three_year_return` / `five_year_return`,
+ * longer horizons funds are judged on: `3y` / `5y`,
  * annualized average returns. Every figure is a human percent; a window or
  * horizon the vendor doesn't cover is null.
  */
 export interface EtfPerformance extends StockPerformance {
-  three_year_return: number | null
-  five_year_return: number | null
+  '3y': number | null
+  '5y': number | null
 }
 
 /**
