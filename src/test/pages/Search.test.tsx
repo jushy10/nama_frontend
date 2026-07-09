@@ -80,8 +80,8 @@ const etfDetail = {
     '6m': null,
     ytd: 11.25,
     '1y': null,
-    three_year_return: 20.41,
-    five_year_return: 13.01,
+    '3y': 20.41,
+    '5y': 13.01,
   },
 }
 

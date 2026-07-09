@@ -12,8 +12,8 @@ const perf: EtfPerformance = {
   '6m': null,
   ytd: 11.25,
   '1y': null,
-  three_year_return: 20.41,
-  five_year_return: -3.4,
+  '3y': 20.41,
+  '5y': -3.4,
 }
 
 const base: EtfDetail = {
@@ -52,7 +52,7 @@ describe('FundReturnsCard', () => {
   it('dashes a window the vendor does not cover', () => {
     renderWithProviders(
       <FundReturnsCard
-        etf={{ ...base, performance: { ...perf, three_year_return: null } }}
+        etf={{ ...base, performance: { ...perf, '3y': null } }}
       />,
     )
     expect(screen.getByText('—')).toBeInTheDocument()
