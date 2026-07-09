@@ -398,7 +398,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       {tab === 'options' && (
         <Box role="tabpanel">
           {stock.options_metrics ? (
-            <OptionsCard metrics={stock.options_metrics} />
+            <OptionsCard metrics={stock.options_metrics} price={stock.price} />
           ) : (
             <Card variant="outlined" sx={{ borderColor: 'divider' }}>
               <CardContent sx={{ p: 3, textAlign: 'center' }}>
