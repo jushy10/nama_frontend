@@ -24,7 +24,9 @@ import type {
   EarningsHistory,
   EarningsSurprise,
   NextEarnings,
+  QuarterlyEarnings,
 } from '@/lib/api'
+import { ForwardPeSection } from '@/components/ForwardPeSection'
 
 // The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
 // and text stays legible at any size — crucial on mobile), while the height is
@@ -1017,6 +1019,9 @@ export default function EarningsCard({
   annual = null,
   revenueGrowth = null,
   epsGrowth = null,
+  price = null,
+  quarterly = null,
+  trailingPe = null,
 }: {
   earnings: EarningsHistory
   // The upcoming (scheduled, not-yet-reported) quarters the charts draw forward
@@ -1025,8 +1030,8 @@ export default function EarningsCard({
   // the beat history keep their one forecast column.
   upcoming?: NextEarnings[] | null
   // The annual earnings series. When present, a Quarterly/Annual toggle lets the
-  // EPS & revenue charts switch to fiscal years — reported years as bars,
-  // upcoming (estimated) years as forecast columns.
+  // whole card switch to fiscal years — the EPS & revenue charts (reported years
+  // as bars, upcoming ones as forecast columns) and the forward-P/E walk below.
   annual?: AnnualEarnings | null
   // Trailing year-over-year growth (percent) for the top and bottom line, from
   // the ticker card's metrics block. Surfaced as a summary strip on the Annual
@@ -1034,6 +1039,19 @@ export default function EarningsCard({
   // would double up with the QoQ story the quarterly view already tells.
   revenueGrowth?: number | null
   epsGrowth?: number | null
+  // Today's price, from the ticker card — feeds the forward-P/E valuation
+  // section below the charts (every multiple divides it). The section self-hides
+  // when price/quarterly aren't supplied, so callers with only the beat history
+  // still get the charts alone.
+  price?: number | null
+  // The raw consolidated quarterly series, feeding the forward-P/E walk's
+  // trailing-TTM anchor and rolling quarter steps (distinct from the `earnings`
+  // view-model the charts read).
+  quarterly?: QuarterlyEarnings | null
+  // The ticker card's trailing P/E multiple (metrics.pe) — the "Current P/E"
+  // tile the forward-P/E walk threads between its reported anchor and the
+  // forward steps.
+  trailingPe?: number | null
 }) {
   const theme = useTheme()
   const { quarters } = earnings
@@ -1047,6 +1065,7 @@ export default function EarningsCard({
   const hasAnnual = annualQuarters.length > 0 || annualForecasts.length > 0
   const [period, setPeriod] = useState<'quarterly' | 'annual'>('quarterly')
   const isAnnual = hasAnnual && period === 'annual'
+  const activePeriod: 'quarterly' | 'annual' = isAnnual ? 'annual' : 'quarterly'
   // The trailing YoY growth summary rides the annual view only, and only when
   // at least one line's growth is served.
   const showTrailingGrowth =
@@ -1174,14 +1193,38 @@ export default function EarningsCard({
               value && setPeriod(value)
             }
             aria-label="Earnings period"
-            sx={{ mt: 2 }}
+            // A pill-style segmented control: one rounded track with the active
+            // segment lifted onto a raised paper chip. The one switch governs
+            // the whole card below it — the charts and the forward-P/E walk.
+            sx={{
+              mt: 2.5,
+              p: 0.5,
+              gap: 0.5,
+              borderRadius: 999,
+              bgcolor: 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+              '& .MuiToggleButtonGroup-grouped': {
+                border: 0,
+                borderRadius: '999px !important',
+                px: 2,
+                py: 0.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                letterSpacing: 0,
+                color: 'text.secondary',
+                '&:hover': { bgcolor: 'action.selected' },
+                '&.Mui-selected': {
+                  color: 'text.primary',
+                  bgcolor: 'background.paper',
+                  boxShadow: 1,
+                  '&:hover': { bgcolor: 'background.paper' },
+                },
+              },
+            }}
           >
-            <ToggleButton value="quarterly" sx={{ px: 1.5, py: 0.25 }}>
-              Quarterly
-            </ToggleButton>
-            <ToggleButton value="annual" sx={{ px: 1.5, py: 0.25 }}>
-              Annual
-            </ToggleButton>
+            <ToggleButton value="quarterly">Quarterly</ToggleButton>
+            <ToggleButton value="annual">Annual</ToggleButton>
           </ToggleButtonGroup>
         )}
 
@@ -1281,6 +1324,21 @@ export default function EarningsCard({
               </Typography>
             )}
           </>
+        )}
+
+        {/* Forward-P/E valuation walk — the same period toggle governs it, so
+            the quarterly view carries the rolling by-quarter walk and the
+            annual view the by-fiscal-year one. The section owns its own top
+            divider and self-hides (renders null) when the active period has no
+            forward consensus to walk. */}
+        {price != null && (
+          <ForwardPeSection
+            price={price}
+            quarterly={quarterly}
+            annual={annual}
+            trailingPe={trailingPe}
+            period={activePeriod}
+          />
         )}
       </CardContent>
     </Card>

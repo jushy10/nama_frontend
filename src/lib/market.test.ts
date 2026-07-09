@@ -3,6 +3,7 @@ import {
   getMarketStatus,
   isMarketOpen,
   marketHoliday,
+  marketLabel,
   marketTooltip,
 } from '@/lib/market'
 
@@ -131,6 +132,21 @@ describe('early-close half-days', () => {
     const status = getMarketStatus(new Date('2026-07-08T17:30:00Z')) // 13:30 EDT
     expect(status.phase).toBe('regular')
     expect(status.halfDay).toBe(false)
+  })
+})
+
+describe('marketLabel — the always-visible menu-bar text', () => {
+  const label = (iso: string) => marketLabel(new Date(iso))
+
+  it('names each phase in plain language', () => {
+    expect(label('2026-07-08T14:00:00Z')).toBe('Market Open') // 10:00 EDT
+    expect(label('2026-07-08T12:00:00Z')).toBe('Pre-Market') // 08:00 EDT
+    expect(label('2026-07-08T20:30:00Z')).toBe('After Hours') // 16:30 EDT
+    expect(label('2026-07-11T15:00:00Z')).toBe('Market Closed') // Sat
+  })
+
+  it('stays "Market Closed" on a holiday (the tooltip carries the name)', () => {
+    expect(label('2026-12-25T15:00:00Z')).toBe('Market Closed') // Christmas
   })
 })
 

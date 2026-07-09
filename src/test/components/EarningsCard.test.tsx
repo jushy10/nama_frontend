@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, renderWithProviders, screen } from '@/test/test-utils'
 import EarningsCard from '@/components/EarningsCard'
-import type { AnnualEarnings, EarningsHistory } from '@/lib/api'
+import type {
+  AnnualEarnings,
+  EarningsHistory,
+  QuarterlyEarnings,
+  QuarterlyEarningsQuarter,
+} from '@/lib/api'
 
 const base: EarningsHistory = {
   symbol: 'NVDA',
@@ -95,6 +100,61 @@ const annualSample: AnnualEarnings = {
       eps_actual_consensus: null,
       is_reported: false,
     },
+  ],
+}
+
+const qtr = (
+  over: Partial<QuarterlyEarningsQuarter>,
+): QuarterlyEarningsQuarter => ({
+  fiscal_year: null,
+  fiscal_quarter: null,
+  period_end: null,
+  report_date: null,
+  eps_actual: null,
+  eps_estimate: null,
+  eps_surprise: null,
+  eps_surprise_percent: null,
+  revenue_estimate: null,
+  revenue_actual: null,
+  beat: null,
+  is_reported: false,
+  ...over,
+})
+
+// The raw quarterly series the forward-P/E walk reads: four reported quarters
+// (TTM EPS 0.68+0.81+0.89+0.96 = 3.34) plus two upcoming ones with a consensus.
+const quarterlySample: QuarterlyEarnings = {
+  symbol: 'NVDA',
+  count: 6,
+  reported_count: 4,
+  upcoming_count: 2,
+  quarters: [
+    qtr({
+      fiscal_year: 2026,
+      fiscal_quarter: 2,
+      eps_actual: 0.68,
+      is_reported: true,
+    }),
+    qtr({
+      fiscal_year: 2026,
+      fiscal_quarter: 3,
+      eps_actual: 0.81,
+      is_reported: true,
+    }),
+    qtr({
+      fiscal_year: 2026,
+      fiscal_quarter: 4,
+      eps_actual: 0.89,
+      is_reported: true,
+    }),
+    qtr({
+      fiscal_year: 2027,
+      fiscal_quarter: 1,
+      eps_actual: 0.96,
+      is_reported: true,
+    }),
+    qtr({ fiscal_year: 2027, fiscal_quarter: 2, eps_estimate: 1.05 }),
+    qtr({ fiscal_year: 2027, fiscal_quarter: 3, eps_estimate: 1.18 }),
   ],
 }
 
@@ -643,5 +703,72 @@ describe('EarningsCard', () => {
     // The verdict rides the quarterly beat history, so it stays put when the
     // charts switch to fiscal years.
     expect(screen.getByText('Beat estimates')).toBeInTheDocument()
+  })
+
+  it('omits the forward-P/E section when no price or quarterly series is passed', () => {
+    // The charts run off the `earnings` view-model alone; the valuation walk
+    // needs the price and the raw quarterly series, so it stays hidden without
+    // them.
+    renderWithProviders(<EarningsCard earnings={base} />)
+    expect(
+      screen.queryByRole('heading', { name: 'Forward P/E' }),
+    ).not.toBeInTheDocument()
+    expect(screen.queryByText('By quarter')).not.toBeInTheDocument()
+  })
+
+  it('shows the by-quarter forward-P/E walk beneath the charts on the quarterly view', () => {
+    renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        price={200}
+        quarterly={quarterlySample}
+        annual={annualSample}
+      />,
+    )
+    // The merged card carries the forward-P/E walk, following the default
+    // (quarterly) toggle: the rolling by-quarter anchor and its first step.
+    expect(
+      screen.getByRole('heading', { name: 'Forward P/E' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.getByText("P/E Q1 '27")).toBeInTheDocument()
+    expect(screen.getByText("Fwd P/E Q2 '27")).toBeInTheDocument()
+    // The by-fiscal-year walk is not drawn until the toggle flips.
+    expect(screen.queryByText('By fiscal year')).not.toBeInTheDocument()
+  })
+
+  it('lets the one toggle switch both the charts and the forward-P/E walk to annual', async () => {
+    const { user } = renderWithProviders(
+      <EarningsCard
+        earnings={base}
+        price={200}
+        quarterly={quarterlySample}
+        annual={annualSample}
+        trailingPe={48}
+      />,
+    )
+
+    // Quarterly by default: fiscal-year chart labels and the by-quarter walk
+    // are absent/present as expected.
+    expect(screen.getAllByText("Q1 '27").length).toBeGreaterThan(0)
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.queryByText('By fiscal year')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Annual' }))
+
+    // One switch moves the whole card: the charts show fiscal years (FY24)…
+    expect(screen.getAllByText('FY24').length).toBeGreaterThan(0)
+    // …and the forward-P/E walk swaps to the by-fiscal-year anchor, dropping
+    // the by-quarter one entirely.
+    expect(screen.getByText('By fiscal year')).toBeInTheDocument()
+    expect(screen.getByText('P/E FY26')).toBeInTheDocument()
+    expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
+    expect(screen.queryByText('By quarter')).not.toBeInTheDocument()
+    expect(screen.queryByText("P/E Q1 '27")).not.toBeInTheDocument()
+
+    // Back to quarterly restores the by-quarter walk.
+    await user.click(screen.getByRole('button', { name: 'Quarterly' }))
+    expect(screen.getByText('By quarter')).toBeInTheDocument()
+    expect(screen.queryByText('By fiscal year')).not.toBeInTheDocument()
   })
 })

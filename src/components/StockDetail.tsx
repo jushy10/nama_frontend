@@ -42,7 +42,6 @@ import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
-import ForwardPeCard from '@/components/ForwardPeCard'
 
 // The card carries everything the stock detail draws off in one request: the
 // snapshot's dividend, the performance windows, the metrics (profitability +
@@ -322,22 +321,12 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Earnings and Forward P/E share one full-width row on desktop. auto-fit
-          (rather than a fixed 1fr 1fr) lets whichever card is present take the
-          whole row when the other is missing — the Forward P/E card self-hides
-          without a forward consensus, and the earnings slot is empty while its
-          query loads or errors. */}
+      {/* Earnings and valuation live in one card now: the plain-language beat
+          verdict, the EPS/revenue charts, and the forward-P/E walk, all under a
+          single Quarterly/Annual toggle. It fills the tab's width; the panel
+          just shows a spinner or an error while the query resolves. */}
       {tab === 'earnings' && (
-        <Box
-          role="tabpanel"
-          sx={{
-            display: 'grid',
-            gridTemplateColumns:
-              'repeat(auto-fit, minmax(min(480px, 100%), 1fr))',
-            gap: 3,
-            alignItems: 'stretch',
-          }}
-        >
+        <Box role="tabpanel">
           {quarterlyQuery.isLoading && (
             <Stack
               sx={{ alignItems: 'center', justifyContent: 'center', py: 2 }}
@@ -360,15 +349,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               annual={annualQuery.data ?? null}
               revenueGrowth={stock.metrics?.revenue_growth_yoy ?? null}
               epsGrowth={stock.metrics?.eps_growth_yoy ?? null}
+              price={stock.price}
+              quarterly={quarterlyQuery.data}
+              trailingPe={stock.metrics?.pe ?? null}
             />
           )}
-
-          <ForwardPeCard
-            price={stock.price}
-            quarterly={quarterlyQuery.data ?? null}
-            annual={annualQuery.data ?? null}
-            trailingPe={stock.metrics?.pe ?? null}
-          />
         </Box>
       )}
 

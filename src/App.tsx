@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import {
   AppBar,
@@ -19,13 +19,13 @@ import {
 import MenuIcon from '@mui/icons-material/Menu'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
-import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded'
-import WbTwilightRoundedIcon from '@mui/icons-material/WbTwilightRounded'
-import NightsStayRoundedIcon from '@mui/icons-material/NightsStayRounded'
-import BedtimeRoundedIcon from '@mui/icons-material/BedtimeRounded'
-import type { SvgIconComponent } from '@mui/icons-material'
 import { useColorMode } from '@/ColorModeProvider'
-import { getMarketStatus, marketTooltip, type MarketPhase } from '@/lib/market'
+import {
+  getMarketStatus,
+  marketLabel,
+  marketTooltip,
+  type MarketPhase,
+} from '@/lib/market'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
@@ -33,6 +33,7 @@ import Search from '@/pages/Search'
 import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
 import RedirectToSearch from '@/components/RedirectToSearch'
+import { MoonIcon, SunIcon } from '@/components/MarketIcons'
 
 const navItems = [
   { label: 'Home', to: '/', end: true },
@@ -92,22 +93,28 @@ function Brand({ large = false }: { large?: boolean }) {
 }
 
 /**
- * How each trading phase reads at a glance — a warming-then-cooling arc: dawn
- * amber → bright sun → dusk indigo → muted moon. Filled + coloured on purpose,
- * so it never reads as a second copy of the outlined light/dark toggle.
+ * Two hand-drawn, universally-read glyphs — a Sun over the daytime half of the
+ * market (pre-market into the regular session) and a Moon over the evening/
+ * overnight half (after-hours into closed). The colour carries the finer read
+ * across a warming-then-cooling arc: dawn amber → bright sun → dusk indigo →
+ * muted moon. Filled + coloured, so they never read as a second copy of the
+ * outlined light/dark toggle sitting at the other end of the bar.
  */
-const PHASE_UI: Record<MarketPhase, { icon: SvgIconComponent; color: string }> =
-  {
-    pre: { icon: WbTwilightRoundedIcon, color: '#fbbf24' },
-    regular: { icon: WbSunnyRoundedIcon, color: '#f59e0b' },
-    after: { icon: NightsStayRoundedIcon, color: '#818cf8' },
-    closed: { icon: BedtimeRoundedIcon, color: 'text.secondary' },
-  }
+const PHASE_UI: Record<
+  MarketPhase,
+  { icon: ComponentType<{ size?: number }>; color: string }
+> = {
+  pre: { icon: SunIcon, color: '#fbbf24' },
+  regular: { icon: SunIcon, color: '#f59e0b' },
+  after: { icon: MoonIcon, color: '#818cf8' },
+  closed: { icon: MoonIcon, color: 'text.secondary' },
+}
 
-/** The current phase (drives the icon) plus its hover summary, kept in sync. */
+/** The current phase (drives the icon), its short label, and hover summary. */
 function useMarketStatus() {
   const read = () => ({
     phase: getMarketStatus(new Date()).phase,
+    label: marketLabel(new Date()),
     tooltip: marketTooltip(new Date()),
   })
   const [state, setState] = useState(read)
@@ -122,12 +129,13 @@ function useMarketStatus() {
 
 /**
  * Small status hint beside the brand: the market's current phase as a sun/moon
- * that walks the trading day. A hint, not a control — no click. Hover shows a
- * one-line read: the phase and how long until it flips (e.g. "Market Open ·
- * Closes in 2h 14m"), or when it next opens when shut.
+ * that walks the trading day, with an always-visible label ("Market Open",
+ * "After Hours", …) so the status reads without a hover. A hint, not a control
+ * — no click. Hover still adds the countdown (e.g. "Market Open · Closes in 2h
+ * 14m"). The label folds away on the tightest (xs) screens, leaving the icon.
  */
 function MarketStatus() {
-  const { phase, tooltip } = useMarketStatus()
+  const { phase, label, tooltip } = useMarketStatus()
   const { icon: Icon, color } = PHASE_UI[phase]
 
   return (
@@ -135,9 +143,34 @@ function MarketStatus() {
       <Box
         role="img"
         aria-label={tooltip}
-        sx={{ display: 'inline-flex', alignItems: 'center', color }}
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          // Optical centering: Roboto's caps sit ~0.06em below their line-box
+          // centre, so a straight center-align leaves the icon reading high
+          // against the wordmark. Nudge the unit down onto the letterforms.
+          position: 'relative',
+          top: '2px',
+        }}
       >
-        <Icon sx={{ fontSize: 20 }} />
+        <Box component="span" sx={{ display: 'inline-flex', color }}>
+          <Icon size={20} />
+        </Box>
+        <Typography
+          component="span"
+          sx={{
+            display: { xs: 'none', sm: 'block' },
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            lineHeight: 1,
+            letterSpacing: '0.01em',
+            color: 'text.secondary',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {label}
+        </Typography>
       </Box>
     </Tooltip>
   )

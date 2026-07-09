@@ -272,6 +272,24 @@ function nextOpenLabel(now: Date): string {
 }
 
 /**
+ * The current phase as a short, always-visible menu-bar label — the at-a-glance
+ * status shown beside the icon (the tooltip carries the fuller countdown).
+ * E.g. "Market Open", "Pre-Market", "After Hours", "Market Closed".
+ */
+export function marketLabel(now: Date): string {
+  switch (getMarketStatus(now).phase) {
+    case 'regular':
+      return 'Market Open'
+    case 'pre':
+      return 'Pre-Market'
+    case 'after':
+      return 'After Hours'
+    case 'closed':
+      return 'Market Closed'
+  }
+}
+
+/**
  * A one-line, human summary of where the market is now and when it next flips —
  * the menu-bar hover text. E.g. "Market Open · Closes in 2h 14m",
  * "Pre-Market · Opens in 45m", "Market Closed · Opens Monday at 9:30 AM ET".
