@@ -24,6 +24,7 @@ import {
   getEtfDetail,
   getIndustryValuation,
   getQuarterlyEarnings,
+  getRatingChanges,
   getRecommendations,
   getRsi,
   getScreener,
@@ -36,6 +37,7 @@ import {
   getTickerType,
   searchEtfs,
   searchStocks,
+  type AnalystRatingChanges,
   type AnalystRecommendations,
   type AnnualEarnings,
   type CandleSeries,
@@ -283,6 +285,20 @@ export function useRecommendations(
   return useQuery({
     queryKey: ['recommendations', symbol],
     queryFn: ({ signal }) => getRecommendations(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * A ticker's analyst rating actions — the upgrade/downgrade feed (`GET
+ * /stocks/{symbol}/rating-changes`). Idle until `symbol` is set.
+ */
+export function useRatingChanges(
+  symbol: string | null | undefined,
+): UseQueryResult<AnalystRatingChanges> {
+  return useQuery({
+    queryKey: ['rating-changes', symbol],
+    queryFn: ({ signal }) => getRatingChanges(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }
