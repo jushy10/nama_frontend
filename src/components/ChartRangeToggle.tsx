@@ -32,10 +32,32 @@ export default function ChartRangeToggle({
       value={value}
       onChange={(_, next: ChartRange | null) => next && onChange(next)}
       aria-label={ariaLabel}
-      sx={{ flexWrap: 'wrap' }}
+      // One connected row that scrolls sideways when it can't fit (a phone),
+      // rather than wrapping into cramped, broken-bordered rows. minWidth:0 lets
+      // the group shrink inside a flex parent so it scrolls instead of spilling.
+      sx={{
+        flexWrap: 'nowrap',
+        minWidth: 0,
+        maxWidth: '100%',
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch',
+        scrollbarWidth: 'none',
+        '&::-webkit-scrollbar': { display: 'none' },
+      }}
     >
       {RANGE_OPTIONS.map((r) => (
-        <ToggleButton key={r} value={r} sx={{ px: 1.5, py: 0.25 }}>
+        <ToggleButton
+          key={r}
+          value={r}
+          // flexShrink:0 keeps each button its natural size so the row scrolls;
+          // a taller tap target on xs (the wrapped rows were only ~26px).
+          sx={{
+            px: 1.5,
+            py: { xs: 0.75, sm: 0.25 },
+            minHeight: { xs: 36, sm: 0 },
+            flexShrink: 0,
+          }}
+        >
           {r}
         </ToggleButton>
       ))}

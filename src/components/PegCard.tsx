@@ -338,9 +338,9 @@ export default function PegCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
-          direction="row"
+          direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
@@ -354,7 +354,13 @@ export default function PegCard({
           </Box>
 
           {verdict && meta && (
-            <Box sx={{ textAlign: 'right' }}>
+            <Box
+              sx={{
+                textAlign: 'right',
+                flexShrink: 0,
+                alignSelf: { xs: 'flex-start' },
+              }}
+            >
               <Typography
                 variant="caption"
                 sx={{
@@ -378,8 +384,9 @@ export default function PegCard({
                   color: meta.color,
                   bgcolor: 'action.hover',
                   fontWeight: 700,
-                  fontSize: '1rem',
+                  fontSize: { xs: '0.8rem', sm: '1rem' },
                   letterSpacing: '0.02em',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {verdict}
@@ -399,7 +406,7 @@ export default function PegCard({
               sx={{
                 mt: 2,
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, 1fr)',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                 columnGap: 2,
               }}
             >

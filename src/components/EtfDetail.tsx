@@ -64,7 +64,7 @@ export default function EtfDetail({ symbol }: { symbol: string }) {
               <FundReturnsCard etf={etf} />
               {etf.description && (
                 <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-                  <CardContent sx={{ p: 3 }}>
+                  <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                     <Typography
                       variant="h6"
                       component="h2"

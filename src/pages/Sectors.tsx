@@ -137,10 +137,16 @@ export default function Sectors() {
             value={timeframe}
             onChange={(_, value: Window | null) => value && setTimeframe(value)}
             aria-label="Performance timeframe"
-            sx={{ flexWrap: 'wrap' }}
+            // rowGap so wrapped buttons read as a second row of pills rather
+            // than fusing to the row above; taller hit area on phones.
+            sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
           >
             {SECTOR_WINDOWS.map((w) => (
-              <ToggleButton key={w.key} value={w.key} sx={{ px: 2, py: 0.5 }}>
+              <ToggleButton
+                key={w.key}
+                value={w.key}
+                sx={{ px: 2, py: { xs: 0.75 } }}
+              >
                 {w.label}
               </ToggleButton>
             ))}
@@ -163,10 +169,15 @@ export default function Sectors() {
           <Box
             sx={{
               display: 'grid',
+              // One card per row on phones; two-up from the sm tablet width and
+              // three-up from lg. A long sector name ("Communication Services")
+              // may wrap to a second line in the half-width card, which reads
+              // fine — far better than a lone full-width card stranding a tablet.
+              // minmax(0,·) lets a card shrink below its content's intrinsic width.
               gridTemplateColumns: {
                 xs: '1fr',
-                sm: 'repeat(2, 1fr)',
-                lg: 'repeat(3, 1fr)',
+                sm: 'repeat(2, minmax(0, 1fr))',
+                lg: 'repeat(3, minmax(0, 1fr))',
               },
               gap: 2,
             }}

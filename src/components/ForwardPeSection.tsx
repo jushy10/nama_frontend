@@ -222,26 +222,41 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
   }, [])
   const W = cw
 
+  // Display-only responsiveness from the measured width (not a media query):
+  // on a phone-width canvas, cap the columns and give the rotated period labels
+  // room. The data is untouched — only what the narrow chart draws changes.
+  const narrow = W < 420
+  const pad = useMemo(
+    () => (narrow ? { ...PAD, left: 6, right: 6, bottom: 40 } : PAD),
+    [narrow],
+  )
+  const viewBars = useMemo(
+    () => (narrow ? bars.slice(0, 6) : bars),
+    [narrow, bars],
+  )
+
   const { cx, y, barW, slot } = useMemo(() => {
-    const plotW = W - PAD.left - PAD.right
-    const plotH = H - PAD.top - PAD.bottom
+    const plotW = W - pad.left - pad.right
+    const plotH = H - pad.top - pad.bottom
     // P/E bars are all positive (loss windows are filtered out), so the scale
     // runs 0 → max with headroom for the value labels.
-    const max = Math.max(...bars.map((b) => b.pe)) * 1.15 || 1
-    const slot = plotW / Math.max(bars.length, 1)
+    const max = Math.max(...viewBars.map((b) => b.pe)) * 1.15 || 1
+    const slot = plotW / Math.max(viewBars.length, 1)
     return {
-      cx: (i: number) => PAD.left + slot * (i + 0.5),
-      y: (v: number) => PAD.top + (1 - v / max) * plotH,
+      cx: (i: number) => pad.left + slot * (i + 0.5),
+      y: (v: number) => pad.top + (1 - v / max) * plotH,
       barW: Math.min(slot * 0.55, 64),
       slot,
     }
-  }, [bars, W])
+  }, [viewBars, pad, W])
 
-  const baseY = H - PAD.bottom
+  const baseY = H - pad.bottom
   // Dashed divider before the first estimate column — just after the "Now" bar
   // (or the reported anchor, when no Current P/E is served) — echoing the
   // reported-vs-forecast split on the earnings charts.
-  const splitAt = bars.findIndex((b) => b.estimated)
+  const splitAt = viewBars.findIndex((b) => b.estimated)
+  // Rotate the period labels once the columns get too tight to read them flat.
+  const rotateLabels = slot < 44
 
   return (
     <Box ref={wrapRef}>
@@ -254,8 +269,8 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
         sx={{ width: '100%', height: 'auto', display: 'block' }}
       >
         <line
-          x1={PAD.left}
-          x2={W - PAD.right}
+          x1={pad.left}
+          x2={W - pad.right}
           y1={baseY}
           y2={baseY}
           stroke={axis}
@@ -264,9 +279,9 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
         />
         {splitAt > 0 && (
           <line
-            x1={PAD.left + slot * splitAt}
-            x2={PAD.left + slot * splitAt}
-            y1={PAD.top}
+            x1={pad.left + slot * splitAt}
+            x2={pad.left + slot * splitAt}
+            y1={pad.top}
             y2={baseY}
             stroke={axis}
             strokeWidth={1}
@@ -274,7 +289,7 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
             opacity={0.4}
           />
         )}
-        {bars.map((b, i) => {
+        {viewBars.map((b, i) => {
           const center = cx(i)
           const top = y(b.pe)
           const h = Math.max(1, baseY - top)
@@ -319,7 +334,10 @@ function PeBarChart({ bars, ariaLabel }: { bars: PeBar[]; ariaLabel: string }) {
                 y={H - 8}
                 fontSize={11}
                 fill={b.estimated ? estColor : axis}
-                textAnchor="middle"
+                textAnchor={rotateLabels ? 'end' : 'middle'}
+                transform={
+                  rotateLabels ? `rotate(-40 ${center} ${H - 8})` : undefined
+                }
               >
                 {b.label}
               </text>

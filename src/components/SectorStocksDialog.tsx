@@ -10,6 +10,8 @@ import {
   IconButton,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import CloseIcon from '@mui/icons-material/Close'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
@@ -270,6 +272,11 @@ export default function SectorStocksDialog({
   sector: Sector | null
   onClose: () => void
 }) {
+  // On phones the dialog goes full-screen so the holdings list gets the whole
+  // viewport instead of a cramped ~300px card boxed in by the default margins.
+  const theme = useTheme()
+  const fullScreen = useMediaQuery(theme.breakpoints.down('sm'))
+
   // Curated constituents for the open sector; the query stays idle until the
   // dialog opens on a sector that has any. A failed ticker comes back null and
   // is filtered out — getTickerCards never rejects the whole batch.
@@ -280,7 +287,13 @@ export default function SectorStocksDialog({
   const stocks = (data ?? []).filter((s): s is TickerCard => s != null)
 
   return (
-    <Dialog open={sector != null} onClose={onClose} fullWidth maxWidth="sm">
+    <Dialog
+      open={sector != null}
+      onClose={onClose}
+      fullScreen={fullScreen}
+      fullWidth
+      maxWidth="sm"
+    >
       <DialogTitle sx={{ pr: 6 }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography component="span" sx={{ fontWeight: 700 }}>

@@ -437,7 +437,7 @@ export default function EtfScreener() {
             options={categoryOptions}
             value={categories}
             onChange={(next) => setCategories(next)}
-            minWidth={220}
+            minWidth={{ xs: '100%', md: 220 }}
           />
 
           {/* Explicit sort control: the column-header sort labels are hidden on the
@@ -510,7 +510,9 @@ export default function EtfScreener() {
               borderRadius: 3,
               bgcolor: 'background.paper',
               overflow: 'auto',
-              maxHeight: 'calc(100vh - 260px)',
+              // Cap the height on desktop; on phones (xs) drop the cap so the page
+              // scrolls naturally instead of trapping a short inner scroll region.
+              maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
               // Dim while a new page/sort loads (previous rows stay put).
               transition: 'opacity 150ms ease',
               opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
@@ -526,6 +528,26 @@ export default function EtfScreener() {
                   whiteSpace: 'nowrap',
                 },
                 '& tbody tr:hover': { bgcolor: 'action.hover' },
+                // Pin the first column (ticker/name) so a row keeps its identity
+                // while the metric columns scroll horizontally on a narrow screen.
+                // The header corner (z-3) sits above both the sticky header row
+                // (z-2) and the pinned body cells (z-1); the pinned body cell
+                // carries an opaque background — matched to the row-hover tint —
+                // so scrolled metrics never show through it.
+                '& thead th:first-of-type': {
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 3,
+                },
+                '& tbody td:first-of-type': {
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  bgcolor: 'background.paper',
+                },
+                '& tbody tr:hover td:first-of-type': {
+                  bgcolor: 'action.hover',
+                },
               }}
             >
               <TableHead>
@@ -536,7 +558,7 @@ export default function EtfScreener() {
                       fontWeight: 600,
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
-                      fontSize: '0.7rem',
+                      fontSize: { xs: '0.75rem', sm: '0.7rem' },
                       backgroundColor: 'background.paper',
                       borderBottom: 2,
                       borderBottomColor: 'divider',

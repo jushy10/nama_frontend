@@ -25,7 +25,12 @@ export default function MultiSelectFilter({
   options: FilterOption[]
   value: string[]
   onChange: (next: string[]) => void
-  minWidth?: number
+  // A fixed width or a responsive object (e.g. `{ xs: '100%', md: 180 }`) so the
+  // field can go full-width and stack on a phone while staying compact on desktop.
+  minWidth?:
+    | number
+    | string
+    | Partial<Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', number | string>>
 }) {
   // Autocomplete works in option objects, the page in bare values — map between
   // them at the edge; an unknown value is simply dropped.

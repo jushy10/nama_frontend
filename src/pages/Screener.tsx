@@ -660,21 +660,21 @@ export default function Screener() {
             options={sectorOptions}
             value={sectors}
             onChange={(next) => setSectors(next)}
-            minWidth={180}
+            minWidth={{ xs: '100%', md: 180 }}
           />
           <MultiSelectFilter
             label="Industry"
             options={industryOptions}
             value={industries}
             onChange={(next) => setIndustries(next)}
-            minWidth={190}
+            minWidth={{ xs: '100%', md: 190 }}
           />
           <MultiSelectFilter
             label="Market cap"
             options={MARKET_CAP_OPTIONS}
             value={marketCaps}
             onChange={(next) => setMarketCaps(next as MarketCapTier[])}
-            minWidth={170}
+            minWidth={{ xs: '100%', md: 170 }}
           />
 
           <ToggleButtonGroup
@@ -774,9 +774,10 @@ export default function Screener() {
               borderRadius: 3,
               bgcolor: 'background.paper',
               overflow: 'auto',
-              // Cap the height so a long page scrolls inside the card with the
-              // header pinned, rather than pushing the pager far down the page.
-              maxHeight: 'calc(100vh - 260px)',
+              // Cap the height on desktop so a long page scrolls inside the card
+              // with the header pinned; on phones (xs) drop the cap so the page
+              // scrolls naturally instead of trapping a short inner scroll region.
+              maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
               // Dim while a new page/sort loads (previous rows stay put).
               transition: 'opacity 150ms ease',
               opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
@@ -794,6 +795,26 @@ export default function Screener() {
                 // A hovered row lifts on a subtle tint so the whole line reads as
                 // one clickable target.
                 '& tbody tr:hover': { bgcolor: 'action.hover' },
+                // Pin the first column (ticker/name) so a row keeps its identity
+                // while the metric columns scroll horizontally on a narrow screen.
+                // The header corner (z-3) sits above both the sticky header row
+                // (z-2) and the pinned body cells (z-1); the pinned body cell
+                // carries an opaque background — matched to the row-hover tint —
+                // so scrolled metrics never show through it.
+                '& thead th:first-of-type': {
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 3,
+                },
+                '& tbody td:first-of-type': {
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  bgcolor: 'background.paper',
+                },
+                '& tbody tr:hover td:first-of-type': {
+                  bgcolor: 'action.hover',
+                },
               }}
             >
               <TableHead>
@@ -804,7 +825,7 @@ export default function Screener() {
                       fontWeight: 600,
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
-                      fontSize: '0.7rem',
+                      fontSize: { xs: '0.75rem', sm: '0.7rem' },
                       // Opaque so scrolled rows don't bleed through the pinned
                       // header; a firmer bottom rule sets it off from the body.
                       backgroundColor: 'background.paper',

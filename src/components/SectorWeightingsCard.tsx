@@ -64,7 +64,7 @@ export default function SectorWeightingsCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider', height: '100%' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Typography variant="h6" component="h2" sx={{ fontWeight: 600, mb: 1 }}>
           Sector Weightings
         </Typography>
