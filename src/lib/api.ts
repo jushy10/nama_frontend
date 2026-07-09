@@ -1945,6 +1945,59 @@ export async function getStockAnalysis(
 }
 
 /**
+ * Where a company's earnings story is heading: 'accelerating' when growth is
+ * picking up (or its beats are getting bigger), 'slowing' when growth fades or it
+ * starts to miss, 'steady' when it holds a consistent pace. Lowercase to match the
+ * API's JSON.
+ */
+export type EarningsTrend = 'accelerating' | 'steady' | 'slowing'
+
+/**
+ * An AI-generated, plain-language read of a stock's earnings story
+ * (`GET /stocks/{symbol}/earnings/analysis`) — the earnings-focused sibling of
+ * `StockAnalysis`. `summary` is the everyday-language headline of how earnings
+ * have gone and where they look headed; `trend` is the direction; `highlights`
+ * are a few short takeaways. `disclaimer` is a fixed not-financial-advice reminder
+ * authored by the service — render it as a footnote — and `model`/`generated_at`
+ * record what produced the read and when. Reasoned only over the recent earnings
+ * timelines; descriptive, not advice, and regenerated at most every few minutes
+ * (the endpoint caches).
+ */
+export interface EarningsAnalysis {
+  symbol: string
+  summary: string
+  trend: EarningsTrend
+  highlights: string[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Fetch the AI earnings analysis for a ticker
+ * (`GET /stocks/{symbol}/earnings/analysis`). The backend runs a language model
+ * over the stock's recent earnings, so this is a slow read — seconds, not
+ * milliseconds — which is why the earnings tab fetches it on its own and shows the
+ * card once it lands. Throws an `ApiError` when the read is unavailable (a symbol
+ * with no earnings on file, or the backend isn't configured for AI analysis).
+ */
+export async function getEarningsAnalysis(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<EarningsAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/earnings/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EarningsAnalysis
+  if (typeof data?.summary !== 'string' || !Array.isArray(data?.highlights)) {
+    throw new ApiError(res.status, 'Malformed earnings analysis response')
+  }
+  return data
+}
+
+/**
  * An AI-generated, plain-language read on a single fund
  * (`GET /stocks/etf/{ticker}/analysis`) — the ETF sibling of `StockAnalysis`,
  * the same shape but keyed on `ticker` with an `asset_type` marker. The backend
