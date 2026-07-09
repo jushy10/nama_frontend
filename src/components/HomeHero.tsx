@@ -2,16 +2,8 @@ import { Link as RouterLink } from 'react-router-dom'
 import { Box, Button, Container, Stack, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import TableRowsIcon from '@mui/icons-material/TableRows'
-import { getMarketStatus, marketLabel, type MarketPhase } from '@/lib/market'
-
-/** Status-dot colour per phase — emerald reads as "live/open", the rest cool as
- *  the session winds down, matching the sun/moon arc in the app bar. */
-const PHASE_DOT: Record<MarketPhase, string> = {
-  pre: '#fbbf24',
-  regular: '#34d399',
-  after: '#7aa5f2',
-  closed: '#9ca3af',
-}
+import { getMarketStatus, marketLabel } from '@/lib/market'
+import MarketStatusDot from '@/components/MarketStatusDot'
 
 /** Today, spelled out (e.g. "Thursday, July 9") for the hero eyebrow. */
 function todayLabel(now: Date): string {
@@ -55,24 +47,7 @@ export default function HomeHero() {
             spacing={1}
             sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
           >
-            <Box
-              sx={{
-                width: 9,
-                height: 9,
-                borderRadius: '50%',
-                bgcolor: PHASE_DOT[phase],
-                flexShrink: 0,
-                ...(phase === 'regular' && {
-                  boxShadow: '0 0 0 0 rgba(52,211,153,0.6)',
-                  animation: 'heroPulse 2s infinite',
-                  '@keyframes heroPulse': {
-                    '0%': { boxShadow: '0 0 0 0 rgba(52,211,153,0.55)' },
-                    '70%': { boxShadow: '0 0 0 6px rgba(52,211,153,0)' },
-                    '100%': { boxShadow: '0 0 0 0 rgba(52,211,153,0)' },
-                  },
-                }),
-              }}
-            />
+            <MarketStatusDot phase={phase} />
             <Typography
               variant="caption"
               sx={{
