@@ -186,6 +186,9 @@ function rangePct(v: number, low: number, high: number): number {
   return Math.max(0, Math.min(100, ((v - low) / (high - low)) * 100))
 }
 
+/** Signed whole-percent for the target-range endpoints, e.g. +33% / -12%. */
+const signedPct = (n: number): string => `${n >= 0 ? '+' : ''}${Math.round(n)}%`
+
 /**
  * The consensus 12-month price target: the mean target and its upside versus the
  * live price, over a low→high range bar that marks where the stock trades now
@@ -210,6 +213,16 @@ function PriceTargets({
         : 'error.main'
   const low = targets.low
   const high = targets.high
+  // The upside/downside at each end of the analyst range, versus today's price
+  // — so the endpoints read as "how far", not just dollar levels.
+  const lowPct =
+    low != null && price != null && price > 0
+      ? ((low - price) / price) * 100
+      : null
+  const highPct =
+    high != null && price != null && price > 0
+      ? ((high - price) / price) * 100
+      : null
 
   return (
     <Box sx={{ mt: 2.5 }}>
@@ -266,7 +279,9 @@ function PriceTargets({
             role="img"
             aria-label={`Price target range ${fmtDollars(low)} to ${fmtDollars(
               high,
-            )}, average ${fmtDollars(mean)}`}
+            )}, average ${fmtDollars(mean)}${
+              price != null ? `, price now ${fmtDollars(price)}` : ''
+            }`}
             sx={{
               position: 'relative',
               height: 8,
@@ -274,7 +289,29 @@ function PriceTargets({
               bgcolor: 'action.hover',
             }}
           >
-            {/* Average-target tick. */}
+            {/* The gap between today's price and the average target, filled in
+                the upside colour — green when the target sits above the price,
+                red when below — so the direction and distance read at a glance. */}
+            {price != null && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: `${Math.min(
+                    rangePct(price, low, high),
+                    rangePct(mean, low, high),
+                  )}%`,
+                  width: `${Math.abs(
+                    rangePct(mean, low, high) - rangePct(price, low, high),
+                  )}%`,
+                  top: 0,
+                  bottom: 0,
+                  borderRadius: 1,
+                  bgcolor: upColor,
+                  opacity: 0.35,
+                }}
+              />
+            )}
+            {/* Average-target tick, in the same upside colour. */}
             <Box
               sx={{
                 position: 'absolute',
@@ -284,7 +321,7 @@ function PriceTargets({
                 width: 3,
                 transform: 'translateX(-50%)',
                 borderRadius: 1,
-                bgcolor: 'success.main',
+                bgcolor: upColor,
               }}
             />
             {/* Current-price marker. */}
@@ -311,9 +348,33 @@ function PriceTargets({
           >
             <Typography variant="caption" color="text.secondary">
               Low {fmtDollars(low)}
+              {lowPct != null && (
+                <Box
+                  component="span"
+                  sx={{
+                    ml: 0.5,
+                    fontWeight: 600,
+                    color: lowPct >= 0 ? 'success.main' : 'error.main',
+                  }}
+                >
+                  {signedPct(lowPct)}
+                </Box>
+              )}
             </Typography>
             <Typography variant="caption" color="text.secondary">
               High {fmtDollars(high)}
+              {highPct != null && (
+                <Box
+                  component="span"
+                  sx={{
+                    ml: 0.5,
+                    fontWeight: 600,
+                    color: highPct >= 0 ? 'success.main' : 'error.main',
+                  }}
+                >
+                  {signedPct(highPct)}
+                </Box>
+              )}
             </Typography>
           </Stack>
         </Box>
@@ -336,6 +397,18 @@ export default function AnalystCard({
     ? DIRECTION[recommendations.direction]
     : null
   const DirectionIcon = direction?.Icon
+
+  // The bull / bear split as a share of the panel — the crisp headline number
+  // the distribution bar otherwise leaves the reader to eyeball.
+  const total = latest?.total ?? 0
+  const bullPct =
+    latest && total > 0
+      ? Math.round(((latest.strong_buy + latest.buy) / total) * 100)
+      : null
+  const bearPct =
+    latest && total > 0
+      ? Math.round(((latest.sell + latest.strong_sell) / total) * 100)
+      : null
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -397,7 +470,28 @@ export default function AnalystCard({
 
         {latest && latest.total > 0 ? (
           <>
-            <Box sx={{ mt: 2.5 }}>
+            <Typography variant="body2" sx={{ mt: 2.5 }}>
+              <Box
+                component="span"
+                sx={{ fontWeight: 700, color: 'success.main' }}
+              >
+                {bullPct}%
+              </Box>{' '}
+              rate it Buy or better
+              {bearPct != null && bearPct > 0 && (
+                <>
+                  {' · '}
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 700, color: 'error.main' }}
+                  >
+                    {bearPct}%
+                  </Box>{' '}
+                  Sell
+                </>
+              )}
+            </Typography>
+            <Box sx={{ mt: 1.5 }}>
               <DistributionBar trend={latest} />
               <Legend trend={latest} />
             </Box>

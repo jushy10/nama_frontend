@@ -86,6 +86,12 @@ const fmtPct = (n: number) => `${n.toFixed(1)}%`
 const fmtMove = (n: number) => `±${Math.abs(n).toFixed(1)}%`
 /** Ratio with two decimals, e.g. 0.24 → "0.24". */
 const fmtRatio = (n: number) => n.toFixed(2)
+/** A dollar price, two decimals, e.g. 203.9 → "$203.90". */
+const fmtDollars = (n: number) =>
+  `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
 
 /** Parse a date-only "YYYY-MM-DD" as a *local* date. Using `new Date(iso)`
  *  treats it as UTC midnight, which formats a day early in negative offsets. */
@@ -166,7 +172,15 @@ function Stat({
   )
 }
 
-export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
+export default function OptionsCard({
+  metrics,
+  price = null,
+}: {
+  metrics: OptionsMetrics
+  // Today's price, from the ticker card — turns the expected move into concrete
+  // price bounds. The range bar self-hides without it (or a bad price).
+  price?: number | null
+}) {
   const {
     implied_volatility: iv,
     expected_move_percent: move,
@@ -183,6 +197,14 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
   const moveLevel = optionsLevel('expected_move', move)
   const insuranceLevel = optionsLevel('insurance_cost', insurance)
   const empty = iv == null && move == null && insurance == null && pcr == null
+
+  // Concrete price bounds for the expected move — symmetric around today's
+  // price — so "±6.4%" reads as real levels the stock could reach by the expiry.
+  const emLow =
+    move != null && price != null && price > 0 ? price * (1 - move / 100) : null
+  const emHigh =
+    move != null && price != null && price > 0 ? price * (1 + move / 100) : null
+  const showRange = emLow != null && emHigh != null
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -300,6 +322,103 @@ export default function OptionsCard({ metrics }: { metrics: OptionsMetrics }) {
                 sub="down bets traded per up bet today (put/call ratio)"
               />
             </Box>
+
+            {/* The expected move as concrete price levels: today's price sits at
+                the centre, the band runs down to the low (red) and up to the
+                high (green) the options are pricing in by the expiry. */}
+            {showRange && (
+              <Box sx={{ mt: 3 }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    justifyContent: 'space-between',
+                    alignItems: 'baseline',
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: 'text.secondary',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em',
+                    }}
+                  >
+                    Expected range{moveBy ? ` by ${fmtDate(moveBy)}` : ''}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+                  >
+                    {fmtMove(move as number)}
+                  </Typography>
+                </Stack>
+                <Box
+                  role="img"
+                  aria-label={`Expected range ${fmtDollars(
+                    emLow as number,
+                  )} to ${fmtDollars(emHigh as number)}, price now ${fmtDollars(
+                    price as number,
+                  )}`}
+                  sx={{
+                    mt: 1,
+                    position: 'relative',
+                    height: 8,
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                    display: 'flex',
+                  }}
+                >
+                  {/* downside half (toward the low) */}
+                  <Box
+                    sx={{ width: '50%', bgcolor: 'error.main', opacity: 0.25 }}
+                  />
+                  {/* upside half (toward the high) */}
+                  <Box
+                    sx={{
+                      width: '50%',
+                      bgcolor: 'success.main',
+                      opacity: 0.25,
+                    }}
+                  />
+                  {/* today's price, centred */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      left: '50%',
+                      top: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: 10,
+                      height: 10,
+                      borderRadius: '50%',
+                      bgcolor: 'text.primary',
+                      border: '2px solid',
+                      borderColor: 'background.paper',
+                    }}
+                  />
+                </Box>
+                <Stack
+                  direction="row"
+                  sx={{ mt: 0.75, justifyContent: 'space-between' }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'error.main', fontWeight: 600 }}
+                  >
+                    {fmtDollars(emLow as number)}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    now {fmtDollars(price as number)}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'success.main', fontWeight: 600 }}
+                  >
+                    {fmtDollars(emHigh as number)}
+                  </Typography>
+                </Stack>
+              </Box>
+            )}
 
             {call && (
               <Typography
