@@ -104,10 +104,17 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The AI take is the slowest read (a live model call), so it rides the loaded
   // ticker on its own and the card fills in once it lands.
   const analysisQuery = useStockAnalysis(loadedSymbol)
-  // The earnings-tab AI read, a separate live model call — it leads the earnings
-  // tab once it lands. Best-effort: it's supplementary to the charts, so an error
-  // (or a symbol the model can't read) just omits the card rather than warning.
-  const earningsAnalysisQuery = useEarningsAnalysis(loadedSymbol)
+  // The earnings-tab AI read, a separate live (slow, paid) model call that leads
+  // the earnings tab once it lands. Unlike the other reads it's gated on the tab
+  // being open, so it never fires on a detail-page load that stays on Overview.
+  // The hook stays mounted here (not inside the tab panel) with a staleTime, so
+  // the result is cached and toggling away and back doesn't re-fire the call.
+  // Best-effort: it's supplementary to the charts, so an error (or a symbol the
+  // model can't read) just omits the card rather than warning.
+  const earningsAnalysisQuery = useEarningsAnalysis(
+    loadedSymbol,
+    tab === 'earnings',
+  )
   // The industry P/E benchmark rides the loaded card's own industry slug (idle
   // until it resolves; never fires for an unclassified stock). Best-effort — it
   // self-hides if the industry has too few valued peers to stand as a
@@ -135,9 +142,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       {/* A small tab menu keeps the detail from being one long scroll: Overview
           holds the essentials (snapshot, performance, the AI take and the price
           chart), Valuation gathers the analytical reads, Analysts the sell-side
-          ratings, and Earnings and Options each get their own tab. Every query
-          fires up top regardless of the active tab, so switching is instant and
-          never refetches. Scrollable so the five labels never crowd a phone. */}
+          ratings, and Earnings and Options each get their own tab. Most queries
+          fire up top regardless of the active tab, so switching is instant and
+          never refetches; the one exception is the earnings analysis, a slow
+          paid model call gated on the Earnings tab being open. Scrollable so the
+          five labels never crowd a phone. */}
       <Tabs
         value={tab}
         onChange={(_, value: StockDetailTab) => setTab(value)}
