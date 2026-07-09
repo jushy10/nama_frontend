@@ -22,6 +22,7 @@ import {
   errorMessage,
   useAnnualEarnings,
   useCandles,
+  useEarningsAnalysis,
   useFiveYearReturn,
   useIndustryValuation,
   useQuarterlyEarnings,
@@ -43,6 +44,7 @@ import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
 import EarningsCard from '@/components/EarningsCard'
+import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
 
 // The card carries everything the stock detail draws off in one request: the
 // snapshot's dividend, the performance windows, the metrics (profitability +
@@ -96,6 +98,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The AI take is the slowest read (a live model call), so it rides the loaded
   // ticker on its own and the card fills in once it lands.
   const analysisQuery = useStockAnalysis(loadedSymbol)
+  // The earnings-tab AI read, a separate live model call — it leads the earnings
+  // tab once it lands. Best-effort: it's supplementary to the charts, so an error
+  // (or a symbol the model can't read) just omits the card rather than warning.
+  const earningsAnalysisQuery = useEarningsAnalysis(loadedSymbol)
   // The industry P/E benchmark rides the loaded card's own industry slug (idle
   // until it resolves; never fires for an unclassified stock). Best-effort — it
   // self-hides if the industry has too few valued peers to stand as a
@@ -366,7 +372,27 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           single Quarterly/Annual toggle. It fills the tab's width; the panel
           just shows a spinner or an error while the query resolves. */}
       {tab === 'earnings' && (
-        <Box role="tabpanel">
+        <Stack spacing={3} role="tabpanel">
+          {/* The AI earnings read leads the tab once it lands — a slow model
+              call, so it shows its own spinner and quietly omits itself on an
+              error (it's supplementary to the charts below, and the endpoint
+              404s for a symbol it can't read). */}
+          {earningsAnalysisQuery.isLoading && (
+            <Stack
+              direction="row"
+              spacing={1.5}
+              sx={{ alignItems: 'center', px: 0.5 }}
+            >
+              <CircularProgress size={20} />
+              <Typography color="text.secondary">
+                Generating earnings analysis…
+              </Typography>
+            </Stack>
+          )}
+          {earningsAnalysisQuery.data && (
+            <EarningsAnalysisCard analysis={earningsAnalysisQuery.data} />
+          )}
+
           {quarterlyQuery.isLoading && (
             <Stack
               sx={{ alignItems: 'center', justifyContent: 'center', py: 2 }}
@@ -394,7 +420,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               trailingPe={stock.metrics?.pe ?? null}
             />
           )}
-        </Box>
+        </Stack>
       )}
 
       {/* Options-market read, riding the single snapshot request. When the

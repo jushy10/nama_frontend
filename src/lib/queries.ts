@@ -27,6 +27,7 @@ import {
   getMarketSummary,
   getRecommendations,
   getRsi,
+  getEarningsAnalysis,
   getScreener,
   getSectorAnalysis,
   getSectors,
@@ -42,6 +43,7 @@ import {
   type CandleSeries,
   type ChartRange,
   type Classifications,
+  type EarningsAnalysis,
   type EtfAnalysis,
   type EtfCategories,
   type EtfDetail,
@@ -302,6 +304,23 @@ export function useStockAnalysis(
   return useQuery({
     queryKey: ['stock-analysis', symbol],
     queryFn: ({ signal }) => getStockAnalysis(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * The AI earnings analysis for a ticker
+ * (`GET /stocks/{symbol}/earnings/analysis`) — a plain-language read of the
+ * company's earnings story the earnings tab shows in a card above the charts.
+ * Like `useStockAnalysis` it's a live model call, so it loads on its own and the
+ * backend caches it briefly. Idle until `symbol` is set.
+ */
+export function useEarningsAnalysis(
+  symbol: string | null | undefined,
+): UseQueryResult<EarningsAnalysis> {
+  return useQuery({
+    queryKey: ['earnings-analysis', symbol],
+    queryFn: ({ signal }) => getEarningsAnalysis(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }
