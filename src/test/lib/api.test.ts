@@ -538,7 +538,7 @@ describe('getSupportLevels', () => {
 describe('getEma', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('requests the default 9/21 periods over the chart range', async () => {
+  it('requests the default 9/21/50 periods over the chart range', async () => {
     let requestedUrl = ''
     const body = {
       symbol: 'AAPL',
@@ -546,6 +546,7 @@ describe('getEma', () => {
       lines: [
         { period: 9, count: 1, latest: 201.1, points: [] },
         { period: 21, count: 1, latest: 195.4, points: [] },
+        { period: 50, count: 1, latest: 190.2, points: [] },
       ],
     }
     vi.stubGlobal(
@@ -569,7 +570,8 @@ describe('getEma', () => {
     // One repeated `period` param per requested line.
     expect(requestedUrl).toContain('period=9')
     expect(requestedUrl).toContain('period=21')
-    expect(result.lines.map((l) => l.period)).toEqual([9, 21])
+    expect(requestedUrl).toContain('period=50')
+    expect(result.lines.map((l) => l.period)).toEqual([9, 21, 50])
   })
 
   it('throws an ApiError carrying the server detail on a non-2xx', async () => {
