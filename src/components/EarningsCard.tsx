@@ -1225,52 +1225,78 @@ export default function EarningsCard({
 
         <EarningsSummary earnings={earnings} />
 
-        {hasAnnual && (
-          <ToggleButtonGroup
-            size="small"
-            exclusive
-            value={period}
-            onChange={(_, value: 'quarterly' | 'annual' | null) =>
-              value && setPeriod(value)
-            }
-            aria-label="Earnings period"
-            // A pill-style segmented control: one rounded track with the active
-            // segment lifted onto a raised paper chip. The one switch governs
-            // the whole card below it — the charts and the forward-P/E walk.
-            sx={{
-              mt: 2.5,
-              p: 0.5,
-              gap: 0.5,
-              borderRadius: 999,
-              bgcolor: 'action.hover',
-              border: '1px solid',
-              borderColor: 'divider',
-              '& .MuiToggleButtonGroup-grouped': {
-                border: 0,
-                borderRadius: '999px !important',
-                px: 2,
-                py: 0.5,
-                // Guarantee a ~40px tap target on touch (the small pill is
-                // shorter than that by default).
-                minHeight: { xs: 40, sm: 'auto' },
-                textTransform: 'none',
-                fontWeight: 600,
-                letterSpacing: 0,
-                color: 'text.secondary',
-                '&:hover': { bgcolor: 'action.selected' },
-                '&.Mui-selected': {
-                  color: 'text.primary',
-                  bgcolor: 'background.paper',
-                  boxShadow: 1,
-                  '&:hover': { bgcolor: 'background.paper' },
-                },
-              },
-            }}
+        {/* ── Reported history: the EPS & revenue charts. The divider + label
+            set this zone off from the latest-quarter summary above; the period
+            toggle rides in the header and governs the time-based views below it
+            (the charts and the forward-P/E walk). ── */}
+        <Stack
+          direction="row"
+          spacing={2}
+          sx={{
+            mt: 3,
+            pt: 3,
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            rowGap: 1,
+          }}
+        >
+          <Typography
+            variant="subtitle2"
+            component="h3"
+            sx={{ fontWeight: 700, letterSpacing: '0.01em' }}
           >
-            <ToggleButton value="quarterly">Quarterly</ToggleButton>
-            <ToggleButton value="annual">Annual</ToggleButton>
-          </ToggleButtonGroup>
-        )}
+            Reported history
+          </Typography>
+          {hasAnnual && (
+            <ToggleButtonGroup
+              size="small"
+              exclusive
+              value={period}
+              onChange={(_, value: 'quarterly' | 'annual' | null) =>
+                value && setPeriod(value)
+              }
+              aria-label="Earnings period"
+              // A pill-style segmented control: one rounded track with the
+              // active segment lifted onto a raised paper chip. The one switch
+              // governs the time-based views below — the charts and the
+              // forward-P/E walk.
+              sx={{
+                p: 0.5,
+                gap: 0.5,
+                borderRadius: 999,
+                bgcolor: 'action.hover',
+                border: '1px solid',
+                borderColor: 'divider',
+                '& .MuiToggleButtonGroup-grouped': {
+                  border: 0,
+                  borderRadius: '999px !important',
+                  px: 2,
+                  py: 0.5,
+                  // Guarantee a ~40px tap target on touch (the small pill is
+                  // shorter than that by default).
+                  minHeight: { xs: 40, sm: 'auto' },
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  letterSpacing: 0,
+                  color: 'text.secondary',
+                  '&:hover': { bgcolor: 'action.selected' },
+                  '&.Mui-selected': {
+                    color: 'text.primary',
+                    bgcolor: 'background.paper',
+                    boxShadow: 1,
+                    '&:hover': { bgcolor: 'background.paper' },
+                  },
+                },
+              }}
+            >
+              <ToggleButton value="quarterly">Quarterly</ToggleButton>
+              <ToggleButton value="annual">Annual</ToggleButton>
+            </ToggleButtonGroup>
+          )}
+        </Stack>
 
         {activeQuarters.length === 0 ? (
           <Typography color="text.secondary" sx={{ mt: 2 }}>
