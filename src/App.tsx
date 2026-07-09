@@ -160,7 +160,7 @@ function MarketStatus() {
         sx={{
           display: 'inline-flex',
           alignItems: 'center',
-          gap: 0.75,
+          gap: 1,
           // Optical centering: Roboto's caps sit ~0.06em below their line-box
           // centre, so a straight center-align leaves the icon reading high
           // against the wordmark. Nudge the unit down onto the letterforms.
@@ -169,7 +169,7 @@ function MarketStatus() {
         }}
       >
         <Box component="span" sx={{ display: 'inline-flex', color }}>
-          <Icon size={20} />
+          <Icon size={24} />
         </Box>
         {/* Compact wording on xs; the full label from sm up. Both are static
             so the phase reads on touch, where the tooltip is out of reach. */}
@@ -177,7 +177,7 @@ function MarketStatus() {
           component="span"
           sx={{
             display: { xs: 'block', sm: 'none' },
-            fontSize: '0.6875rem',
+            fontSize: '0.8125rem',
             fontWeight: 600,
             lineHeight: 1,
             letterSpacing: '0.01em',
@@ -191,7 +191,7 @@ function MarketStatus() {
           component="span"
           sx={{
             display: { xs: 'none', sm: 'block' },
-            fontSize: '0.8125rem',
+            fontSize: '1rem',
             fontWeight: 600,
             lineHeight: 1,
             letterSpacing: '0.01em',
@@ -251,7 +251,7 @@ function App() {
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             <Stack
               direction="row"
-              spacing={{ xs: 0.75, sm: 1.25 }}
+              spacing={{ xs: 0.75, sm: 2, md: 3 }}
               sx={{ alignItems: 'center' }}
             >
               <Brand large />
