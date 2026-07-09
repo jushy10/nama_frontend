@@ -34,12 +34,20 @@ export default function SectionHeading({
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           {icon && (
             <Box
-              sx={{ display: 'inline-flex', color: 'primary.main', flexShrink: 0 }}
+              sx={{
+                display: 'inline-flex',
+                color: 'primary.main',
+                flexShrink: 0,
+              }}
             >
               {icon}
             </Box>
           )}
-          <Typography variant="h6" component={component} sx={{ fontWeight: 600 }}>
+          <Typography
+            variant="h6"
+            component={component}
+            sx={{ fontWeight: 600 }}
+          >
             {title}
           </Typography>
         </Stack>

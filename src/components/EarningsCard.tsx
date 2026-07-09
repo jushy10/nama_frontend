@@ -1180,11 +1180,7 @@ export default function EarningsCard({
                 Earnings
               </Typography>
             </Stack>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ mt: 0.5 }}
-            >
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {isAnnual
                 ? hasRevenue
                   ? 'Annual EPS & revenue by fiscal year'
