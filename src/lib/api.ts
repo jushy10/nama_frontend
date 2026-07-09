@@ -163,6 +163,47 @@ export interface SectorAnalysis {
   generated_at: string
 }
 
+/** Which trailing timeframe a market-summary breakdown covers. */
+export type MarketPeriodName = 'week' | 'month' | 'year'
+
+/**
+ * One headline index's return over a single timeframe. `symbol` is the proxy ETF
+ * the index is read through (SPY for the S&P 500, QQQ for the Nasdaq);
+ * `change_percent` is that proxy's real move over the period (from the board, not
+ * authored by the model).
+ */
+export interface MarketIndexReturn {
+  name: string
+  symbol: string
+  change_percent: number | null
+}
+
+/**
+ * One timeframe in the market summary — the past week, month, or year — with each
+ * index's real return over it and the AI's one-line read of the stretch.
+ */
+export interface MarketPeriod {
+  period: MarketPeriodName
+  indexes: MarketIndexReturn[]
+  note: string
+}
+
+/**
+ * An AI-generated overview of how the US market has moved lately: a plain
+ * `summary`, the risk posture (`tone`), and a `periods` breakdown by timeframe
+ * (the past year, month and week), each with the indexes' real returns and a
+ * one-line note. `disclaimer` is service-authored — descriptive, not financial
+ * advice. `model`/`generated_at` record what produced it and when.
+ */
+export interface MarketSummary {
+  summary: string
+  tone: MarketTone
+  periods: MarketPeriod[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
 /** Trailing-return windows in display order, for selectors and strips. */
 export const PERF_WINDOWS: { key: keyof StockPerformance; label: string }[] = [
   { key: '1w', label: '1W' },
@@ -672,6 +713,15 @@ export async function getSectorAnalysis(
   const res = await fetch(`${API_BASE}/sectors/analysis`, { signal })
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as SectorAnalysis
+}
+
+/** Fetch the AI overview of how the US market moved over the year/month/week. */
+export async function getMarketSummary(
+  signal?: AbortSignal,
+): Promise<MarketSummary> {
+  const res = await fetch(`${API_BASE}/market/summary`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as MarketSummary
 }
 
 /** Index universe the screener can narrow to. */
