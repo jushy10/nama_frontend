@@ -9,6 +9,7 @@ import {
 } from '@mui/material'
 import { errorMessage, useEtfAnalysis, useEtfDetail } from '@/lib/queries'
 import AnalysisCard from '@/components/AnalysisCard'
+import AnalysisLoadingCard from '@/components/AnalysisLoadingCard'
 import EtfCard from '@/components/EtfCard'
 import FundReturnsCard from '@/components/FundReturnsCard'
 import TopHoldingsCard from '@/components/TopHoldingsCard'
@@ -91,20 +92,7 @@ export default function EtfDetail({ symbol }: { symbol: string }) {
               (e.g. the model isn't configured) degrades to a warning rather than
               sinking the page. */}
           {analysisQuery.isLoading && (
-            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-              <CardContent sx={{ p: 3 }}>
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: 'center' }}
-                >
-                  <CircularProgress size={20} />
-                  <Typography color="text.secondary">
-                    Generating AI analysis…
-                  </Typography>
-                </Stack>
-              </CardContent>
-            </Card>
+            <AnalysisLoadingCard title="AI Analysis" />
           )}
           {analysisQuery.isError && (
             <Alert severity="warning" variant="outlined">
