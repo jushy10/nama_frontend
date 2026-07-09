@@ -47,8 +47,9 @@ const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
 const fmtPctShort = (n: number) =>
   `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(0)}%`
 
-/** Muted fill for the "estimate" bar — faint enough to sit behind the actual,
- *  and legible on both the dark and light canvas. Shared with the legend. */
+/** Muted fill for the "estimate" marker — faint enough to sit behind the
+ *  actual, and legible on both the dark and light canvas. Shared with the
+ *  legend. */
 const estimateColor = (theme: Theme) =>
   theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)'
 
@@ -133,10 +134,11 @@ const SESSION_LABEL: Record<string, string> = {
   dmh: 'during hours',
 }
 
-/** One reported column for the grouped-bar chart: a muted "estimate" bar beside
- *  the reported "actual", coloured by whether it met or beat. Reported columns
- *  carry no growth figure — the bar heights already tell that story; only the
- *  forward columns annotate the growth their consensus implies. */
+/** One reported point on the trend line: the reported "actual" plus the
+ *  "estimate" it's measured against (drawn as a faint marker), coloured by
+ *  whether it met or beat. Reported points carry no growth figure — the line's
+ *  slope already tells that story; only the forward points annotate the growth
+ *  their consensus implies. */
 interface ChartBar {
   key: string
   label: string
@@ -292,8 +294,14 @@ function SurpriseChart({
   const grid = theme.palette.divider
   const axis = theme.palette.text.secondary
   const est = estimateColor(theme)
-  const forecast = theme.palette.primary.main // indigo accent for the forecast
+  const forecast = theme.palette.primary.main // blue accent for the forecast
   const neutral = neutralColor ?? axis
+  // The reported trend line's colour: a series with no beat/miss meaning
+  // (revenue) draws in its own accent; EPS rides the blue accent, its beat and
+  // miss carried by the point colours instead.
+  const lineColor = neutralColor ?? forecast
+  // The card surface, for the ring that lifts a point off the line beneath it.
+  const surface = theme.palette.background.paper
   // The pointer-selected column — a mouse hover or, on touch, a tap. null falls
   // back to the latest column carrying a value (see `active` below).
   const [hover, setHover] = useState<number | null>(null)
@@ -406,8 +414,46 @@ function SurpriseChart({
     )
   }
 
-  const { cx, y, groupW, gap, barW, ticks, zeroY, slot, n } = geo
+  const { cx, y, ticks, zeroY, slot, n } = geo
   const fcIndex = data.length // the forecast column's slot, at the right edge
+
+  // The reported trend as one polyline per unbroken run of quarters — a missing
+  // quarter (no reported value) splits the line rather than bridging the gap.
+  const actualSegments: { x: number; y: number }[][] = []
+  {
+    let seg: { x: number; y: number }[] = []
+    data.forEach((b, i) => {
+      if (b.actual == null) {
+        if (seg.length) actualSegments.push(seg)
+        seg = []
+      } else {
+        seg.push({ x: cx(i), y: y(b.actual) })
+      }
+    })
+    if (seg.length) actualSegments.push(seg)
+  }
+
+  // The dashed forward line runs from the last reported point through the
+  // upcoming consensus points, so the estimate reads as a continuation.
+  let lastActualIdx = -1
+  for (let i = data.length - 1; i >= 0; i--) {
+    if (data[i].actual != null) {
+      lastActualIdx = i
+      break
+    }
+  }
+  const forecastPts: { x: number; y: number }[] = []
+  if (lastActualIdx >= 0) {
+    forecastPts.push({
+      x: cx(lastActualIdx),
+      y: y(data[lastActualIdx].actual as number),
+    })
+  }
+  viewForecasts.forEach((f, k) => {
+    if (f.estimate != null) {
+      forecastPts.push({ x: cx(fcIndex + k), y: y(f.estimate) })
+    }
+  })
 
   // Value labels ride beneath every column, so on narrow slots (a phone-width
   // chart) the full format collides with its neighbours — swap in the tighter
@@ -537,7 +583,7 @@ function SurpriseChart({
           alignItems: 'baseline',
           columnGap: 1.5,
           rowGap: 0.5,
-          fontSize: '0.8rem',
+          fontSize: '0.95rem',
           fontWeight: 500,
           mb: 1.5,
           px: 1.5,
@@ -593,12 +639,7 @@ function SurpriseChart({
               stroke={grid}
               strokeWidth={1}
             />
-            <text
-              x={W - pad.right + 6}
-              y={y(t) + 3.5}
-              fontSize={11}
-              fill={axis}
-            >
+            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={13} fill={axis}>
               {fmt(t)}
             </text>
           </g>
@@ -628,139 +669,166 @@ function SurpriseChart({
           />
         )}
 
+        {/* faint estimate markers — what analysts expected, tied to the
+            reported actual by a hairline so a beat/miss reads at a glance. */}
+        {data.map((b, i) =>
+          b.estimate == null ? null : (
+            <g key={`est-${b.key}`}>
+              {b.actual != null && (
+                <line
+                  x1={cx(i)}
+                  y1={y(b.estimate)}
+                  x2={cx(i)}
+                  y2={y(b.actual)}
+                  stroke={est}
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
+                />
+              )}
+              <circle cx={cx(i)} cy={y(b.estimate)} r={3.5} fill={est} />
+            </g>
+          ),
+        )}
+
+        {/* the reported trend line — one polyline per unbroken run of quarters */}
+        {actualSegments.map((seg, i) => (
+          <polyline
+            key={`ln-${i}`}
+            points={seg.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={lineColor}
+            strokeWidth={2.5}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ))}
+
+        {/* the forward consensus, as a dashed continuation of the line */}
+        {forecastPts.length > 1 && (
+          <polyline
+            points={forecastPts.map((p) => `${p.x},${p.y}`).join(' ')}
+            fill="none"
+            stroke={forecast}
+            strokeWidth={2.5}
+            strokeDasharray="6 5"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.85}
+          />
+        )}
+
+        {/* reported points: a dot coloured green/red by beat, the value above
+            it, the surprise % across the top, the quarter label beneath. */}
         {data.map((b, i) => {
           const center = cx(i)
-          const estX = center - groupW / 2
-          // With no estimate bar (revenue), centre the lone actual in the slot.
-          const actX =
-            b.estimate == null ? center - barW / 2 : estX + barW + gap
-          const actColor = b.beat == null ? neutral : b.beat ? up : down
-          // Nothing reported this quarter (no estimate and no actual) — draw a
-          // labelled "no data" slot so the gap reads as missing, not as zero.
+          const dotColor = b.beat == null ? lineColor : b.beat ? up : down
           const isGap = b.estimate == null && b.actual == null
-
-          const bar = (x: number, v: number | null, fill: string) => {
-            if (v == null) return null
-            const top = Math.min(y(v), zeroY)
-            const h = Math.max(1, Math.abs(y(v) - zeroY))
-            return (
-              <rect x={x} y={top} width={barW} height={h} rx={2} fill={fill} />
-            )
-          }
-
-          // Surprise % rides in the top margin, aligned across all groups. It
-          // shortens with the value labels (slot < 50), and drops out entirely
-          // once the slots are too tight to read it (slot < 34) — it stays a
-          // tap away in the detail line above the plot.
-          const surprise =
-            b.surprise == null || slot < 34 ? null : (
-              <text
-                x={center}
-                y={18}
-                fontSize={11}
-                fontWeight={600}
-                fill={actColor}
-                textAnchor="middle"
-              >
-                {growthFmt(b.surprise)}
-              </text>
-            )
-
           return (
             <g key={b.key}>
-              {surprise}
-              {bar(estX, b.estimate, est)}
-              {bar(actX, b.actual, actColor)}
-              {/* "no data" mark, centred in the plot for a gap column */}
+              {b.surprise != null && slot >= 34 && (
+                <text
+                  x={center}
+                  y={18}
+                  fontSize={12}
+                  fontWeight={600}
+                  fill={dotColor}
+                  textAnchor="middle"
+                >
+                  {growthFmt(b.surprise)}
+                </text>
+              )}
+              {b.actual != null && (
+                <>
+                  <circle
+                    cx={center}
+                    cy={y(b.actual)}
+                    r={6}
+                    fill={dotColor}
+                    stroke={surface}
+                    strokeWidth={2.5}
+                  />
+                  {showBarLabel(i) && (
+                    <text
+                      x={center}
+                      y={y(b.actual) - 12}
+                      fontSize={14}
+                      fontWeight={600}
+                      fill={dotColor}
+                      textAnchor="middle"
+                    >
+                      {barFmt(b.actual)}
+                    </text>
+                  )}
+                </>
+              )}
+              {/* a labelled gap so a missing quarter reads as missing, not zero */}
               {isGap && (
                 <text
                   x={center}
                   y={pad.top + (H - pad.top - pad.bottom) / 2}
-                  fontSize={15}
+                  fontSize={13}
                   fill={axis}
                   textAnchor="middle"
                   dominantBaseline="middle"
                 >
-                  —
+                  no data
                 </text>
               )}
-              {/* quarter label + the reported value (or "no data") beneath it.
-                  The label thins out on a tight axis (showBarLabel); the value
-                  stays under every bar. */}
               {showBarLabel(i) && (
                 <text
                   x={center}
-                  y={H - 26}
-                  fontSize={11}
+                  y={H - 12}
+                  fontSize={13}
                   fill={axis}
                   textAnchor="middle"
                 >
                   {b.label}
                 </text>
               )}
-              <text
-                x={center}
-                y={H - 12}
-                fontSize={isGap ? 9 : 11}
-                fontWeight={isGap ? 400 : 600}
-                fill={isGap ? axis : actColor}
-                textAnchor="middle"
-              >
-                {isGap ? 'no data' : b.actual != null ? barFmt(b.actual) : ''}
-              </text>
             </g>
           )
         })}
 
-        {/* forward "expected" columns: analyst consensus for upcoming quarters */}
+        {/* forward consensus points: a hollow dot, the target above it, and the
+            growth the consensus implies beneath. */}
         {viewForecasts.map((f, k) => {
           const e = f.estimate
           if (e == null) return null
           const center = cx(fcIndex + k)
-          const top = Math.min(y(e), zeroY)
-          const h = Math.max(1, Math.abs(y(e) - zeroY))
+          const py = y(e)
           return (
             <g key={f.key}>
-              {/* forecast bar: faint accent fill + dashed outline */}
-              <rect
-                x={center - barW / 2}
-                y={top}
-                width={barW}
-                height={h}
-                rx={2}
-                fill={forecast}
-                fillOpacity={0.18}
+              <circle
+                cx={center}
+                cy={py}
+                r={5.5}
+                fill={surface}
                 stroke={forecast}
-                strokeWidth={1.25}
-                strokeDasharray="3 2"
+                strokeWidth={2.5}
               />
-              {/* fiscal label + the consensus target beneath it, mirroring the
-                  reported columns (value under the quarter) */}
               <text
                 x={center}
-                y={H - 26}
-                fontSize={11}
-                fill={forecast}
-                textAnchor="middle"
-              >
-                {f.label}
-              </text>
-              <text
-                x={center}
-                y={H - 12}
-                fontSize={11}
-                fontWeight={600}
+                y={py - 12}
+                fontSize={13}
                 fill={forecast}
                 textAnchor="middle"
               >
                 {barFmt(e)}
               </text>
-              {/* the YoY growth the consensus implies vs. a year earlier */}
+              <text
+                x={center}
+                y={H - 12}
+                fontSize={13}
+                fill={forecast}
+                textAnchor="middle"
+              >
+                {f.label}
+              </text>
               {f.growth != null && (
                 <text
                   x={center}
                   y={H + 2}
-                  fontSize={10}
+                  fontSize={11}
                   fontWeight={500}
                   fill={f.growth >= 0 ? up : down}
                   textAnchor="middle"
@@ -953,7 +1021,7 @@ function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
             px: 1,
             py: 0.25,
             borderRadius: 1,
-            fontSize: '0.7rem',
+            fontSize: '0.78rem',
             fontWeight: 700,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
@@ -972,7 +1040,7 @@ function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
         </Typography>
       </Stack>
 
-      <Typography sx={{ fontSize: '0.95rem', lineHeight: 1.5 }}>
+      <Typography sx={{ fontSize: '1.15rem', lineHeight: 1.5 }}>
         Reported{' '}
         <Box component="span" sx={{ fontWeight: 700 }}>
           {fmtEps(reported.actual as number)}
@@ -1026,7 +1094,7 @@ function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
               />
             ))}
           </Stack>
-          <Typography variant="body2" color="text.secondary">
+          <Typography sx={{ fontSize: '1rem' }} color="text.secondary">
             Beat estimates in{' '}
             <Box
               component="span"
