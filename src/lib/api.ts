@@ -343,9 +343,9 @@ export interface EmaLine {
 }
 
 /**
- * The EMA overlay for a ticker — one line per requested period (the classic
- * 20/50/200), drawn on the candle chart's price axis. `lines` is in the order
- * the periods were requested.
+ * The EMA overlay for a ticker — one line per requested period (e.g. the
+ * short-term 9/21), drawn on the candle chart's price axis. `lines` is in the
+ * order the periods were requested.
  */
 export interface EmaSeries {
   symbol: string
@@ -1558,8 +1558,8 @@ export async function getSupportLevels(
   return data
 }
 
-/** The default EMA overlay: the classic 20 / 50 / 200-period moving averages. */
-export const DEFAULT_EMA_PERIODS = [20, 50, 200] as const
+/** The default EMA overlay: the short-term 9 / 21-period moving averages. */
+export const DEFAULT_EMA_PERIODS = [9, 21] as const
 
 /**
  * Fetch the EMA overlay for a ticker. Mirrors `getCandles`' window handling
