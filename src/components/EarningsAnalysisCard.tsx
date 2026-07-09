@@ -126,16 +126,27 @@ export default function EarningsAnalysisCard({
                 spacing={1.25}
                 sx={{ alignItems: 'flex-start' }}
               >
+                {/* Center the dot on the first text line: the wrapper is one
+                    line-box tall (body1's 1.5 line-height) and centers the dot
+                    within it, so the two stay aligned at any font size — a fixed
+                    top margin drifts the moment the line-height changes. */}
                 <Box
                   sx={{
-                    mt: '8px',
-                    width: 7,
-                    height: 7,
-                    borderRadius: '50%',
-                    bgcolor: 'primary.main',
                     flexShrink: 0,
+                    height: '1.5em',
+                    display: 'flex',
+                    alignItems: 'center',
                   }}
-                />
+                >
+                  <Box
+                    sx={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: '50%',
+                      bgcolor: 'primary.main',
+                    }}
+                  />
+                </Box>
                 <Typography variant="body1">{highlight}</Typography>
               </Stack>
             ))}
