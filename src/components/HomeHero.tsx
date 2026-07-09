@@ -148,17 +148,7 @@ export default function HomeHero() {
               startIcon={<SearchIcon />}
               sx={{ borderColor: 'divider', color: 'text.primary' }}
             >
-              Search a Stock
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/search"
-              variant="outlined"
-              size="large"
-              startIcon={<SearchIcon />}
-              sx={{ borderColor: 'divider', color: 'text.primary' }}
-            >
-              Search an ETF
+              Search a Stock or ETF
             </Button>
           </Stack>
         </Stack>
