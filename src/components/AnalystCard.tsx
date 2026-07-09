@@ -2,6 +2,7 @@ import {
   Box,
   Card,
   CardContent,
+  Divider,
   Stack,
   Typography,
   useTheme,
@@ -10,10 +11,12 @@ import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
 import TrendingFlatIcon from '@mui/icons-material/TrendingFlat'
 import type { Theme } from '@mui/material/styles'
-import type {
-  AnalystRecommendations,
-  Recommendation,
-  RecommendationTrend,
+import {
+  priceTargetUpside,
+  type AnalystPriceTargets,
+  type AnalystRecommendations,
+  type Recommendation,
+  type RecommendationTrend,
 } from '@/lib/api'
 
 // Amber for the neutral "Hold" call — the theme defines only green (up) and red
@@ -170,10 +173,161 @@ function Legend({ trend }: { trend: RecommendationTrend }) {
   )
 }
 
+/** "$315.57" — a price-target dollar amount, two decimals. */
+function fmtDollars(n: number): string {
+  return `$${n.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+/** A value's position within [low, high] as a clamped 0–100 percent. */
+function rangePct(v: number, low: number, high: number): number {
+  return Math.max(0, Math.min(100, ((v - low) / (high - low)) * 100))
+}
+
+/**
+ * The consensus 12-month price target: the mean target and its upside versus the
+ * live price, over a low→high range bar that marks where the stock trades now
+ * (the dot) against the average target (the tick). Renders nothing without a mean
+ * target; the range bar is skipped when the low/high spread is missing or degenerate.
+ */
+function PriceTargets({
+  targets,
+  price,
+}: {
+  targets: AnalystPriceTargets
+  price: number | null
+}) {
+  const mean = targets.mean
+  if (mean == null) return null
+  const upside = priceTargetUpside(targets, price)
+  const upColor =
+    upside == null
+      ? 'text.secondary'
+      : upside >= 0
+        ? 'success.main'
+        : 'error.main'
+  const low = targets.low
+  const high = targets.high
+
+  return (
+    <Box sx={{ mt: 2.5 }}>
+      <Divider sx={{ mb: 2 }} />
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+      >
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'text.secondary',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          12-Month Price Target
+        </Typography>
+        {upside != null && (
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 700,
+              color: upColor,
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {upside >= 0 ? '+' : ''}
+            {upside.toFixed(1)}% upside
+          </Typography>
+        )}
+      </Stack>
+
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ mt: 0.5, alignItems: 'baseline' }}
+      >
+        <Typography
+          variant="h5"
+          sx={{ fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+        >
+          {fmtDollars(mean)}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          avg target{price != null ? ` · now ${fmtDollars(price)}` : ''}
+        </Typography>
+      </Stack>
+
+      {low != null && high != null && high > low && (
+        <Box sx={{ mt: 2 }}>
+          <Box
+            role="img"
+            aria-label={`Price target range ${fmtDollars(low)} to ${fmtDollars(
+              high,
+            )}, average ${fmtDollars(mean)}`}
+            sx={{
+              position: 'relative',
+              height: 8,
+              borderRadius: 1,
+              bgcolor: 'action.hover',
+            }}
+          >
+            {/* Average-target tick. */}
+            <Box
+              sx={{
+                position: 'absolute',
+                left: `${rangePct(mean, low, high)}%`,
+                top: -2,
+                bottom: -2,
+                width: 3,
+                transform: 'translateX(-50%)',
+                borderRadius: 1,
+                bgcolor: 'success.main',
+              }}
+            />
+            {/* Current-price marker. */}
+            {price != null && (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  left: `${rangePct(price, low, high)}%`,
+                  top: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  width: 10,
+                  height: 10,
+                  borderRadius: '50%',
+                  bgcolor: 'text.primary',
+                  border: '2px solid',
+                  borderColor: 'background.paper',
+                }}
+              />
+            )}
+          </Box>
+          <Stack
+            direction="row"
+            sx={{ mt: 0.75, justifyContent: 'space-between' }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Low {fmtDollars(low)}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              High {fmtDollars(high)}
+            </Typography>
+          </Stack>
+        </Box>
+      )}
+    </Box>
+  )
+}
+
 export default function AnalystCard({
   recommendations,
+  price = null,
 }: {
   recommendations: AnalystRecommendations
+  price?: number | null
 }) {
   const latest = recommendations.latest
   const consensus = latest?.consensus ?? null
@@ -258,6 +412,12 @@ export default function AnalystCard({
                   {direction.text}
                 </Typography>
               </Stack>
+            )}
+            {recommendations.price_targets && (
+              <PriceTargets
+                targets={recommendations.price_targets}
+                price={price}
+              />
             )}
           </>
         ) : (

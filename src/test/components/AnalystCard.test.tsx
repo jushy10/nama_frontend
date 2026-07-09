@@ -40,7 +40,13 @@ const base: AnalystRecommendations = {
   count: 2,
   direction: 'upgraded',
   latest: trend({ strong_buy: 13, buy: 24, hold: 7 }, 'Buy', 1.86),
+  price_targets: null,
   trends: [],
+}
+
+const withTargets: AnalystRecommendations = {
+  ...base,
+  price_targets: { mean: 315, high: 400, low: 215, median: 315 },
 }
 
 describe('AnalystCard', () => {
@@ -97,10 +103,42 @@ describe('AnalystCard', () => {
       count: 0,
       direction: null,
       latest: null,
+      price_targets: null,
       trends: [],
     }
     renderWithProviders(<AnalystCard recommendations={recs} />)
     expect(screen.getByText(/no analyst coverage/i)).toBeInTheDocument()
     expect(screen.queryByText('Consensus')).not.toBeInTheDocument()
+  })
+
+  it('shows the price target with upside against the live price', () => {
+    renderWithProviders(
+      <AnalystCard recommendations={withTargets} price={300} />,
+    )
+    expect(screen.getByText('12-Month Price Target')).toBeInTheDocument()
+    expect(screen.getByText('$315.00')).toBeInTheDocument() // the mean target
+    // (315 - 300) / 300 = +5.0%
+    expect(screen.getByText(/\+5\.0% upside/)).toBeInTheDocument()
+    expect(screen.getByText(/Low \$215\.00/)).toBeInTheDocument()
+    expect(screen.getByText(/High \$400\.00/)).toBeInTheDocument()
+  })
+
+  it('shows a negative upside when the price is above the mean target', () => {
+    renderWithProviders(
+      <AnalystCard recommendations={withTargets} price={350} />,
+    )
+    // (315 - 350) / 350 = -10.0%
+    expect(screen.getByText(/-10\.0% upside/)).toBeInTheDocument()
+  })
+
+  it('shows the target without an upside when no price is supplied', () => {
+    renderWithProviders(<AnalystCard recommendations={withTargets} />)
+    expect(screen.getByText('$315.00')).toBeInTheDocument()
+    expect(screen.queryByText(/upside/)).not.toBeInTheDocument()
+  })
+
+  it('omits the price target section when there are no targets', () => {
+    renderWithProviders(<AnalystCard recommendations={base} price={300} />)
+    expect(screen.queryByText('12-Month Price Target')).not.toBeInTheDocument()
   })
 })

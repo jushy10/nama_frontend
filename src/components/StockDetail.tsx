@@ -232,7 +232,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             </Alert>
           )}
           {recommendationsQuery.data && (
-            <AnalystCard recommendations={recommendationsQuery.data} />
+            <AnalystCard
+              recommendations={recommendationsQuery.data}
+              price={stock.price}
+            />
           )}
 
           <Card variant="outlined" sx={{ borderColor: 'divider' }}>
