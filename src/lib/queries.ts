@@ -24,6 +24,7 @@ import {
   getEtfDetail,
   getIndustryValuation,
   getQuarterlyEarnings,
+  getMarketSummary,
   getRecommendations,
   getRsi,
   getScreener,
@@ -48,6 +49,7 @@ import {
   type EtfSearchSort,
   type IndustryValuation,
   type MarketCapTier,
+  type MarketSummary,
   type QuarterlyEarnings,
   type Quote,
   type RsiSeries,
@@ -341,6 +343,21 @@ export function useSectorAnalysis(): UseQueryResult<SectorAnalysis> {
   return useQuery({
     queryKey: ['sector-analysis'],
     queryFn: ({ signal }) => getSectorAnalysis(signal),
+    staleTime: 15 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * The AI overview of how the US market has moved over the past year, month and
+ * week. Regenerated at most every ~15 min and metered, so — like the sector read
+ * — keep it stale-tolerant and don't retry: a 502/503 (model briefly unavailable
+ * or not configured) just leaves the widget hidden.
+ */
+export function useMarketSummary(): UseQueryResult<MarketSummary> {
+  return useQuery({
+    queryKey: ['market-summary'],
+    queryFn: ({ signal }) => getMarketSummary(signal),
     staleTime: 15 * 60 * 1000,
     retry: false,
   })
