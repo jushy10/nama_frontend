@@ -30,6 +30,7 @@ import {
   useSupportLevels,
   useTickerCard,
 } from '@/lib/queries'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
 import AnalysisCard from '@/components/AnalysisCard'
 import StockCard from '@/components/StockCard'
 import PerformanceCard from '@/components/PerformanceCard'
@@ -204,6 +205,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                   spacing={1}
                   sx={{ alignItems: 'baseline' }}
                 >
+                  <ShowChartIcon
+                    fontSize="small"
+                    sx={{ color: 'primary.main', alignSelf: 'center' }}
+                  />
                   <Typography
                     variant="h6"
                     component="h2"

@@ -3,6 +3,7 @@ import { Box, Button, Container, Stack, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import TableRowsIcon from '@mui/icons-material/TableRows'
 import { marketLabel } from '@/lib/market'
+import { heroWash } from '@/components/heroWash'
 
 /** Today, spelled out (e.g. "Thursday, July 9") for the hero eyebrow. */
 function todayLabel(now: Date): string {
@@ -28,12 +29,8 @@ export default function HomeHero() {
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        // A soft blue→gold wash over the canvas — brighter in dark, gentle
-        // in light so text stays legible either way.
-        background: (theme) =>
-          theme.palette.mode === 'dark'
-            ? 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.22), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.14), transparent 55%)'
-            : 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.12), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.09), transparent 55%)',
+        // The blue→gold wash, shared with the stock-detail hero cards.
+        background: (theme) => heroWash(theme),
       }}
     >
       <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 8 } }}>

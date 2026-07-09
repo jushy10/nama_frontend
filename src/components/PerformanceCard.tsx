@@ -1,5 +1,7 @@
 import { Box, Card, CardContent, Typography } from '@mui/material'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import { PERF_WINDOWS, type StockPerformance } from '@/lib/api'
+import SectionHeading from '@/components/SectionHeading'
 
 /** Signed percent for directional figures (returns/changes). */
 const fmtPct = (n: number | null) =>
@@ -62,9 +64,11 @@ export default function PerformanceCard({
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
       <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-          Performance
-        </Typography>
+        <SectionHeading
+          icon={<TrendingUpIcon fontSize="small" />}
+          title="Performance"
+          subtitle="Trailing total return by window"
+        />
         <Box
           sx={{
             mt: 2,
