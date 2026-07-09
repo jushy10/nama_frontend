@@ -1,4 +1,5 @@
 import { Box, Container } from '@mui/material'
+import HomeHero from '@/components/HomeHero'
 import MarketIndices from '@/components/MarketIndices'
 import MarketSummary from '@/components/MarketSummary'
 import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
@@ -6,14 +7,17 @@ import SectorPulse from '@/components/SectorPulse'
 import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
 
 /**
- * Home dashboard: the AI market summary and the sector-pulse read shown side by
- * side (they stack on narrow screens), then the day's index strip.
+ * Home dashboard, read top to bottom as one story: a hero intro, then the day's
+ * live index moves (what's happening now), the AI market + sector reads (what it
+ * means), and finally the mega-cap growth leaders (where to look). Every band
+ * shares the same `lg` width and vertical rhythm so the page reads as one system,
+ * and each stacks cleanly on phones.
  *
- * Both reads are best-effort. Each card is gated on its own query, so if one
- * model read fails the survivor flexes to the full width; the shared band drops
- * out only when both are gone. (The hooks are also called inside each card —
- * React Query dedupes by key, so this reads the same cached result, not a second
- * fetch.)
+ * The two AI reads are best-effort and side by side. Each is gated on its own
+ * query, so if one model read fails the survivor flexes to the full width; the
+ * shared band drops out only when both are gone. (The hooks are also called
+ * inside each card — React Query dedupes by key, so this reads the same cached
+ * result, not a second fetch.)
  */
 function Home() {
   const marketFailed = useMarketSummary().isError
@@ -21,6 +25,10 @@ function Home() {
 
   return (
     <>
+      <HomeHero />
+
+      <MarketIndices />
+
       {(!marketFailed || !sectorFailed) && (
         <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
           <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
@@ -46,8 +54,8 @@ function Home() {
           </Container>
         </Box>
       )}
+
       <MegaCapGrowthLeaders />
-      <MarketIndices />
     </>
   )
 }
