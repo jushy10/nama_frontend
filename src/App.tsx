@@ -85,8 +85,19 @@ function Brand({ large = false }: { large?: boolean }) {
           }),
         }}
       >
-        Nama{' '}
-        <Box component="span" sx={{ color: 'primary.light' }}>
+        <Box
+          component="span"
+          sx={{
+            // Exact logo navy on light; lifted blue on dark for legibility.
+            color: (theme) =>
+              theme.palette.mode === 'dark'
+                ? theme.palette.primary.light
+                : theme.palette.primary.dark,
+          }}
+        >
+          Nama
+        </Box>{' '}
+        <Box component="span" sx={{ color: 'secondary.main' }}>
           Insights
         </Box>
       </Typography>
@@ -98,7 +109,7 @@ function Brand({ large = false }: { large?: boolean }) {
  * Two hand-drawn, universally-read glyphs — a Sun over the daytime half of the
  * market (pre-market into the regular session) and a Moon over the evening/
  * overnight half (after-hours into closed). The colour carries the finer read
- * across a warming-then-cooling arc: dawn amber → bright sun → dusk indigo →
+ * across a warming-then-cooling arc: dawn amber → bright sun → dusk blue →
  * muted moon. Filled + coloured, so they never read as a second copy of the
  * outlined light/dark toggle sitting at the other end of the bar.
  */
@@ -108,7 +119,7 @@ const PHASE_UI: Record<
 > = {
   pre: { icon: SunIcon, color: '#fbbf24' },
   regular: { icon: SunIcon, color: '#f59e0b' },
-  after: { icon: MoonIcon, color: '#818cf8' },
+  after: { icon: MoonIcon, color: '#7aa5f2' },
   closed: { icon: MoonIcon, color: 'text.secondary' },
 }
 
@@ -330,7 +341,7 @@ function App() {
                 color: 'text.secondary',
                 '&.active': {
                   color: 'text.primary',
-                  bgcolor: 'rgba(99,102,241,0.12)',
+                  bgcolor: 'rgba(47,99,180,0.12)',
                 },
               }}
             >

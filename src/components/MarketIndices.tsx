@@ -25,7 +25,6 @@ const INDICES: QuoteDef[] = [
   { label: 'S&P 500', symbol: 'SPY' },
   { label: 'Nasdaq 100', symbol: 'QQQ' },
   { label: 'Dow Jones', symbol: 'DIA' },
-  { label: 'Russell 2000', symbol: 'IWM' },
 ]
 
 /**

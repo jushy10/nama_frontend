@@ -88,7 +88,7 @@ export default function SectorCard({
         cursor: 'pointer',
         borderColor: 'divider',
         transition: 'border-color 150ms',
-        '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
+        '&:hover': { borderColor: 'rgba(47,99,180,0.4)' },
         '&:focus-visible': {
           outline: '2px solid',
           outlineColor: 'primary.main',
@@ -121,7 +121,7 @@ export default function SectorCard({
               sx={{
                 width: 40,
                 height: 40,
-                bgcolor: 'rgba(99,102,241,0.12)',
+                bgcolor: 'rgba(47,99,180,0.12)',
                 color: 'primary.light',
                 flexShrink: 0,
               }}
@@ -183,9 +183,9 @@ export default function SectorCard({
         <Box
           sx={{
             borderRadius: 2,
-            bgcolor: 'rgba(99,102,241,0.08)',
+            bgcolor: 'rgba(47,99,180,0.08)',
             border: 1,
-            borderColor: 'rgba(99,102,241,0.25)',
+            borderColor: 'rgba(47,99,180,0.25)',
             px: 2,
             py: 1.5,
           }}

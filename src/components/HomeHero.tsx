@@ -9,7 +9,7 @@ import { getMarketStatus, marketLabel, type MarketPhase } from '@/lib/market'
 const PHASE_DOT: Record<MarketPhase, string> = {
   pre: '#fbbf24',
   regular: '#34d399',
-  after: '#818cf8',
+  after: '#7aa5f2',
   closed: '#9ca3af',
 }
 
@@ -38,12 +38,12 @@ export default function HomeHero() {
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        // A soft indigo→purple wash over the canvas — brighter in dark, gentle
+        // A soft blue→gold wash over the canvas — brighter in dark, gentle
         // in light so text stays legible either way.
         background: (theme) =>
           theme.palette.mode === 'dark'
-            ? 'radial-gradient(1100px 380px at 15% -20%, rgba(99,102,241,0.22), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(168,85,247,0.14), transparent 55%)'
-            : 'radial-gradient(1100px 380px at 15% -20%, rgba(99,102,241,0.12), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(168,85,247,0.09), transparent 55%)',
+            ? 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.22), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.14), transparent 55%)'
+            : 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.12), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.09), transparent 55%)',
       }}
     >
       <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 8 } }}>
@@ -104,7 +104,7 @@ export default function HomeHero() {
             <Box
               component="span"
               sx={{
-                background: 'linear-gradient(90deg, #818cf8 0%, #a855f7 100%)',
+                background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
                 backgroundClip: 'text',
@@ -138,7 +138,7 @@ export default function HomeHero() {
               size="large"
               startIcon={<TableRowsIcon />}
             >
-              Open the screener
+              Open the Screener
             </Button>
             <Button
               component={RouterLink}
@@ -148,7 +148,17 @@ export default function HomeHero() {
               startIcon={<SearchIcon />}
               sx={{ borderColor: 'divider', color: 'text.primary' }}
             >
-              Search a stock
+              Search a Stock
+            </Button>
+            <Button
+              component={RouterLink}
+              to="/search"
+              variant="outlined"
+              size="large"
+              startIcon={<SearchIcon />}
+              sx={{ borderColor: 'divider', color: 'text.primary' }}
+            >
+              Search an ETF
             </Button>
           </Stack>
         </Stack>

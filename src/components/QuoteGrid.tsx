@@ -36,7 +36,7 @@ const TILE_SX = {
   color: 'inherit',
   textDecoration: 'none',
   transition: 'border-color 150ms',
-  '&:hover': { borderColor: 'rgba(99,102,241,0.4)' },
+  '&:hover': { borderColor: 'rgba(47,99,180,0.4)' },
 } as const
 
 function QuoteTile({
