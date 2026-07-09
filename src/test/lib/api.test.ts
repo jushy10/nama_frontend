@@ -4,6 +4,7 @@ import {
   clampToRegularHours,
   defaultTimeframe,
   getCandles,
+  getEma,
   getEtfAnalysis,
   getIndustryValuation,
   getStockAnalysis,
@@ -531,6 +532,63 @@ describe('getSupportLevels', () => {
     await expect(getSupportLevels('ZZZZ')).rejects.toThrow(
       /No stock data found/,
     )
+  })
+})
+
+describe('getEma', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the default 20/50/200 periods over the chart range', async () => {
+    let requestedUrl = ''
+    const body = {
+      symbol: 'AAPL',
+      timeframe: '1Day',
+      lines: [
+        { period: 20, count: 1, latest: 201.1, points: [] },
+        { period: 50, count: 1, latest: 195.4, points: [] },
+        { period: 200, count: 0, latest: null, points: [] },
+      ],
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getEma('AAPL', { range: '6M' })
+
+    expect(requestedUrl).toContain('/stocks/ticker/AAPL/ema')
+    // Same window handling as getCandles so the points share the candles' bars.
+    expect(requestedUrl).toContain('timeframe=1Day')
+    expect(requestedUrl).toContain('range=6M')
+    // One repeated `period` param per requested line.
+    expect(requestedUrl).toContain('period=20')
+    expect(requestedUrl).toContain('period=50')
+    expect(requestedUrl).toContain('period=200')
+    expect(result.lines.map((l) => l.period)).toEqual([20, 50, 200])
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () =>
+            Promise.resolve({
+              detail: "No stock data found for symbol 'ZZZZ'.",
+            }),
+        }),
+      ),
+    )
+    await expect(getEma('ZZZZ')).rejects.toThrow(/No stock data found/)
   })
 })
 
