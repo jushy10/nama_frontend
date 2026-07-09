@@ -25,6 +25,7 @@ import {
   useFiveYearReturn,
   useIndustryValuation,
   useQuarterlyEarnings,
+  useRatingChanges,
   useRecommendations,
   useStockAnalysis,
   useSupportLevels,
@@ -41,6 +42,7 @@ import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
+import RatingChangesCard from '@/components/RatingChangesCard'
 import EarningsCard from '@/components/EarningsCard'
 
 // The card carries everything the stock detail draws off in one request: the
@@ -83,6 +85,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const supportQuery = useSupportLevels(loadedSymbol)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const recommendationsQuery = useRecommendations(loadedSymbol)
+  const ratingChangesQuery = useRatingChanges(loadedSymbol)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
   // The AI take is the slowest read (a live model call), so it rides the loaded
@@ -237,6 +240,14 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               price={stock.price}
             />
           )}
+
+          {/* The upgrade/downgrade feed — best-effort enrichment that self-hides
+              when there are no events (or the fetch fails), so it never shows an
+              empty card. */}
+          {ratingChangesQuery.data &&
+            ratingChangesQuery.data.changes.length > 0 && (
+              <RatingChangesCard ratingChanges={ratingChangesQuery.data} />
+            )}
 
           <Card variant="outlined" sx={{ borderColor: 'divider' }}>
             <CardContent sx={{ p: { xs: 2, sm: 3 } }}>

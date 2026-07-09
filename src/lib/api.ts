@@ -1828,6 +1828,54 @@ export async function getRecommendations(
 }
 
 /**
+ * One published sell-side rating action — the discrete event behind the monthly
+ * trend. `firm` and `published_at` identify it; `action` is Yahoo's grade action
+ * (`up`/`down`/`init`/`main`/`reit`), `from_grade`→`to_grade` the move, and
+ * `target_current`/`target_prior` the price target it set versus the one it replaced
+ * (any null when the source omits it). `is_upgrade`/`is_downgrade` are the derived
+ * direction, served so a client doesn't re-derive them from `action`.
+ */
+export interface RatingChange {
+  firm: string
+  published_at: string // ISO date the action was published
+  action: string | null
+  from_grade: string | null
+  to_grade: string | null
+  target_current: number | null
+  target_prior: number | null
+  is_upgrade: boolean
+  is_downgrade: boolean
+}
+
+/**
+ * A stock's individual analyst rating actions, newest first — the upgrade/downgrade
+ * feed that, aggregated by month, becomes the recommendation trend. `count` is how
+ * many events are returned; an empty `changes` means the source publishes none.
+ */
+export interface AnalystRatingChanges {
+  symbol: string
+  count: number
+  changes: RatingChange[]
+}
+
+/** Fetch a ticker's analyst rating actions (upgrades/downgrades), newest first. */
+export async function getRatingChanges(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<AnalystRatingChanges> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/rating-changes`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AnalystRatingChanges
+  if (!Array.isArray(data?.changes)) {
+    throw new ApiError(res.status, 'Malformed rating-changes response')
+  }
+  return data
+}
+
+/**
  * The AI analysis's headline call — a plain buy / hold / sell verdict. Lowercase
  * to match the API's JSON, and deliberately distinct from the five-step sell-side
  * `Recommendation` (Strong Buy … Strong Sell) so the AI read and the analyst
