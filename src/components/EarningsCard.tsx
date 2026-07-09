@@ -26,7 +26,10 @@ import type {
   NextEarnings,
   QuarterlyEarnings,
 } from '@/lib/api'
+import BarChartIcon from '@mui/icons-material/BarChart'
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import { ForwardPeSection } from '@/components/ForwardPeSection'
+import { heroWash } from '@/components/heroWash'
 
 // The plot's viewBox WIDTH tracks the measured container width (so 1 unit ≈ 1px
 // and text stays legible at any size — crucial on mobile), while the height is
@@ -1154,7 +1157,16 @@ export default function EarningsCard({
   )
 
   return (
-    <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+    <Card
+      variant="outlined"
+      sx={{
+        position: 'relative',
+        overflow: 'hidden',
+        borderColor: 'divider',
+        // The home-page blue→gold wash, so the earnings tab reads as a hero.
+        backgroundImage: (theme) => heroWash(theme),
+      }}
+    >
       <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
@@ -1162,10 +1174,13 @@ export default function EarningsCard({
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
           <Box>
-            <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-              Earnings
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <BarChartIcon fontSize="small" sx={{ color: 'primary.main' }} />
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                Earnings
+              </Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {isAnnual
                 ? hasRevenue
                   ? 'Annual EPS & revenue by fiscal year'
@@ -1184,26 +1199,48 @@ export default function EarningsCard({
                 // below the title, so left-align it there instead of stranding
                 // the date at the far edge.
                 textAlign: { xs: 'left', sm: 'right' },
-                borderRadius: 1.5,
+                borderRadius: 2,
                 px: 2,
                 py: 1.25,
-                bgcolor: 'action.hover',
+                // A gold-tinted "next report" chip — the brand's second accent,
+                // set off from the blue-led heading beside it.
+                bgcolor: (theme) => alpha(theme.palette.secondary.main, 0.12),
+                border: '1px solid',
+                borderColor: (theme) =>
+                  alpha(theme.palette.secondary.main, 0.35),
               }}
             >
-              <Typography
-                variant="caption"
+              <Stack
+                direction="row"
+                spacing={0.5}
                 sx={{
-                  color: 'text.secondary',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  display: 'block',
-                  fontSize: '0.7rem',
+                  alignItems: 'center',
+                  justifyContent: { xs: 'flex-start', sm: 'flex-end' },
                 }}
               >
-                Next report
-              </Typography>
+                <CalendarMonthIcon
+                  sx={{ fontSize: 14, color: 'secondary.main' }}
+                />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'secondary.main',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.05em',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                  }}
+                >
+                  Next report
+                </Typography>
+              </Stack>
               <Typography
-                sx={{ fontWeight: 700, fontSize: '1.35rem', lineHeight: 1.3 }}
+                sx={{
+                  fontWeight: 700,
+                  fontSize: '1.35rem',
+                  lineHeight: 1.3,
+                  mt: 0.25,
+                }}
               >
                 {fmtReportDate(nextRpt.report_date)}
               </Typography>

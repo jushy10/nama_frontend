@@ -13,6 +13,7 @@ import {
   stockLogoUrl,
   type TickerCard,
 } from '@/lib/api'
+import { heroWash } from '@/components/heroWash'
 
 const fmt = (n: number | null) =>
   n == null
@@ -112,10 +113,15 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
     <Card
       variant="outlined"
       sx={{
+        position: 'relative',
+        overflow: 'hidden',
         borderColor: 'divider',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
+        // The home-page blue→gold wash, so the identity card reads as this
+        // page's hero rather than one more flat panel.
+        backgroundImage: (theme) => heroWash(theme),
       }}
     >
       <CardContent
