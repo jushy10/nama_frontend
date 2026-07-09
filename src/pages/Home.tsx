@@ -1,6 +1,7 @@
 import { Box, Container } from '@mui/material'
 import MarketIndices from '@/components/MarketIndices'
 import MarketSummary from '@/components/MarketSummary'
+import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
 import SectorPulse from '@/components/SectorPulse'
 import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
 
@@ -45,6 +46,7 @@ function Home() {
           </Container>
         </Box>
       )}
+      <MegaCapGrowthLeaders />
       <MarketIndices />
     </>
   )
