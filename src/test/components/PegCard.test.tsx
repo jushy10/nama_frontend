@@ -12,8 +12,9 @@ describe('PegCard', () => {
     ).toBeInTheDocument()
     expect(screen.getByText('Cheap for Its Growth')).toBeInTheDocument()
     expect(screen.getByText(/price looks cheap/i)).toBeInTheDocument()
-    // The bases are disclosed: reported growth trailing, consensus forward.
-    expect(screen.getByText(/growth analysts expect/i)).toBeInTheDocument()
+    // The bases are disclosed on the readings themselves: reported growth
+    // trailing, expected EPS growth forward.
+    expect(screen.getByText(/expected EPS growth/i)).toBeInTheDocument()
   })
 
   it('calls the 1–2 middle Fairly Priced', () => {

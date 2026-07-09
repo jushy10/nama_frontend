@@ -1,5 +1,6 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import { pegVerdict, type PegVerdict } from '@/lib/api'
+import InfoHint from '@/components/InfoHint'
 
 // Amber for the unremarkable 1–2 middle — matches the Profitability card's
 // cautionary tier, the shared amber the verdict cards use for a neutral call.
@@ -345,9 +346,12 @@ export default function PegCard({
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
           <Box>
-            <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-              PEG Ratio
-            </Typography>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                PEG Ratio
+              </Typography>
+              <InfoHint title="Trailing uses the past year's reported EPS growth; forward uses the growth analysts expect for next fiscal year (FY1 → FY2). A rough guide that varies by sector." />
+            </Stack>
             <Typography variant="caption" color="text.secondary">
               P/E ÷ EPS growth — trailing &amp; forward
             </Typography>
@@ -436,16 +440,6 @@ export default function PegCard({
                 {compare && ` ${compare}`}
               </Typography>
             )}
-
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              sx={{ display: 'block', mt: 1 }}
-            >
-              Trailing uses the past year's reported EPS growth; forward uses
-              the growth analysts expect for next fiscal year (FY1 → FY2). A
-              rough guide that varies by sector.
-            </Typography>
           </>
         )}
       </CardContent>

@@ -6,6 +6,7 @@ import {
   type IndustryPeStance,
   type IndustryValuation,
 } from '@/lib/api'
+import InfoHint from '@/components/InfoHint'
 
 // Cheaper-than-peers reads green, in-line amber, pricier red — the same
 // valuation palette the PEG card uses, so "green = cheap" stays consistent down
@@ -350,11 +351,14 @@ export default function IndustryPeCard({
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
           <Box>
-            <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-              Industry P/E
-            </Typography>
+            <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+              <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
+                Industry P/E
+              </Typography>
+              <InfoHint title="The median trailing P/E of same-industry peers with a positive multiple. A rough guide — a higher or lower P/E than peers can reflect faster or slower growth, not just a richer or cheaper price." />
+            </Stack>
             <Typography variant="caption" color="text.secondary">
-              Trailing multiple vs. {label} peers
+              Trailing multiple vs. {count} {label} peers
             </Typography>
           </Box>
 
@@ -427,17 +431,6 @@ export default function IndustryPeCard({
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
           {comparisonLine(stockPe, median_pe, label, stance)}
-        </Typography>
-
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: 'block', mt: 1 }}
-        >
-          Median trailing P/E across {count} {count === 1 ? 'peer' : 'peers'}{' '}
-          with a positive multiple in the same industry. A rough guide — a
-          higher or lower P/E than peers can reflect faster or slower growth,
-          not just a richer or cheaper price.
         </Typography>
       </CardContent>
     </Card>
