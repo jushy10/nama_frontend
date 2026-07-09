@@ -140,6 +140,24 @@ describe('Screener', () => {
     )
   })
 
+  it('filters by several sectors at once (repeated sector params)', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // The multi-select stays open across picks, so both sectors land in one go
+    // and ride out as repeated `sector` params (an OR set).
+    await user.click(screen.getByRole('combobox', { name: /sector/i }))
+    await user.click(await screen.findByRole('option', { name: 'Technology' }))
+    await user.click(await screen.findByRole('option', { name: 'Energy' }))
+
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/sector=technology/)
+      expect(url).toMatch(/sector=energy/)
+    })
+  })
+
   it('filters by index membership', async () => {
     const calls = stubApi()
     const { user } = renderWithProviders(<Screener />)

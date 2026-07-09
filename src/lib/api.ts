@@ -922,22 +922,24 @@ export interface StockSearchResponse {
 /**
  * Search/filter/sort the screened ≥$1B US universe (`GET /stocks/ticker`). `q`
  * matches (case-insensitive substring) the company name OR ticker, so "NV"
- * surfaces Nvidia and NVDA; `sector`/`industry` take a classification slug (or a
- * raw label — the API slugifies it); `inSp500`/`inNasdaq100` narrow to index
- * members; `marketCap` narrows to one cap tier (mega/large/mid/small). `sort`
- * (default market cap, a trailing or forward growth metric, or a `growth`/
- * `forward_growth` blend) and `order` (default desc) order the page;
- * `limit`/`offset` window it. Only screened stocks are returned, so every row
- * carries a market cap.
+ * surfaces Nvidia and NVDA; `sectors`/`industries` each take one or more
+ * classification slugs (or raw labels — the API slugifies them) and match ANY of
+ * them (an OR set), while the two axes AND together; `inSp500`/`inNasdaq100`
+ * narrow to index members; `marketCaps` narrows to the union of one or more cap
+ * tiers (mega/large/mid/small). `sort` (default market cap, a trailing or forward
+ * growth metric, or a `growth`/`forward_growth` blend) and `order` (default desc)
+ * order the page; `limit`/`offset` window it. Each filter is sent as a repeated
+ * query param (`?sector=a&sector=b`). Only screened stocks are returned, so every
+ * row carries a market cap.
  */
 export async function searchStocks(
   opts: {
     q?: string | null
-    sector?: string | null
-    industry?: string | null
+    sectors?: string[] | null
+    industries?: string[] | null
     inSp500?: boolean | null
     inNasdaq100?: boolean | null
-    marketCap?: MarketCapTier | null
+    marketCaps?: MarketCapTier[] | null
     sort?: StockSearchSort
     order?: SortOrder
     limit?: number
@@ -947,11 +949,11 @@ export async function searchStocks(
 ): Promise<StockSearchResponse> {
   const qs = new URLSearchParams()
   if (opts.q) qs.set('q', opts.q)
-  if (opts.sector) qs.set('sector', opts.sector)
-  if (opts.industry) qs.set('industry', opts.industry)
+  for (const s of opts.sectors ?? []) qs.append('sector', s)
+  for (const i of opts.industries ?? []) qs.append('industry', i)
   if (opts.inSp500) qs.set('in_sp500', 'true')
   if (opts.inNasdaq100) qs.set('in_nasdaq100', 'true')
-  if (opts.marketCap) qs.set('market_cap', opts.marketCap)
+  for (const t of opts.marketCaps ?? []) qs.append('market_cap', t)
   if (opts.sort) qs.set('sort', opts.sort)
   if (opts.order) qs.set('order', opts.order)
   if (opts.limit != null) qs.set('limit', String(opts.limit))
@@ -992,21 +994,24 @@ export async function getClassifications(
 }
 
 /**
- * A sort key for the ETF universe search. Only two columns rank a fund on a
- * number: `net_assets` (assets under management — the "top ETFs" default) and
- * `expense_ratio` (the annual fee — pair with an ascending order for the cheapest
- * first). Category is a filter, not a sort — it's a label, not a magnitude.
+ * A sort key for the ETF universe search. Three columns rank a fund on a number:
+ * `net_assets` (assets under management — the "top ETFs" default), `expense_ratio`
+ * (the annual fee — pair with an ascending order for the cheapest first), and
+ * `dividend_yield` (the trailing distribution yield — descending surfaces the
+ * highest-income funds). Category is a filter, not a sort — it's a label, not a
+ * magnitude.
  */
-export type EtfSearchSort = 'net_assets' | 'expense_ratio'
+export type EtfSearchSort = 'net_assets' | 'expense_ratio' | 'dividend_yield'
 
 /**
  * One row of an ETF universe search (`GET /stocks/etfs`) — the screened fund's
  * stored facts, with no live price (the search is a single DB read; open the row
  * for a live quote). `net_assets` is raw USD (assets under management, the ETF
  * analogue of a stock's market cap); `expense_ratio` is the annual fee as a
- * percent (`0.03` = 0.03%). `category` is the fund's snake_case Yahoo category
- * slug (e.g. `large_growth`). Everything but `ticker` may be null until the sync
- * enriches the fund.
+ * percent (`0.03` = 0.03%); `dividend_yield` is the trailing distribution yield
+ * as a percent (`1.03` = 1.03%). `category` is the fund's snake_case Yahoo
+ * category slug (e.g. `large_growth`). Everything but `ticker` may be null until
+ * the sync enriches the fund (a non-distributing fund keeps a null yield).
  */
 export interface EtfSearchResult {
   ticker: string
@@ -1015,6 +1020,7 @@ export interface EtfSearchResult {
   net_assets: number | null
   expense_ratio: number | null
   category: string | null
+  dividend_yield: number | null
 }
 
 /**
@@ -1033,14 +1039,16 @@ export interface EtfSearchResponse {
 /**
  * Search/filter/sort the screened top US ETF universe (`GET /stocks/etfs`). `q`
  * matches (case-insensitive substring) the fund name OR ticker, so "gold"
- * surfaces gold-miner funds and "SPY" matches by ticker; `category` takes a
- * category slug (or a raw label — the API slugifies it). `sort` (default net
- * assets) and `order` (default desc) order the page; `limit`/`offset` window it.
+ * surfaces gold-miner funds and "SPY" matches by ticker; `categories` takes one
+ * or more category slugs (or raw labels — the API slugifies them) and matches ANY
+ * of them (an OR set), each sent as a repeated `category` param. `sort` (default
+ * net assets) and `order` (default desc) order the page; `limit`/`offset` window
+ * it.
  */
 export async function searchEtfs(
   opts: {
     q?: string | null
-    category?: string | null
+    categories?: string[] | null
     sort?: EtfSearchSort
     order?: SortOrder
     limit?: number
@@ -1050,7 +1058,7 @@ export async function searchEtfs(
 ): Promise<EtfSearchResponse> {
   const qs = new URLSearchParams()
   if (opts.q) qs.set('q', opts.q)
-  if (opts.category) qs.set('category', opts.category)
+  for (const c of opts.categories ?? []) qs.append('category', c)
   if (opts.sort) qs.set('sort', opts.sort)
   if (opts.order) qs.set('order', opts.order)
   if (opts.limit != null) qs.set('limit', String(opts.limit))
