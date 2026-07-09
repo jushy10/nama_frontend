@@ -2,7 +2,6 @@ import { Link as RouterLink } from 'react-router-dom'
 import { Box, Button, Container, Stack, Typography } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
 import TableRowsIcon from '@mui/icons-material/TableRows'
-import { marketLabel } from '@/lib/market'
 import { heroWash } from '@/components/heroWash'
 
 /** Today, spelled out (e.g. "Thursday, July 9") for the hero eyebrow. */
@@ -35,28 +34,19 @@ export default function HomeHero() {
     >
       <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 8 } }}>
         <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 720 }}>
-          {/* Live status eyebrow: the phase label, then today's date. The
-              live status dot now lives in the app bar. */}
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
+          {/* Eyebrow: today's date. The live market-status dot lives in the
+              app bar. */}
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.08em',
+              color: 'text.primary',
+            }}
           >
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
-                color: 'text.primary',
-              }}
-            >
-              {marketLabel(now)}
-            </Typography>
-            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-              · {todayLabel(now)}
-            </Typography>
-          </Stack>
+            {todayLabel(now)}
+          </Typography>
 
           {/* Two-tone headline: the accent phrase carries the brand gradient. */}
           <Typography
