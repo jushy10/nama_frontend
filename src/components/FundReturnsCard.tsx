@@ -55,8 +55,8 @@ export default function FundReturnsCard({ etf }: { etf: EtfDetail }) {
   const perf = etf.performance
   const entries: { label: string; value: number | null }[] = [
     { label: 'YTD', value: perf?.ytd ?? null },
-    { label: '3Y (ann.)', value: perf?.three_year_return ?? null },
-    { label: '5Y (ann.)', value: perf?.five_year_return ?? null },
+    { label: '3Y (ann.)', value: perf?.['3y'] ?? null },
+    { label: '5Y (ann.)', value: perf?.['5y'] ?? null },
   ]
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
