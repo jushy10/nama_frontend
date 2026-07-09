@@ -1,15 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   Container,
   IconButton,
   InputAdornment,
   MenuItem,
+  Paper,
   Skeleton,
   Stack,
   Table,
@@ -39,6 +39,10 @@ import {
   type StockSearchSort,
 } from '@/lib/api'
 import { errorMessage, useClassifications, useStockSearch } from '@/lib/queries'
+import MultiSelectFilter, {
+  type FilterOption,
+} from '@/components/MultiSelectFilter'
+import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
 
 // Wait this long after the last keystroke before searching, so typing a ticker
 // doesn't fire a request per letter.
@@ -153,15 +157,25 @@ const SORT_OPTIONS: { key: StockSearchSort; label: string }[] = [
 // lands on a market-cap sort; this is how you drop back to that unsorted order.
 const NO_SORT = 'none'
 
-// The market-cap tier filter's options, each mapping to the API's `market_cap`
-// value; `all` clears the filter. Ranges are the API's half-open buckets.
-const MARKET_CAP_TIERS: { value: MarketCapTier | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Caps' },
-  { value: 'mega', label: 'Mega-cap (≥ $200B)' },
-  { value: 'large', label: 'Large-cap ($10–200B)' },
-  { value: 'mid', label: 'Mid-cap ($2–10B)' },
-  { value: 'small', label: 'Small-cap ($250M–$2B)' },
+// The market-cap tier filter's options. `label` rides the dropdown (with the
+// bounds for context); `short` is the concise form the active-filter chip shows.
+// No "all" entry — an empty selection already means "every size".
+const MARKET_CAP_TIERS: {
+  value: MarketCapTier
+  label: string
+  short: string
+}[] = [
+  { value: 'mega', label: 'Mega-cap · $200B+', short: 'Mega-cap' },
+  { value: 'large', label: 'Large-cap · $10–200B', short: 'Large-cap' },
+  { value: 'mid', label: 'Mid-cap · $2–10B', short: 'Mid-cap' },
+  { value: 'small', label: 'Small-cap · under $2B', short: 'Small-cap' },
 ]
+const MARKET_CAP_OPTIONS: FilterOption[] = MARKET_CAP_TIERS.map((t) => ({
+  value: t.value,
+  label: t.label,
+}))
+const capShort = (tier: MarketCapTier) =>
+  MARKET_CAP_TIERS.find((t) => t.value === tier)?.short ?? tier
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
 // industry, indices, + the metric columns.
@@ -422,20 +436,20 @@ function SkeletonRow({ sort }: { sort: StockSearchSort | null }) {
 
 /**
  * Screener page: search and filter the screened ≥$1B US universe by name/ticker,
- * sector, industry and index membership. Lands sorted by market cap (largest
- * first); pick another metric — or "None" for the backend's own order — via a
- * column header or the "Sort by" menu. Rows are stored facts (no live price)
- * served straight from the DB, so a page is one cheap query; clicking a row opens
- * that stock's live detail page.
+ * one or more sectors and industries, market-cap tier(s), and index membership.
+ * Lands sorted by market cap (largest first); pick another metric — or "None" for
+ * the backend's own order — via a column header or the "Sort by" menu. Rows are
+ * stored facts (no live price) served straight from the DB, so a page is one cheap
+ * query; clicking a row opens that stock's live detail page.
  */
 export default function Screener() {
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
-  const [sector, setSector] = useState('all')
-  const [industry, setIndustry] = useState('all')
+  const [sectors, setSectors] = useState<string[]>([])
+  const [industries, setIndustries] = useState<string[]>([])
   const [sp500, setSp500] = useState(false)
   const [nasdaq100, setNasdaq100] = useState(false)
-  const [marketCap, setMarketCap] = useState<MarketCapTier | 'all'>('all')
+  const [marketCaps, setMarketCaps] = useState<MarketCapTier[]>([])
   // Default to market cap so the largest names lead on landing; "None" (null)
   // drops to the backend's own order, any other key re-sorts.
   const [sort, setSort] = useState<StockSearchSort | null>('market_cap')
@@ -450,30 +464,44 @@ export default function Screener() {
     setPage(0)
   }, [
     debouncedSearch,
-    sector,
-    industry,
+    sectors,
+    industries,
     sp500,
     nasdaq100,
-    marketCap,
+    marketCaps,
     sort,
     order,
   ])
 
   const query = useStockSearch({
     q: debouncedSearch.trim() || null,
-    sector: sector === 'all' ? null : sector,
-    industry: industry === 'all' ? null : industry,
+    sectors,
+    industries,
     inSp500: sp500,
     inNasdaq100: nasdaq100,
-    marketCap: marketCap === 'all' ? null : marketCap,
+    marketCaps,
     sort,
     order,
     limit: rowsPerPage,
     offset: page * rowsPerPage,
   })
   const classifications = useClassifications()
-  const sectors = classifications.data?.sectors ?? []
-  const industries = classifications.data?.industries ?? []
+  const sectorOptions = useMemo<FilterOption[]>(
+    () =>
+      (classifications.data?.sectors ?? []).map((s) => ({
+        value: s,
+        label: humanizeClassification(s),
+      })),
+    [classifications.data],
+  )
+  const industryOptions = useMemo<FilterOption[]>(
+    () =>
+      (classifications.data?.industries ?? []).map((i) => ({
+        value: i,
+        label: humanizeClassification(i),
+      })),
+    [classifications.data],
+  )
 
   const data = query.data ?? null
   const rows = data?.results ?? []
@@ -481,11 +509,11 @@ export default function Screener() {
   const showError = query.isError && !data
   const hasFilters =
     !!searchInput ||
-    sector !== 'all' ||
-    industry !== 'all' ||
+    sectors.length > 0 ||
+    industries.length > 0 ||
     sp500 ||
     nasdaq100 ||
-    marketCap !== 'all'
+    marketCaps.length > 0
 
   // Clicking a sorted column flips its direction; a new column starts descending
   // (biggest / fastest-growing first, the useful default for each metric).
@@ -503,16 +531,58 @@ export default function Screener() {
 
   const clearFilters = () => {
     setSearchInput('')
-    setSector('all')
-    setIndustry('all')
+    setSectors([])
+    setIndustries([])
     setSp500(false)
     setNasdaq100(false)
-    setMarketCap('all')
+    setMarketCaps([])
   }
 
   const membership = [
     ...(sp500 ? ['sp500'] : []),
     ...(nasdaq100 ? ['nasdaq100'] : []),
+  ]
+
+  // Every applied narrowing as a one-click-removable chip — the specifics the
+  // compact multi-select fields only show as a count, plus the search term and
+  // index toggles, so the row is a complete, honest summary of what's applied.
+  const activeChips: ActiveChip[] = [
+    ...(debouncedSearch.trim()
+      ? [
+          {
+            key: 'q',
+            label: `“${debouncedSearch.trim()}”`,
+            onDelete: () => setSearchInput(''),
+          },
+        ]
+      : []),
+    ...sectors.map((s) => ({
+      key: `sector:${s}`,
+      label: humanizeClassification(s),
+      onDelete: () => setSectors((xs) => xs.filter((x) => x !== s)),
+    })),
+    ...industries.map((i) => ({
+      key: `industry:${i}`,
+      label: humanizeClassification(i),
+      onDelete: () => setIndustries((xs) => xs.filter((x) => x !== i)),
+    })),
+    ...marketCaps.map((t) => ({
+      key: `cap:${t}`,
+      label: capShort(t),
+      onDelete: () => setMarketCaps((xs) => xs.filter((x) => x !== t)),
+    })),
+    ...(sp500
+      ? [{ key: 'sp500', label: 'S&P 500', onDelete: () => setSp500(false) }]
+      : []),
+    ...(nasdaq100
+      ? [
+          {
+            key: 'nasdaq100',
+            label: 'Nasdaq 100',
+            onDelete: () => setNasdaq100(false),
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -546,161 +616,145 @@ export default function Screener() {
         </Tooltip>
       </Stack>
 
-      {/* Filters */}
-      <Stack
-        direction={{ xs: 'column', md: 'row' }}
-        spacing={1.5}
-        sx={{ mt: 4, flexWrap: 'wrap', alignItems: { md: 'center' } }}
+      {/* Filter card */}
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 4,
+          p: { xs: 1.5, sm: 2 },
+          borderRadius: 3,
+          borderColor: 'divider',
+          bgcolor: 'background.paper',
+        }}
       >
-        <TextField
-          size="small"
-          label="Search name or ticker"
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="e.g. NV"
-          sx={{ minWidth: { xs: '100%', md: 260 } }}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon fontSize="small" />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-        <TextField
-          select
-          size="small"
-          label="Sector"
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          sx={{ minWidth: 190 }}
-        >
-          <MenuItem value="all">All Sectors</MenuItem>
-          {sectors.map((s) => (
-            <MenuItem key={s} value={s}>
-              {humanizeClassification(s)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Industry"
-          value={industry}
-          onChange={(e) => setIndustry(e.target.value)}
-          sx={{ minWidth: 210 }}
-        >
-          <MenuItem value="all">All Industries</MenuItem>
-          {industries.map((i) => (
-            <MenuItem key={i} value={i}>
-              {humanizeClassification(i)}
-            </MenuItem>
-          ))}
-        </TextField>
-        <TextField
-          select
-          size="small"
-          label="Market cap"
-          value={marketCap}
-          onChange={(e) =>
-            setMarketCap(e.target.value as MarketCapTier | 'all')
-          }
-          sx={{ minWidth: 190 }}
-        >
-          {MARKET_CAP_TIERS.map((tier) => (
-            <MenuItem key={tier.value} value={tier.value}>
-              {tier.label}
-            </MenuItem>
-          ))}
-        </TextField>
-
-        <ToggleButtonGroup
-          size="small"
-          value={membership}
-          onChange={(_, values: string[]) => {
-            setSp500(values.includes('sp500'))
-            setNasdaq100(values.includes('nasdaq100'))
-          }}
-          aria-label="Index membership"
-        >
-          <ToggleButton value="sp500" sx={{ px: 2, py: 0.5 }}>
-            S&amp;P 500
-          </ToggleButton>
-          <ToggleButton value="nasdaq100" sx={{ px: 2, py: 0.5 }}>
-            Nasdaq 100
-          </ToggleButton>
-        </ToggleButtonGroup>
-
-        {/* Explicit sort control: the column-header sort labels are hidden on the
-            narrowest screens, so this keeps every metric sortable on mobile. */}
-        <Stack
-          direction="row"
-          spacing={0.5}
+        <Box
           sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1.5,
             alignItems: 'center',
-            flex: { xs: '1 1 auto', md: '0 0 auto' },
           }}
         >
           <TextField
-            select
             size="small"
-            label="Sort by"
-            value={sort ?? NO_SORT}
-            onChange={(e) => {
-              const v = e.target.value
-              setSort(v === NO_SORT ? null : (v as StockSearchSort))
+            label="Search name or ticker"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="e.g. NV"
+            sx={{
+              minWidth: { xs: '100%', md: 240 },
+              flex: { md: '1 1 240px' },
             }}
-            sx={{ minWidth: 150, flexGrow: 1 }}
-          >
-            <MenuItem value={NO_SORT}>None</MenuItem>
-            {SORT_OPTIONS.map((opt) => (
-              <MenuItem key={opt.key} value={opt.key}>
-                {opt.label}
-              </MenuItem>
-            ))}
-          </TextField>
-          {/* Direction only means something once a sort is chosen. */}
-          <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
-            <span>
-              <IconButton
-                onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
-                disabled={sort == null}
-                aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
-                sx={{ color: 'text.secondary' }}
-              >
-                <ArrowDownwardIcon
-                  sx={{
-                    transition: 'transform 150ms ease',
-                    transform: order === 'asc' ? 'rotate(180deg)' : 'none',
-                  }}
-                />
-              </IconButton>
-            </span>
-          </Tooltip>
-        </Stack>
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <MultiSelectFilter
+            label="Sector"
+            options={sectorOptions}
+            value={sectors}
+            onChange={(next) => setSectors(next)}
+            minWidth={180}
+          />
+          <MultiSelectFilter
+            label="Industry"
+            options={industryOptions}
+            value={industries}
+            onChange={(next) => setIndustries(next)}
+            minWidth={190}
+          />
+          <MultiSelectFilter
+            label="Market cap"
+            options={MARKET_CAP_OPTIONS}
+            value={marketCaps}
+            onChange={(next) => setMarketCaps(next as MarketCapTier[])}
+            minWidth={170}
+          />
 
-        {hasFilters && (
-          <Button
-            onClick={clearFilters}
+          <ToggleButtonGroup
             size="small"
-            sx={{ color: 'text.secondary' }}
+            value={membership}
+            onChange={(_, values: string[]) => {
+              setSp500(values.includes('sp500'))
+              setNasdaq100(values.includes('nasdaq100'))
+            }}
+            aria-label="Index membership"
           >
-            Clear
-          </Button>
-        )}
-      </Stack>
+            <ToggleButton value="sp500" sx={{ px: 2, py: 0.5 }}>
+              S&amp;P 500
+            </ToggleButton>
+            <ToggleButton value="nasdaq100" sx={{ px: 2, py: 0.5 }}>
+              Nasdaq 100
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {/* Explicit sort control: the column-header sort labels are hidden on the
+              narrowest screens, so this keeps every metric sortable on mobile. */}
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{ alignItems: 'center', ml: { md: 'auto' } }}
+          >
+            <TextField
+              select
+              size="small"
+              label="Sort by"
+              value={sort ?? NO_SORT}
+              onChange={(e) => {
+                const v = e.target.value
+                setSort(v === NO_SORT ? null : (v as StockSearchSort))
+              }}
+              sx={{ minWidth: 150 }}
+            >
+              <MenuItem value={NO_SORT}>None</MenuItem>
+              {SORT_OPTIONS.map((opt) => (
+                <MenuItem key={opt.key} value={opt.key}>
+                  {opt.label}
+                </MenuItem>
+              ))}
+            </TextField>
+            {/* Direction only means something once a sort is chosen. */}
+            <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
+              <span>
+                <IconButton
+                  onClick={() =>
+                    setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
+                  }
+                  disabled={sort == null}
+                  aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
+                  sx={{ color: 'text.secondary' }}
+                >
+                  <ArrowDownwardIcon
+                    sx={{
+                      transition: 'transform 150ms ease',
+                      transform: order === 'asc' ? 'rotate(180deg)' : 'none',
+                    }}
+                  />
+                </IconButton>
+              </span>
+            </Tooltip>
+          </Stack>
+        </Box>
+
+        <ActiveFilters chips={activeChips} onClearAll={clearFilters} />
+      </Paper>
 
       {/* Summary line */}
       {data && (
         <Typography
           variant="body2"
           color="text.secondary"
-          sx={{ mt: 2 }}
+          sx={{ mt: 2.5 }}
           aria-live="polite"
         >
           {`${data.total.toLocaleString()} ${data.total === 1 ? 'stock' : 'stocks'}`}
+          {hasFilters ? ' match your filters' : ' in the universe'}
         </Typography>
       )}
 
@@ -714,10 +768,10 @@ export default function Screener() {
         <>
           <TableContainer
             sx={{
-              mt: 3,
+              mt: 1.5,
               border: 1,
               borderColor: 'divider',
-              borderRadius: 2,
+              borderRadius: 3,
               bgcolor: 'background.paper',
               overflow: 'auto',
               // Cap the height so a long page scrolls inside the card with the
@@ -737,6 +791,9 @@ export default function Screener() {
                   px: { xs: 1, sm: 2 },
                   whiteSpace: 'nowrap',
                 },
+                // A hovered row lifts on a subtle tint so the whole line reads as
+                // one clickable target.
+                '& tbody tr:hover': { bgcolor: 'action.hover' },
               }}
             >
               <TableHead>

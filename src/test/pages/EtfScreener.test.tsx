@@ -22,6 +22,7 @@ const SEARCH_PAGE = {
       net_assets: 2.3e12,
       expense_ratio: 0.03,
       category: 'large_blend',
+      dividend_yield: 1.23,
     },
     {
       ticker: 'GLD',
@@ -30,6 +31,7 @@ const SEARCH_PAGE = {
       net_assets: 7.8e10,
       expense_ratio: 0.4,
       category: 'commodities_focused',
+      dividend_yield: null, // a non-distributing fund — renders "—"
     },
   ],
 }
@@ -71,7 +73,7 @@ const lastSearchUrl = (calls: string[]) =>
 afterEach(() => vi.unstubAllGlobals())
 
 describe('EtfScreener', () => {
-  it('lists the screened ETF universe with net assets and expense ratio', async () => {
+  it('lists the screened ETF universe with net assets, expense ratio and yield', async () => {
     stubApi()
     renderWithProviders(<EtfScreener />)
 
@@ -80,9 +82,12 @@ describe('EtfScreener', () => {
       screen.getByText('Vanguard Total Stock Market ETF'),
     ).toBeInTheDocument()
     expect(screen.getByText('GLD')).toBeInTheDocument()
-    // Compact net assets, the expense-ratio percent, and the total-count summary.
+    // Compact net assets, the expense-ratio percent, the distribution yield, and
+    // the total-count summary.
     expect(screen.getByText('$2.3T')).toBeInTheDocument()
     expect(screen.getByText('0.03%')).toBeInTheDocument()
+    expect(screen.getByText('1.23%')).toBeInTheDocument()
+    expect(screen.getByText('Div Yield')).toBeInTheDocument()
     expect(screen.getByText(/2 ETFs/)).toBeInTheDocument()
   })
 
@@ -113,6 +118,26 @@ describe('EtfScreener', () => {
     )
   })
 
+  it('filters by several categories at once (repeated category params)', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<EtfScreener />)
+    await screen.findByText('VTI')
+
+    // The multi-select stays open across picks, so two categories land in one go
+    // and both ride out as repeated `category` params (an OR set).
+    await user.click(screen.getByRole('combobox', { name: /category/i }))
+    await user.click(await screen.findByRole('option', { name: 'Large Blend' }))
+    await user.click(
+      await screen.findByRole('option', { name: 'Commodities Focused' }),
+    )
+
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/category=large_blend/)
+      expect(url).toMatch(/category=commodities_focused/)
+    })
+  })
+
   it('sorts by a metric column when its header is clicked', async () => {
     const calls = stubApi()
     const { user } = renderWithProviders(<EtfScreener />)
@@ -122,6 +147,19 @@ describe('EtfScreener', () => {
 
     await waitFor(() =>
       expect(lastSearchUrl(calls)).toMatch(/sort=expense_ratio/),
+    )
+    expect(lastSearchUrl(calls)).toMatch(/order=desc/)
+  })
+
+  it('sorts by dividend yield via its column header', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(<EtfScreener />)
+    await screen.findByText('VTI')
+
+    await user.click(screen.getByText('Div Yield'))
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/sort=dividend_yield/),
     )
     expect(lastSearchUrl(calls)).toMatch(/order=desc/)
   })

@@ -81,11 +81,11 @@ export default function Search() {
   // Stocks sort by market cap (so "nv" floats Nvidia to the top), funds by AUM.
   const stockSearch = useStockSearch({
     q: query || null,
-    sector: null,
-    industry: null,
+    sectors: [],
+    industries: [],
     inSp500: false,
     inNasdaq100: false,
-    marketCap: null,
+    marketCaps: [],
     sort: 'market_cap',
     order: 'desc',
     limit: STOCK_SUGGESTIONS,
@@ -94,7 +94,7 @@ export default function Search() {
   })
   const etfSearch = useEtfSearch({
     q: query || null,
-    category: null,
+    categories: [],
     sort: 'net_assets',
     order: 'desc',
     limit: ETF_SUGGESTIONS,

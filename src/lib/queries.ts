@@ -374,11 +374,11 @@ export function useScreener(
  *  backend returns rows in its own default order. */
 export interface StockSearchParams {
   q: string | null
-  sector: string | null
-  industry: string | null
+  sectors: string[]
+  industries: string[]
   inSp500: boolean
   inNasdaq100: boolean
-  marketCap: MarketCapTier | null
+  marketCaps: MarketCapTier[]
   sort: StockSearchSort | null
   order: SortOrder
   limit: number
@@ -403,11 +403,11 @@ export function useStockSearch(
     queryFn: ({ signal }) =>
       searchStocks({
         q: params.q,
-        sector: params.sector,
-        industry: params.industry,
+        sectors: params.sectors,
+        industries: params.industries,
         inSp500: params.inSp500 || null,
         inNasdaq100: params.inNasdaq100 || null,
-        marketCap: params.marketCap,
+        marketCaps: params.marketCaps,
         // No sort → send neither param, so the backend uses its default order.
         sort: params.sort ?? undefined,
         order: params.sort ? params.order : undefined,
@@ -436,7 +436,7 @@ export function useClassifications(): UseQueryResult<Classifications> {
 /** An ETF universe-search request: the text query, category filter, sort, and page window. */
 export interface EtfSearchParams {
   q: string | null
-  category: string | null
+  categories: string[]
   sort: EtfSearchSort
   order: SortOrder
   limit: number
@@ -460,7 +460,7 @@ export function useEtfSearch(
     queryFn: ({ signal }) =>
       searchEtfs({
         q: params.q,
-        category: params.category,
+        categories: params.categories,
         sort: params.sort,
         order: params.order,
         limit: params.limit,
