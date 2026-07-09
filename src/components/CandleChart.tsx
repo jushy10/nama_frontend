@@ -119,7 +119,10 @@ export default function CandleChart({
   const intraday = !!timeframe && /Min|Hour/.test(timeframe)
 
   const geo = useMemo(() => {
-    const plotW = W - PAD.left - PAD.right
+    // Reclaim some of the price-axis gutter on a phone so the plot gets more
+    // width before the candles compress — the labels don't need 58px there.
+    const padRight = W < 420 ? 40 : PAD.right
+    const plotW = W - PAD.left - padRight
     const plotH = H - PAD.top - PAD.bottom
     const priceH = plotH - VOL_BAND
 
@@ -161,7 +164,42 @@ export default function CandleChart({
       Math.round((i * (n - 1)) / Math.max(dateN - 1, 1)),
     )
 
-    return { x, y, volY, volTop, slot, bodyW, priceTicks, dateIdx, n, min, max }
+    // Below ~2.5px a slot the bodies collapse into a 1px smear (a phone's 6M/1Y
+    // view), so fall back to a filled close-price area — the trend still reads
+    // and the tap crosshair/readout keep working. Candles return on their own
+    // once there's room again (a wider container or a shorter range).
+    const dense = slot < 2.5
+    const trendUp = n > 0 && candles[n - 1].close >= candles[0].close
+    let linePath = ''
+    let areaPath = ''
+    if (dense && n > 0) {
+      const pts = candles
+        .map((d, i) => `${x(i).toFixed(2)},${y(d.close).toFixed(2)}`)
+        .join('L')
+      linePath = `M${pts}`
+      areaPath = `M${x(0).toFixed(2)},${volTop.toFixed(2)}L${pts}L${x(
+        n - 1,
+      ).toFixed(2)},${volTop.toFixed(2)}Z`
+    }
+
+    return {
+      x,
+      y,
+      volY,
+      volTop,
+      slot,
+      bodyW,
+      priceTicks,
+      dateIdx,
+      n,
+      min,
+      max,
+      padRight,
+      dense,
+      linePath,
+      areaPath,
+      trendUp,
+    }
   }, [candles, W, intraday])
 
   if (candles.length === 0) {
@@ -172,7 +210,22 @@ export default function CandleChart({
     )
   }
 
-  const { x, y, volY, volTop, bodyW, priceTicks, dateIdx, min, max } = geo
+  const {
+    x,
+    y,
+    volY,
+    volTop,
+    bodyW,
+    priceTicks,
+    dateIdx,
+    min,
+    max,
+    padRight,
+    dense,
+    linePath,
+    areaPath,
+    trendUp,
+  } = geo
   const active = hover ?? candles.length - 1
   const c = candles[active]
   const cUp = c.close >= c.open
@@ -284,18 +337,13 @@ export default function CandleChart({
           <g key={`p${i}`}>
             <line
               x1={PAD.left}
-              x2={W - PAD.right}
+              x2={W - padRight}
               y1={y(p)}
               y2={y(p)}
               stroke={grid}
               strokeWidth={1}
             />
-            <text
-              x={W - PAD.right + 6}
-              y={y(p) + 3.5}
-              fontSize={11}
-              fill={axis}
-            >
+            <text x={W - padRight + 6} y={y(p) + 3.5} fontSize={11} fill={axis}>
               {fmtAxis(p)}
             </text>
           </g>
@@ -303,7 +351,7 @@ export default function CandleChart({
         {/* divider above the volume band */}
         <line
           x1={PAD.left}
-          x2={W - PAD.right}
+          x2={W - padRight}
           y1={volTop}
           y2={volTop}
           stroke={grid}
@@ -316,7 +364,7 @@ export default function CandleChart({
           const isFirst = k === 0
           const isLast = k === dateIdx.length - 1
           const anchor = isFirst ? 'start' : isLast ? 'end' : 'middle'
-          const tx = isFirst ? PAD.left : isLast ? W - PAD.right : x(i)
+          const tx = isFirst ? PAD.left : isLast ? W - padRight : x(i)
           return (
             <text
               key={`d${i}`}
@@ -347,33 +395,47 @@ export default function CandleChart({
           )
         })}
 
-        {/* candles: wick + body */}
-        {candles.map((d, i) => {
-          const color = d.close >= d.open ? up : down
-          const yo = y(d.open)
-          const yc = y(d.close)
-          const top = Math.min(yo, yc)
-          const h = Math.max(1, Math.abs(yc - yo))
-          return (
-            <g key={`c${i}`}>
-              <line
-                x1={x(i)}
-                x2={x(i)}
-                y1={y(d.high)}
-                y2={y(d.low)}
-                stroke={color}
-                strokeWidth={1}
-              />
-              <rect
-                x={x(i) - bodyW / 2}
-                y={top}
-                width={bodyW}
-                height={h}
-                fill={color}
-              />
-            </g>
-          )
-        })}
+        {/* price series: real candles when there's room, else a filled
+            close-price area once the slots collapse below ~2.5px (geo.dense) */}
+        {dense ? (
+          <>
+            <path d={areaPath} fill={trendUp ? up : down} opacity={0.12} />
+            <path
+              d={linePath}
+              fill="none"
+              stroke={trendUp ? up : down}
+              strokeWidth={1.5}
+              strokeLinejoin="round"
+            />
+          </>
+        ) : (
+          candles.map((d, i) => {
+            const color = d.close >= d.open ? up : down
+            const yo = y(d.open)
+            const yc = y(d.close)
+            const top = Math.min(yo, yc)
+            const h = Math.max(1, Math.abs(yc - yo))
+            return (
+              <g key={`c${i}`}>
+                <line
+                  x1={x(i)}
+                  x2={x(i)}
+                  y1={y(d.high)}
+                  y2={y(d.low)}
+                  stroke={color}
+                  strokeWidth={1}
+                />
+                <rect
+                  x={x(i) - bodyW / 2}
+                  y={top}
+                  width={bodyW}
+                  height={h}
+                  fill={color}
+                />
+              </g>
+            )
+          })
+        )}
 
         {/* support levels: dashed price lines (in view only) with an axis tag,
             drawn over the candles but under the hover crosshair */}
@@ -385,7 +447,7 @@ export default function CandleChart({
             <g key={`s${i}`} pointerEvents="none">
               <line
                 x1={supportStartX(lvl.last_touched)}
-                x2={W - PAD.right}
+                x2={W - padRight}
                 y1={yy}
                 y2={yy}
                 stroke={support}
@@ -394,16 +456,16 @@ export default function CandleChart({
                 opacity={s.opacity}
               />
               <rect
-                x={W - PAD.right + 1}
+                x={W - padRight + 1}
                 y={yy - 7}
-                width={PAD.right - 2}
+                width={padRight - 2}
                 height={14}
                 rx={2}
                 fill={support}
                 opacity={Math.min(1, s.opacity + 0.2)}
               />
               <text
-                x={W - PAD.right + (PAD.right - 1) / 2}
+                x={W - padRight + (padRight - 1) / 2}
                 y={yy + 3.5}
                 fontSize={10}
                 fontWeight={600}

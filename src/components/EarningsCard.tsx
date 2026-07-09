@@ -314,22 +314,41 @@ function SurpriseChart({
   }, [])
   const W = cw
 
-  const hasForecast = forecasts.length > 0
+  // Display-only responsiveness, driven by the *measured* width (not a media
+  // query): on a phone-width canvas the columns get too tight for their
+  // labels, so trim to the most recent history and the nearest forecasts, and
+  // pull the axis gutters in. The underlying data is untouched — this only
+  // changes what the narrow chart draws.
+  const narrow = W < 420
+  const pad = useMemo(
+    () => (narrow ? { ...PAD, right: 40, bottom: 42, left: 8 } : PAD),
+    [narrow],
+  )
+  const viewForecasts = useMemo(
+    () => (narrow ? forecasts.slice(0, 2) : forecasts),
+    [narrow, forecasts],
+  )
+
+  const hasForecast = viewForecasts.length > 0
 
   // Whether any forecast column carries a YoY growth figure (reported columns
   // never do — their bar heights already show the growth). The growth row
   // rides in 14 extra viewBox units beneath the value labels, so charts with
   // nothing to show keep their original height instead of a blank strip.
-  const growthRow = forecasts.some((f) => f.growth != null)
+  const growthRow = viewForecasts.some((f) => f.growth != null)
   const vbH = growthRow ? H + 14 : H
 
   // API is newest-first; a time axis reads oldest → newest, left → right. The
-  // forecasts sit at the far right, after the last reported quarter.
-  const data = useMemo(() => [...bars].reverse(), [bars])
+  // forecasts sit at the far right, after the last reported quarter. On a
+  // narrow canvas keep only the newest few columns so the labels stay legible.
+  const data = useMemo(() => {
+    const ordered = [...bars].reverse()
+    return narrow ? ordered.slice(-5) : ordered
+  }, [bars, narrow])
 
   const geo = useMemo(() => {
-    const plotW = W - PAD.left - PAD.right
-    const plotH = H - PAD.top - PAD.bottom
+    const plotW = W - pad.left - pad.right
+    const plotH = H - pad.top - pad.bottom
 
     // Always anchor the scale at zero so bar heights are comparable and the
     // baseline is meaningful; stretch to cover whatever actual/estimate reach,
@@ -343,7 +362,7 @@ function SurpriseChart({
         if (v < min) min = v
       }
     }
-    for (const f of forecasts) {
+    for (const f of viewForecasts) {
       if (f.estimate == null) continue
       if (f.estimate > max) max = f.estimate
       if (f.estimate < min) min = f.estimate
@@ -353,7 +372,7 @@ function SurpriseChart({
     max += padV
     if (min < 0) min -= padV // only drop the floor when there are losses
 
-    const n = data.length + forecasts.length
+    const n = data.length + viewForecasts.length
     const slot = plotW / Math.max(n, 1)
     const groupW = Math.min(slot * 0.62, 72)
     const gap = Math.min(groupW * 0.12, 4)
@@ -363,9 +382,9 @@ function SurpriseChart({
     const grouped = data.some((b) => b.estimate != null)
     const barW = grouped ? (groupW - gap) / 2 : groupW
 
-    const cx = (i: number) => PAD.left + slot * (i + 0.5)
+    const cx = (i: number) => pad.left + slot * (i + 0.5)
     const y = (v: number) =>
-      PAD.top + (1 - (v - min) / (max - min || 1)) * plotH
+      pad.top + (1 - (v - min) / (max - min || 1)) * plotH
 
     const tickN = 4
     const ticks = Array.from(
@@ -374,7 +393,7 @@ function SurpriseChart({
     )
 
     return { cx, y, groupW, gap, barW, ticks, zeroY: y(0), slot, n }
-  }, [data, forecasts, W])
+  }, [data, viewForecasts, pad, W])
 
   if (data.length === 0 && !hasForecast) {
     return (
@@ -394,6 +413,14 @@ function SurpriseChart({
   // The growth row shortens the same way ("+34%"), keeping the decimal for
   // the detail line above the plot.
   const growthFmt = slot < 50 ? fmtPctShort : fmtPct
+  // Under-bar quarter labels collide once the slots get tight; below ~44 units
+  // a label no longer clears its neighbour. Keep the newest column labelled and
+  // drop every other one going back — the value stays under every bar and a tap
+  // fills the detail line, so the axis reads without stacking rotated text over
+  // the values.
+  const labelEvery = slot >= 44
+  const showBarLabel = (i: number) =>
+    labelEvery || (data.length - 1 - i) % 2 === 0
 
   // Default the detail to the latest column that actually carries a value — the
   // newest reported quarter normally, but the forecast when only a forward
@@ -419,7 +446,7 @@ function SurpriseChart({
     const rect = e.currentTarget.getBoundingClientRect()
     if (!rect.width) return null
     const vbX = ((e.clientX - rect.left) / rect.width) * W
-    const i = Math.floor((vbX - PAD.left) / slot)
+    const i = Math.floor((vbX - pad.left) / slot)
     return Math.max(0, Math.min(n - 1, i))
   }
 
@@ -483,7 +510,7 @@ function SurpriseChart({
           )
         })()
       : (() => {
-          const f = forecasts[active - data.length]
+          const f = viewForecasts[active - data.length]
           if (!f) return null
           return (
             <>
@@ -543,10 +570,10 @@ function SurpriseChart({
         {/* hovered-column highlight band */}
         {hover != null && (
           <rect
-            x={PAD.left + slot * hover}
-            y={PAD.top}
+            x={pad.left + slot * hover}
+            y={pad.top}
             width={slot}
-            height={H - PAD.top - PAD.bottom}
+            height={H - pad.top - pad.bottom}
             fill={axis}
             opacity={0.08}
             pointerEvents="none"
@@ -556,15 +583,15 @@ function SurpriseChart({
         {ticks.map((t, i) => (
           <g key={`t${i}`}>
             <line
-              x1={PAD.left}
-              x2={W - PAD.right}
+              x1={pad.left}
+              x2={W - pad.right}
               y1={y(t)}
               y2={y(t)}
               stroke={grid}
               strokeWidth={1}
             />
             <text
-              x={W - PAD.right + 6}
+              x={W - pad.right + 6}
               y={y(t) + 3.5}
               fontSize={11}
               fill={axis}
@@ -575,8 +602,8 @@ function SurpriseChart({
         ))}
         {/* zero baseline, drawn a touch stronger than the gridlines */}
         <line
-          x1={PAD.left}
-          x2={W - PAD.right}
+          x1={pad.left}
+          x2={W - pad.right}
           y1={zeroY}
           y2={zeroY}
           stroke={axis}
@@ -587,10 +614,10 @@ function SurpriseChart({
         {/* dashed divider between reported history and the forward estimate */}
         {hasForecast && data.length > 0 && (
           <line
-            x1={PAD.left + slot * fcIndex}
-            x2={PAD.left + slot * fcIndex}
-            y1={PAD.top}
-            y2={H - PAD.bottom}
+            x1={pad.left + slot * fcIndex}
+            x2={pad.left + slot * fcIndex}
+            y1={pad.top}
+            y2={H - pad.bottom}
             stroke={axis}
             strokeWidth={1}
             strokeDasharray="2 3"
@@ -618,9 +645,12 @@ function SurpriseChart({
             )
           }
 
-          // Surprise % rides in the top margin, aligned across all groups.
+          // Surprise % rides in the top margin, aligned across all groups. It
+          // shortens with the value labels (slot < 50), and drops out entirely
+          // once the slots are too tight to read it (slot < 34) — it stays a
+          // tap away in the detail line above the plot.
           const surprise =
-            b.surprise == null ? null : (
+            b.surprise == null || slot < 34 ? null : (
               <text
                 x={center}
                 y={18}
@@ -629,7 +659,7 @@ function SurpriseChart({
                 fill={actColor}
                 textAnchor="middle"
               >
-                {fmtPct(b.surprise)}
+                {growthFmt(b.surprise)}
               </text>
             )
 
@@ -642,7 +672,7 @@ function SurpriseChart({
               {isGap && (
                 <text
                   x={center}
-                  y={PAD.top + (H - PAD.top - PAD.bottom) / 2}
+                  y={pad.top + (H - pad.top - pad.bottom) / 2}
                   fontSize={15}
                   fill={axis}
                   textAnchor="middle"
@@ -651,16 +681,20 @@ function SurpriseChart({
                   —
                 </text>
               )}
-              {/* quarter label + the reported value (or "no data") beneath it */}
-              <text
-                x={center}
-                y={H - 26}
-                fontSize={11}
-                fill={axis}
-                textAnchor="middle"
-              >
-                {b.label}
-              </text>
+              {/* quarter label + the reported value (or "no data") beneath it.
+                  The label thins out on a tight axis (showBarLabel); the value
+                  stays under every bar. */}
+              {showBarLabel(i) && (
+                <text
+                  x={center}
+                  y={H - 26}
+                  fontSize={11}
+                  fill={axis}
+                  textAnchor="middle"
+                >
+                  {b.label}
+                </text>
+              )}
               <text
                 x={center}
                 y={H - 12}
@@ -676,7 +710,7 @@ function SurpriseChart({
         })}
 
         {/* forward "expected" columns: analyst consensus for upcoming quarters */}
-        {forecasts.map((f, k) => {
+        {viewForecasts.map((f, k) => {
           const e = f.estimate
           if (e == null) return null
           const center = cx(fcIndex + k)
@@ -920,6 +954,10 @@ function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
             fontWeight: 700,
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
+            // Keep the two-word verdict on one line beside the caption instead
+            // of wrapping inside its pill on a narrow header.
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             color: verdictColor,
             bgcolor: alpha(verdictColor, 0.15),
           }}
@@ -1117,9 +1155,9 @@ export default function EarningsCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
         <Stack
-          direction="row"
+          direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
           sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
         >
@@ -1142,7 +1180,10 @@ export default function EarningsCard({
             <Box
               sx={{
                 flexShrink: 0,
-                textAlign: 'right',
+                // Hugs the right on desktop; on the stacked phone header it sits
+                // below the title, so left-align it there instead of stranding
+                // the date at the far edge.
+                textAlign: { xs: 'left', sm: 'right' },
                 borderRadius: 1.5,
                 px: 2,
                 py: 1.25,
@@ -1209,6 +1250,9 @@ export default function EarningsCard({
                 borderRadius: '999px !important',
                 px: 2,
                 py: 0.5,
+                // Guarantee a ~40px tap target on touch (the small pill is
+                // shorter than that by default).
+                minHeight: { xs: 40, sm: 'auto' },
                 textTransform: 'none',
                 fontWeight: 600,
                 letterSpacing: 0,

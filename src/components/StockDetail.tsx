@@ -239,7 +239,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           )}
 
           <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-            <CardContent sx={{ p: 3 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
               <Stack
                 direction={{ xs: 'column', sm: 'row' }}
                 spacing={1.5}
@@ -296,7 +296,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                   sx={{
                     alignItems: 'center',
                     justifyContent: 'center',
-                    minHeight: 280,
+                    minHeight: 360,
                   }}
                 >
                   <CircularProgress />

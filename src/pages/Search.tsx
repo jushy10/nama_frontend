@@ -168,7 +168,7 @@ export default function Search() {
   const isEtf = type?.asset_type === 'etf'
 
   return (
-    <Container maxWidth="xl" sx={{ py: 6 }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
       <Typography
         variant="h4"
         component="h1"

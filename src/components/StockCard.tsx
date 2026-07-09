@@ -89,7 +89,7 @@ function Stat({ label, value }: { label: string; value: string }) {
         sx={{
           m: 0,
           fontWeight: 700,
-          fontSize: '1.5rem',
+          fontSize: { xs: '1.25rem', sm: '1.5rem' },
           lineHeight: 1.15,
           letterSpacing: '-0.01em',
           fontVariantNumeric: 'tabular-nums',
@@ -120,7 +120,7 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
     >
       <CardContent
         sx={{
-          p: 3,
+          p: { xs: 2, sm: 3 },
           flexGrow: 1,
           display: 'flex',
           flexDirection: 'column',
@@ -286,7 +286,7 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
             m: 0,
             flexGrow: 1,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gridAutoRows: '1fr',
             gap: 1,
           }}
