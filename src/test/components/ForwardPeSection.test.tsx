@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
-import ForwardPeCard from '@/components/ForwardPeCard'
+import { ForwardPeSection } from '@/components/ForwardPeSection'
 import type {
   AnnualEarnings,
   QuarterlyEarnings,
@@ -124,19 +124,16 @@ const annualSample: AnnualEarnings = {
   ],
 }
 
-describe('ForwardPeCard', () => {
+describe('ForwardPeSection — annual', () => {
   it('walks the last fiscal year’s P/E → FY1 → FY2 at today’s price', () => {
     renderWithProviders(
-      <ForwardPeCard
-        price={200}
-        quarterly={quarterlySample}
-        annual={annualSample}
-      />,
+      <ForwardPeSection price={200} annual={annualSample} period="annual" />,
     )
 
     expect(
       screen.getByRole('heading', { name: 'Forward P/E' }),
     ).toBeInTheDocument()
+    expect(screen.getByText('By fiscal year')).toBeInTheDocument()
 
     // Anchor: 200 ÷ 3.20 — the last completed fiscal year's reported EPS on
     // the consensus basis (preferred over the GAAP 3.10). The multiple shows
@@ -157,7 +154,6 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('Est. EPS $5.00')).toBeInTheDocument()
 
     // The walk is also drawn as columns: FY26 + one bar per forecast year.
-    expect(screen.getByText('By fiscal year')).toBeInTheDocument()
     expect(
       screen.getByRole('img', { name: /by fiscal year/i }),
     ).toBeInTheDocument()
@@ -177,7 +173,7 @@ describe('ForwardPeCard', () => {
 
   it('anchors on GAAP diluted EPS, with the caveat, when no consensus-basis actual is served', () => {
     renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
         annual={{
           ...annualSample,
@@ -185,6 +181,7 @@ describe('ForwardPeCard', () => {
             y.is_reported ? { ...y, eps_actual_consensus: null } : y,
           ),
         }}
+        period="annual"
       />,
     )
 
@@ -200,9 +197,8 @@ describe('ForwardPeCard', () => {
 
   it('tints a compressing multiple green and an expanding one red', () => {
     renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
-        quarterly={quarterlySample}
         annual={{
           ...annualSample,
           years: [
@@ -212,6 +208,7 @@ describe('ForwardPeCard', () => {
             year({ fiscal_year: 2028, eps_estimate: 5.0 }),
           ],
         }}
+        period="annual"
       />,
     )
     // Dark theme (the test default) palette: success.main / error.main.
@@ -223,15 +220,52 @@ describe('ForwardPeCard', () => {
     expect(screen.getByText('-38.0% vs FY26')).toHaveStyle({ color: green })
   })
 
+  it('shows an em dash for a fiscal year whose consensus is a loss', () => {
+    renderWithProviders(
+      <ForwardPeSection
+        price={200}
+        annual={{
+          ...annualSample,
+          years: [year({ fiscal_year: 2027, eps_estimate: -0.5 })],
+        }}
+        period="annual"
+      />,
+    )
+    // A P/E over negative earnings is meaningless — dash, not a negative PE.
+    expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
+    expect(screen.getByText('Est. EPS -$0.50')).toBeInTheDocument()
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
+    expect(screen.queryByText('-400.00')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing on the annual view when there is no forward fiscal year', () => {
+    const { container } = renderWithProviders(
+      <ForwardPeSection
+        price={200}
+        annual={{
+          ...annualSample,
+          years: annualSample.years.filter((y) => y.is_reported),
+        }}
+        period="annual"
+      />,
+    )
+    expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('ForwardPeSection — quarterly', () => {
   it('walks and charts the rolling 12-month P/E for each upcoming quarter', () => {
     renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
         quarterly={quarterlySample}
-        annual={annualSample}
+        period="quarterly"
       />,
     )
 
+    expect(
+      screen.getByRole('heading', { name: 'Forward P/E' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('By quarter')).toBeInTheDocument()
     expect(screen.getByRole('img', { name: /by quarter/i })).toBeInTheDocument()
 
@@ -262,7 +296,7 @@ describe('ForwardPeCard', () => {
 
   it('skips a quarter whose rolling window is incomplete', () => {
     renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
         quarterly={{
           ...quarterlySample,
@@ -274,7 +308,7 @@ describe('ForwardPeCard', () => {
               : qq,
           ),
         }}
-        annual={annualSample}
+        period="quarterly"
       />,
     )
     expect(screen.queryByText("Fwd P/E Q2 '27")).not.toBeInTheDocument()
@@ -285,17 +319,14 @@ describe('ForwardPeCard', () => {
       screen.queryByRole('img', { name: /by quarter/i }),
     ).not.toBeInTheDocument()
     // Only three usable actuals remain, so the quarter walk loses its
-    // trailing-TTM anchor — the tile renders unlabelled with an em dash —
-    // while the fiscal-year anchor (from the annual series) is unaffected.
+    // trailing-TTM anchor — the tile renders unlabelled with an em dash.
     expect(screen.getByText('P/E (TTM)')).toBeInTheDocument()
     expect(screen.getByText('—')).toBeInTheDocument()
-    expect(screen.getByText('P/E FY26')).toBeInTheDocument()
-    expect(screen.getAllByText('62.50').length).toBeGreaterThan(0)
   })
 
   it('keeps a quarter whose rolling window is a loss, dashing its multiple', () => {
     renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
         quarterly={{
           ...quarterlySample,
@@ -307,6 +338,7 @@ describe('ForwardPeCard', () => {
               : { ...qq, eps_estimate: -(qq.eps_estimate as number) },
           ),
         }}
+        period="quarterly"
       />,
     )
     // The section and its steps stay, each showing the consensus window with
@@ -325,62 +357,59 @@ describe('ForwardPeCard', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows an em dash for a fiscal year whose consensus is a loss', () => {
-    renderWithProviders(
-      <ForwardPeCard
-        price={200}
-        annual={{
-          ...annualSample,
-          years: [year({ fiscal_year: 2027, eps_estimate: -0.5 })],
-        }}
-      />,
-    )
-    // A P/E over negative earnings is meaningless — dash, not a negative PE.
-    expect(screen.getByText('Fwd P/E FY27')).toBeInTheDocument()
-    expect(screen.getByText('Est. EPS -$0.50')).toBeInTheDocument()
-    expect(screen.getAllByText('—').length).toBeGreaterThan(0)
-    expect(screen.queryByText('-400.00')).not.toBeInTheDocument()
-  })
-
-  it('threads the Current P/E tile and a "Now" bar into both walks', () => {
-    renderWithProviders(
-      <ForwardPeCard
-        price={200}
-        quarterly={quarterlySample}
-        annual={annualSample}
-        trailingPe={55.5}
-      />,
-    )
-
-    // The trailing multiple sits between each walk's reported anchor and its
-    // forward steps — once in the fiscal-year walk, once in the by-quarter
-    // walk — with the "price ÷ TTM EPS" hint under each tile.
-    expect(screen.getAllByText('Current P/E')).toHaveLength(2)
-    expect(screen.getAllByText('55.50').length).toBeGreaterThanOrEqual(2)
-    expect(screen.getAllByText('Price ÷ trailing 12-mo EPS')).toHaveLength(2)
-
-    // …and as a solid "Now" column on each chart.
-    expect(screen.getAllByText('Now').length).toBeGreaterThanOrEqual(1)
-
-    // Each section's footnote explains the new tile.
-    expect(
-      screen.getByText(/the figure quotes report today/i),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText(/the standard quote, which can sit apart/i),
-    ).toBeInTheDocument()
-  })
-
-  it('renders nothing when there is no forward consensus at all', () => {
+  it('renders nothing on the quarterly view when there is no upcoming quarter', () => {
     const { container } = renderWithProviders(
-      <ForwardPeCard
+      <ForwardPeSection
         price={200}
         quarterly={{
           ...quarterlySample,
           quarters: quarterlySample.quarters.filter((qq) => qq.is_reported),
         }}
+        period="quarterly"
       />,
     )
     expect(container).toBeEmptyDOMElement()
+  })
+})
+
+describe('ForwardPeSection — Current P/E', () => {
+  it('threads the Current P/E tile and a "Now" bar into the annual walk', () => {
+    renderWithProviders(
+      <ForwardPeSection
+        price={200}
+        annual={annualSample}
+        trailingPe={55.5}
+        period="annual"
+      />,
+    )
+    // The trailing multiple sits between the reported anchor and the forward
+    // steps, with the "price ÷ TTM EPS" hint under the tile…
+    expect(screen.getByText('Current P/E')).toBeInTheDocument()
+    expect(screen.getAllByText('55.50').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Price ÷ trailing 12-mo EPS')).toBeInTheDocument()
+    // …and as a solid "Now" column on the chart.
+    expect(screen.getByText('Now')).toBeInTheDocument()
+    // The footnote explains the new tile.
+    expect(
+      screen.getByText(/the figure quotes report today/i),
+    ).toBeInTheDocument()
+  })
+
+  it('threads the Current P/E tile and a "Now" bar into the quarterly walk', () => {
+    renderWithProviders(
+      <ForwardPeSection
+        price={200}
+        quarterly={quarterlySample}
+        trailingPe={55.5}
+        period="quarterly"
+      />,
+    )
+    expect(screen.getByText('Current P/E')).toBeInTheDocument()
+    expect(screen.getAllByText('55.50').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Price ÷ trailing 12-mo EPS')).toBeInTheDocument()
+    expect(screen.getByText('Now')).toBeInTheDocument()
+    expect(
+      screen.getByText(/the standard quote, which can sit apart/i),
+    ).toBeInTheDocument()
   })
 })
