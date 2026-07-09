@@ -26,6 +26,7 @@ import {
   useEma,
   useFiveYearReturn,
   useIndustryValuation,
+  usePeHistory,
   useQuarterlyEarnings,
   useRecommendations,
   useStockAnalysis,
@@ -39,6 +40,7 @@ import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import PegCard from '@/components/PegCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
+import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
@@ -121,6 +123,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // self-hides if the industry has too few valued peers to stand as a
   // benchmark, so no loading/error UI.
   const industryValuationQuery = useIndustryValuation(stock?.industry ?? null)
+  // The stock's own trailing-P/E history rides the loaded ticker (idle until it
+  // resolves). Best-effort — an uncovered/blocked symbol resolves to an empty
+  // series and the card self-hides, so no loading/error UI.
+  const peHistoryQuery = usePeHistory(loadedSymbol)
 
   if (cardQuery.isLoading) {
     return (
@@ -338,24 +344,35 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             />
           )}
 
+          {/* "Is the price rich or cheap versus its own history?" The trailing
+              P/E at each past earnings release, anchored on the stock's own
+              median rather than its peers'. Best-effort: self-hides when the
+              series is too short (an uncovered/blocked symbol comes back near
+              empty), so no loading/error UI. */}
+          {peHistoryQuery.data && (
+            <PeHistoryCard history={peHistoryQuery.data} />
+          )}
+
           {/* Nothing to value — a rare unclassified/uncovered name. A plain
               empty state beats a blank panel. */}
-          {!stock.metrics && !industryValuationQuery.data && (
-            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <Typography
-                  variant="h6"
-                  component="h2"
-                  sx={{ fontWeight: 600 }}
-                >
-                  Valuation
-                </Typography>
-                <Typography color="text.secondary" sx={{ mt: 1 }}>
-                  No valuation data for {stock.ticker}.
-                </Typography>
-              </CardContent>
-            </Card>
-          )}
+          {!stock.metrics &&
+            !industryValuationQuery.data &&
+            !peHistoryQuery.data?.points.length && (
+              <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+                <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                  <Typography
+                    variant="h6"
+                    component="h2"
+                    sx={{ fontWeight: 600 }}
+                  >
+                    Valuation
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    No valuation data for {stock.ticker}.
+                  </Typography>
+                </CardContent>
+              </Card>
+            )}
         </Stack>
       )}
 
