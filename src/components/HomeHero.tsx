@@ -32,7 +32,7 @@ export default function HomeHero() {
         background: (theme) => heroWash(theme),
       }}
     >
-      <Container maxWidth="lg" sx={{ py: { xs: 5, sm: 8 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 8 } }}>
         <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 720 }}>
           {/* Eyebrow: today's date. The live market-status dot lives in the
               app bar. */}

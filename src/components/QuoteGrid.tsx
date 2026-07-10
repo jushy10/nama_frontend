@@ -235,6 +235,14 @@ const gridColumns = (linkToStock: boolean) => ({
   md: 'repeat(4, minmax(0, 1fr))',
 })
 
+/** A `grid-template-columns` value: a single track string or a per-breakpoint
+ *  map. Passed as `columns` it overrides {@link gridColumns} — the home index
+ *  strip uses it so its three tiles fill the full width instead of leaving the
+ *  fourth column of the default desktop grid empty. */
+type GridColumns =
+  | string
+  | Partial<Record<'xs' | 'sm' | 'md' | 'lg' | 'xl', string>>
+
 /**
  * A self-refreshing grid of price tiles, one per `item`, each showing the day's
  * move. Loads on mount and re-polls every `refreshMs`; a symbol that fails comes
@@ -252,6 +260,10 @@ const gridColumns = (linkToStock: boolean) => ({
  * With `etf`, the tiles are quoted through the ETF endpoint
  * (`/stocks/etf/{ticker}`) instead of the stock ticker card — for strips of
  * funds, like the home page's index-ETF proxies.
+ *
+ * With `columns`, the default responsive grid is replaced — pass an explicit
+ * `grid-template-columns` value to make a short strip fill the full width (the
+ * home index proxies span three equal columns rather than three-of-four).
  */
 export default function QuoteGrid({
   items,
@@ -260,6 +272,7 @@ export default function QuoteGrid({
   etf = false,
   selectedSymbol = null,
   onSelect,
+  columns,
 }: {
   items: QuoteDef[]
   refreshMs?: number
@@ -267,6 +280,7 @@ export default function QuoteGrid({
   etf?: boolean
   selectedSymbol?: string | null
   onSelect?: (symbol: string) => void
+  columns?: GridColumns
 }) {
   const symbols = items.map((i) => i.symbol)
   const { data } = useQuoteCards(symbols, {
@@ -289,7 +303,7 @@ export default function QuoteGrid({
     <Box
       sx={{
         display: 'grid',
-        gridTemplateColumns: gridColumns(linkToStock),
+        gridTemplateColumns: columns ?? gridColumns(linkToStock),
         gap: 2,
       }}
     >
