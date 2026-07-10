@@ -8,6 +8,8 @@ import {
   Container,
   Stack,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import type { ChartRange } from '@/lib/api'
@@ -27,6 +29,13 @@ const INDICES: QuoteDef[] = [
   { label: 'Dow Jones', symbol: 'DIA' },
 ]
 
+// The band runs the full `xl` width on desktop, so the chart gets extra height
+// there to keep a balanced landscape shape at that span (the stock page's chart
+// defaults to 360). Phones keep the original height so a portrait-tall chart
+// doesn't dominate the screen.
+const CHART_HEIGHT_DESKTOP = 440
+const CHART_HEIGHT_MOBILE = 360
+
 /**
  * Home-page band of major US index proxies with their move for the day, plus a
  * candlestick chart of whichever index is selected. Each tile is a toggle —
@@ -42,9 +51,18 @@ export default function MarketIndices() {
   const candleQuery = useCandles(selected, range)
   const active = INDICES.find((i) => i.symbol === selected) ?? INDICES[0]
 
+  // Taller chart on the wide desktop band; the phone keeps the original height.
+  // `noSsr` reads the real viewport on the first client render (no SSR here), so
+  // the chart doesn't briefly mount at the wrong height. The loading placeholder
+  // reserves the same height so the card doesn't jump when data lands.
+  const theme = useTheme()
+  const chartHeight = useMediaQuery(theme.breakpoints.up('sm'), { noSsr: true })
+    ? CHART_HEIGHT_DESKTOP
+    : CHART_HEIGHT_MOBILE
+
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
         <Box sx={{ mb: 3 }}>
           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
             <ShowChartIcon fontSize="small" sx={{ color: 'primary.main' }} />
@@ -58,11 +76,18 @@ export default function MarketIndices() {
           </Typography>
         </Box>
 
+        {/* Exactly three index proxies, so hold three equal columns from sm up
+            (two-up on phones) — they span the full band width rather than
+            stopping at three of the default four-column desktop grid. */}
         <QuoteGrid
           items={INDICES}
           etf
           selectedSymbol={selected}
           onSelect={setSelected}
+          columns={{
+            xs: 'repeat(2, minmax(0, 1fr))',
+            sm: 'repeat(3, minmax(0, 1fr))',
+          }}
         />
 
         <Card variant="outlined" sx={{ borderColor: 'divider', mt: 3 }}>
@@ -100,7 +125,7 @@ export default function MarketIndices() {
                 sx={{
                   alignItems: 'center',
                   justifyContent: 'center',
-                  minHeight: 280,
+                  minHeight: chartHeight,
                 }}
               >
                 <CircularProgress />
@@ -115,6 +140,7 @@ export default function MarketIndices() {
               <CandleChart
                 candles={candleQuery.data.candles}
                 timeframe={candleQuery.data.timeframe}
+                height={chartHeight}
               />
             )}
           </CardContent>

@@ -12,10 +12,11 @@ import type { Candle, EmaLine, SupportLevel } from '@/lib/api'
 // so one viewBox unit ≈ one CSS pixel and the in-SVG axis text stays legible on
 // a phone instead of being shrunk to ~4px by an 820-unit box crammed into
 // ~300px. Until we've measured — and in jsdom, which has no ResizeObserver — we
-// fall back to a sensible desktop width. The height is fixed, so with
-// `preserveAspectRatio="none"` the chart always renders H px tall.
+// fall back to a sensible desktop width. The height is fixed per instance (the
+// `height` prop, defaulting to H_DEFAULT), so with `preserveAspectRatio="none"`
+// the chart always renders that many px tall.
 const W_FALLBACK = 820
-const H = 360
+const H_DEFAULT = 360
 const PAD = { top: 14, right: 58, bottom: 26, left: 10 }
 const VOL_BAND = 54 // height reserved for the volume histogram at the bottom
 
@@ -84,6 +85,13 @@ interface Props {
    * window are simply skipped — a line only draws where the candles exist.
    */
   emaLines?: EmaLine[]
+  /**
+   * Overall SVG height in px (default {@link H_DEFAULT}, 360). The home band runs
+   * a taller chart to match its full-bleed width; the stock page keeps the
+   * default. All internal geometry derives from this, so the plot scales while
+   * the volume band keeps its fixed height.
+   */
+  height?: number
 }
 
 /**
@@ -97,6 +105,7 @@ export default function CandleChart({
   timeframe,
   supportLevels,
   emaLines,
+  height = H_DEFAULT,
 }: Props) {
   const theme = useTheme()
   const [hover, setHover] = useState<number | null>(null)
@@ -121,6 +130,9 @@ export default function CandleChart({
     return () => ro.disconnect()
   }, [])
   const W = cw
+  // Local alias so the geometry below reads the same as before; all of it
+  // derives from H, which is now per-instance via the `height` prop.
+  const H = height
 
   const up = theme.palette.success.main
   const down = theme.palette.error.main
@@ -228,7 +240,7 @@ export default function CandleChart({
       trendUp,
       emaPaths,
     }
-  }, [candles, W, intraday, emaLines])
+  }, [candles, W, H, intraday, emaLines])
 
   if (candles.length === 0) {
     return (
