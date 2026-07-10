@@ -580,7 +580,7 @@ export function optionsSignal(
 /** How far back a chart reaches. Doubles as the API `range` query value. */
 export const CHART_RANGES = [
   '1D',
-  '5D',
+  '7D',
   '1M',
   '3M',
   '6M',
@@ -614,7 +614,7 @@ export function defaultTimeframe(range: ChartRange): Timeframe {
   switch (range) {
     case '1D':
       return '5Min'
-    case '5D':
+    case '7D':
       return '15Min'
     case '1M':
       return '4Hour'

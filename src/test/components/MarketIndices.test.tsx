@@ -145,10 +145,10 @@ describe('MarketIndices', () => {
       await screen.findByRole('img', { name: /candlestick price chart/i }),
     ).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: '5D' }))
+    await user.click(screen.getByRole('button', { name: '7D' }))
     await waitFor(() =>
       expect(mock).toHaveBeenCalledWith(
-        expect.stringMatching(/\/stocks\/ticker\/SPY\/candles\?.*range=5D/),
+        expect.stringMatching(/\/stocks\/ticker\/SPY\/candles\?.*range=7D/),
         expect.anything(),
       ),
     )

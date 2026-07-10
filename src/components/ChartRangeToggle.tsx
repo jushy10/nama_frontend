@@ -5,7 +5,7 @@ import type { ChartRange } from '@/lib/api'
 // price chart shares this row so they all present one mental model.
 const RANGE_OPTIONS: ChartRange[] = [
   '1D',
-  '5D',
+  '7D',
   '1M',
   '3M',
   '6M',
