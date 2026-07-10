@@ -67,6 +67,119 @@ function fmtCap(n: number): string {
   return `$${n.toFixed(0)}`
 }
 
+// Text fitting, in viewBox units. Tickers are drawn as large as will fit a tile,
+// with the day-move percent stacked beneath when there's still room for both. A
+// tile too small for even the smallest legible ticker is left blank.
+const PCT_RATIO = 0.62 // percent font size relative to the ticker's
+const LABEL_PAD = 1.5 // inset kept clear of the tile edge, per side
+const MAX_TICKER_FS = 22 // cap so the biggest tiles don't get billboard text
+const MIN_TICKER_FS = 3.5 // below this a ticker is unreadable — draw nothing
+const MIN_PCT_FS = 2.7 // and below this the percent line is dropped
+
+// Advance widths (as a fraction of font size) for the bold glyphs a ticker or
+// percent can contain — measured from the app's `system-ui` bold face (Segoe UI on
+// Windows, the widest of the common system fonts, so text sized by these never
+// spills on narrower faces like macOS's San Francisco). A single average factor
+// can't fit both "WDC" (all wide letters) and "IT" (all narrow), so labels are
+// sized by their real summed glyph widths; unknown glyphs fall back to wide.
+const GLYPH_EM: Record<string, number> = {
+  A: 0.73,
+  B: 0.68,
+  C: 0.63,
+  D: 0.74,
+  E: 0.6,
+  F: 0.57,
+  G: 0.77,
+  H: 0.79,
+  I: 0.33,
+  J: 0.45,
+  K: 0.68,
+  L: 0.56,
+  M: 0.96,
+  N: 0.79,
+  O: 0.76,
+  P: 0.62,
+  Q: 0.76,
+  R: 0.69,
+  S: 0.63,
+  T: 0.59,
+  U: 0.78,
+  V: 0.71,
+  W: 1.03,
+  X: 0.69,
+  Y: 0.67,
+  Z: 0.63,
+  '0': 0.58,
+  '1': 0.58,
+  '2': 0.58,
+  '3': 0.58,
+  '4': 0.58,
+  '5': 0.58,
+  '6': 0.58,
+  '7': 0.58,
+  '8': 0.58,
+  '9': 0.58,
+  '.': 0.28,
+  ',': 0.28,
+  '+': 0.71,
+  '-': 0.41,
+  '%': 0.87,
+  ' ': 0.28,
+}
+const DEFAULT_EM = 0.8
+
+/** Text width in font-size units — the summed advance widths of its glyphs. */
+function textEm(s: string): number {
+  let sum = 0
+  for (const c of s) sum += GLYPH_EM[c] ?? DEFAULT_EM
+  return sum
+}
+
+interface TileLabel {
+  showTicker: boolean
+  showPct: boolean
+  tickerFs: number
+  pctFs: number
+}
+
+/**
+ * The largest ticker (and optional percent) font that fits a `w`×`h` tile.
+ *
+ * Sizing is bounded by the tile width (the ticker must fit on one line, measured by
+ * its real glyph widths) and its height (one line for the ticker alone, or ~two when
+ * the percent stacks below). Returns `showTicker: false` when the tile can't hold a
+ * legible ticker at all.
+ */
+function fitLabel(
+  w: number,
+  h: number,
+  ticker: string,
+  pct: string,
+): TileLabel {
+  const innerW = w - LABEL_PAD * 2
+  const innerH = h - LABEL_PAD * 2
+  const widthCapped = innerW / textEm(ticker)
+
+  // Stacked ticker + percent: split the height ~two lines, and only if the
+  // percent string also fits the width at its smaller font.
+  const stackFs = Math.min(widthCapped, innerH / 1.95, MAX_TICKER_FS)
+  const stackPctFs = stackFs * PCT_RATIO
+  const pctFitsWidth = textEm(pct) * stackPctFs <= innerW
+  const showPct =
+    stackFs >= MIN_TICKER_FS && stackPctFs >= MIN_PCT_FS && pctFitsWidth
+
+  // Ticker alone: it may use nearly the full height.
+  const soloFs = Math.min(widthCapped, innerH * 0.92, MAX_TICKER_FS)
+  const showTicker = showPct || soloFs >= MIN_TICKER_FS
+
+  return {
+    showTicker,
+    showPct,
+    tickerFs: showPct ? stackFs : soloFs,
+    pctFs: stackPctFs,
+  }
+}
+
 /**
  * The heat-map treemap: sectors are the outer blocks (sized by their combined
  * market cap), each holding its stocks as inner tiles (sized by market cap,
@@ -132,10 +245,15 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
       <rect x={0} y={0} width={W} height={H} fill={paper} />
 
       {tiles.map((t) => {
-        const label = Math.min(t.w, t.h)
-        const showText = t.w > 26 && t.h > 16
-        const ticker = Math.max(7, Math.min(22, label / 3.1))
-        const showPct = t.h > ticker * 2.1 && t.w > ticker * 2.4
+        const pct = fmtPct(t.stock.change_percent)
+        const { showTicker, showPct, tickerFs, pctFs } = fitLabel(
+          t.w,
+          t.h,
+          t.stock.ticker,
+          pct,
+        )
+        const cx = t.x + t.w / 2
+        const cy = t.y + t.h / 2
         return (
           <g
             key={t.stock.ticker}
@@ -147,7 +265,7 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
             <title>
               {t.stock.ticker}
               {t.stock.name ? ` · ${t.stock.name}` : ''} ·{' '}
-              {fmtCap(t.stock.market_cap)} · {fmtPct(t.stock.change_percent)}
+              {fmtCap(t.stock.market_cap)} · {pct}
             </title>
             <rect
               x={t.x}
@@ -156,29 +274,29 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
               height={t.h}
               fill={tileColor(t.stock.change_percent)}
             />
-            {showText && (
+            {showTicker && (
               <text
-                x={t.x + t.w / 2}
-                y={t.y + t.h / 2 + (showPct ? -ticker * 0.15 : ticker * 0.34)}
+                x={cx}
+                y={cy + (showPct ? -tickerFs * 0.12 : tickerFs * 0.34)}
                 textAnchor="middle"
                 fill="#ffffff"
-                fontSize={ticker}
+                fontSize={tickerFs}
                 fontWeight={700}
                 style={{ pointerEvents: 'none' }}
               >
                 {t.stock.ticker}
               </text>
             )}
-            {showText && showPct && (
+            {showPct && (
               <text
-                x={t.x + t.w / 2}
-                y={t.y + t.h / 2 + ticker * 0.8}
+                x={cx}
+                y={cy + tickerFs * 0.82}
                 textAnchor="middle"
                 fill="rgba(255,255,255,0.9)"
-                fontSize={ticker * 0.62}
+                fontSize={pctFs}
                 style={{ pointerEvents: 'none' }}
               >
-                {fmtPct(t.stock.change_percent)}
+                {pct}
               </text>
             )}
           </g>

@@ -11,6 +11,7 @@ import {
 } from '@mui/material'
 import type { StockIndex } from '@/lib/api'
 import { errorMessage, useHeatMap } from '@/lib/queries'
+import { dedupeShareClasses } from '@/lib/heatmap'
 import HeatMapChart, { HeatMapLegend } from '@/components/HeatMap'
 
 const SCOPES: { value: StockIndex; label: string }[] = [
@@ -22,11 +23,18 @@ export default function HeatMapPage() {
   const [scope, setScope] = useState<StockIndex>('sp500')
   const query = useHeatMap(scope)
 
+  // Collapse multi-class shares (GOOGL/GOOG, …) to one tile per company so nothing
+  // is double-counted — feeds both the treemap and the up/down tally below.
+  const board = useMemo(
+    () => (query.data ? dedupeShareClasses(query.data) : undefined),
+    [query.data],
+  )
+
   // Up/down tally across every tile, for the summary line.
   const tally = useMemo(() => {
     let up = 0
     let down = 0
-    for (const sector of query.data?.sectors ?? []) {
+    for (const sector of board?.sectors ?? []) {
       for (const industry of sector.industries) {
         for (const s of industry.stocks) {
           if (s.change_percent == null) continue
@@ -36,7 +44,7 @@ export default function HeatMapPage() {
       }
     }
     return { up, down }
-  }, [query.data])
+  }, [board])
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
@@ -97,7 +105,7 @@ export default function HeatMapPage() {
               >
                 {tally.down} down
               </Box>{' '}
-              · {query.data.count} stocks
+              · {board?.count ?? 0} stocks
             </Typography>
             <HeatMapLegend />
           </Stack>
@@ -116,7 +124,8 @@ export default function HeatMapPage() {
           </Alert>
         )}
         {query.isSuccess &&
-          (query.data.count === 0 ? (
+          board &&
+          (board.count === 0 ? (
             <Alert severity="info" variant="outlined">
               No stocks to map yet — the universe is still being populated.
             </Alert>
@@ -130,7 +139,7 @@ export default function HeatMapPage() {
                 bgcolor: 'background.paper',
               }}
             >
-              <HeatMapChart data={query.data} />
+              <HeatMapChart data={board} />
             </Box>
           ))}
       </Box>
