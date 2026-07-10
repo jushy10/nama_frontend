@@ -2064,11 +2064,14 @@ export async function getAnalystInfo(
   const data = (await res.json()) as AnalystInfo
   if (
     !Array.isArray(data?.recommendations?.trends) ||
-    !Array.isArray(data?.rating_changes) ||
-    !Array.isArray(data?.top_firms)
+    !Array.isArray(data?.rating_changes)
   ) {
     throw new ApiError(res.status, 'Malformed analyst-info response')
   }
+  // `top_firms` was added to this endpoint after the fields above; tolerate a
+  // backend that predates it (deploy skew) by defaulting to an empty list rather
+  // than failing the whole card.
+  if (!Array.isArray(data.top_firms)) data.top_firms = []
   return data
 }
 
