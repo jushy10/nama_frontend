@@ -38,6 +38,16 @@ const navItems = [
   { label: 'Heat Map', to: '/heatmap', end: false },
 ]
 
+// House brand accents, reused across the nav. The blue→gold line mirrors the
+// hero headline gradient; the active pill stays navy so white text keeps its
+// contrast (a gold-ended fill would wash it out).
+const BRAND_LINE =
+  'linear-gradient(90deg, transparent 0%, #4f83e6 28%, #d7a739 72%, transparent 100%)'
+const ACTIVE_PILL = 'linear-gradient(135deg, #07378e 0%, #4f83e6 100%)'
+const ACTIVE_GLOW = '0 6px 16px -5px rgba(47,99,180,0.55)'
+const LOGO_GLOW = 'drop-shadow(0 0 8px rgba(47,99,180,0.4))'
+const LOGO_GLOW_HOVER = 'drop-shadow(0 0 12px rgba(47,99,180,0.65))'
+
 /** `large` is for the top banner; the drawer keeps the compact size so the
  *  wordmark still fits its 260px panel. */
 function Brand({ large = false }: { large?: boolean }) {
@@ -52,6 +62,7 @@ function Brand({ large = false }: { large?: boolean }) {
         gap: 1,
         textDecoration: 'none',
         color: 'text.primary',
+        '&:hover img': { filter: LOGO_GLOW_HOVER },
       }}
     >
       <Box
@@ -63,6 +74,8 @@ function Brand({ large = false }: { large?: boolean }) {
           width: large ? { xs: 40, md: 64 } : 48,
           display: 'block',
           flexShrink: 0,
+          filter: LOGO_GLOW,
+          transition: 'filter 0.25s ease',
         }}
       />
       {/* The large wordmark only fits beside the phone toolbar's buttons at
@@ -108,7 +121,18 @@ function ColorModeToggle() {
       onClick={toggleColorMode}
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
+      sx={{
+        color: 'text.secondary',
+        border: 1,
+        borderColor: 'divider',
+        transition:
+          'color 0.2s ease, border-color 0.2s ease, background 0.2s ease',
+        '&:hover': {
+          color: 'primary.light',
+          borderColor: 'primary.main',
+          bgcolor: 'action.hover',
+        },
+      }}
     >
       {isDark ? <LightModeOutlinedIcon /> : <DarkModeOutlinedIcon />}
     </IconButton>
@@ -140,44 +164,64 @@ function App() {
           borderColor: 'divider',
         }}
       >
+        {/* Thin blue→gold ticker line echoing the hero headline gradient. */}
+        <Box sx={{ height: 2, background: BRAND_LINE }} />
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
             <Brand large />
-            {/* Desktop: inline nav. Mobile (xs–sm): collapses to a drawer. */}
+            {/* Desktop (lg+): inline nav. Below lg the seven items no longer fit
+                beside the wordmark, so the bar collapses to the drawer. */}
             <Stack
               direction="row"
-              spacing={3}
-              sx={{ alignItems: 'center', display: { xs: 'none', md: 'flex' } }}
+              spacing={1.5}
+              sx={{ alignItems: 'center', display: { xs: 'none', lg: 'flex' } }}
             >
-              {navItems.map((item) => (
-                <Button
-                  key={item.to}
-                  component={NavLink}
-                  to={item.to}
-                  end={item.end}
-                  variant="text"
-                  sx={{
-                    color: 'text.secondary',
-                    fontWeight: 500,
-                    fontSize: '1rem',
-                    minWidth: 0,
-                    p: 0,
-                    '&:hover': {
-                      color: 'text.primary',
-                      bgcolor: 'transparent',
-                    },
-                    '&.active': { color: 'text.primary' },
-                  }}
-                >
-                  {item.label}
-                </Button>
-              ))}
+              <Stack
+                direction="row"
+                spacing={0.5}
+                sx={{ alignItems: 'center' }}
+              >
+                {navItems.map((item) => (
+                  <Button
+                    key={item.to}
+                    component={NavLink}
+                    to={item.to}
+                    end={item.end}
+                    variant="text"
+                    disableRipple
+                    sx={{
+                      px: 1.5,
+                      py: 0.75,
+                      minWidth: 0,
+                      borderRadius: 999,
+                      fontWeight: 600,
+                      fontSize: '0.9rem',
+                      lineHeight: 1.2,
+                      whiteSpace: 'nowrap',
+                      color: 'text.secondary',
+                      transition:
+                        'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
+                      '&:hover:not(.active)': {
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                      },
+                      '&.active': {
+                        color: '#fff',
+                        background: ACTIVE_PILL,
+                        boxShadow: ACTIVE_GLOW,
+                      },
+                    }}
+                  >
+                    {item.label}
+                  </Button>
+                ))}
+              </Stack>
               <ColorModeToggle />
             </Stack>
             <Stack
               direction="row"
               spacing={0.5}
-              sx={{ alignItems: 'center', display: { xs: 'flex', md: 'none' } }}
+              sx={{ alignItems: 'center', display: { xs: 'flex', lg: 'none' } }}
             >
               <ColorModeToggle />
               <IconButton
@@ -197,14 +241,21 @@ function App() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         slotProps={{
-          paper: { sx: { width: 260, bgcolor: 'background.paper' } },
+          paper: { sx: { width: 272, bgcolor: 'background.paper' } },
         }}
       >
+        {/* Mirror the AppBar's blue→gold accent along the drawer's top edge. */}
+        <Box
+          sx={{
+            height: 3,
+            background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
+          }}
+        />
         <Box sx={{ p: 2 }}>
           <Brand />
         </Box>
         <Divider />
-        <List>
+        <List sx={{ px: 1, py: 1.5 }}>
           {navItems.map((item) => (
             <ListItemButton
               key={item.to}
@@ -213,11 +264,18 @@ function App() {
               end={item.end}
               onClick={() => setDrawerOpen(false)}
               sx={{
+                borderRadius: 2,
+                my: 0.5,
                 color: 'text.secondary',
+                transition: 'color 0.2s ease, background 0.2s ease',
+                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
                 '&.active': {
-                  color: 'text.primary',
-                  bgcolor: 'rgba(47,99,180,0.12)',
+                  color: '#fff',
+                  background: ACTIVE_PILL,
+                  boxShadow: ACTIVE_GLOW,
+                  '&:hover': { color: '#fff', background: ACTIVE_PILL },
                 },
+                '& .MuiListItemText-primary': { fontWeight: 600 },
               }}
             >
               <ListItemText primary={item.label} />
