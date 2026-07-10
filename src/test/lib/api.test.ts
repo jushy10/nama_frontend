@@ -767,6 +767,18 @@ describe('getPeHistory', () => {
         { date: '2024-02-01', price: 185.12, ttm_eps: 6.43, pe: 28.78 },
         { date: '2024-05-01', price: 190.0, ttm_eps: 6.5, pe: 29.23 },
       ],
+      stats: {
+        current_pe: 29.23,
+        median_pe: 24.5,
+        p25_pe: 21.0,
+        p75_pe: 26.0,
+        min_pe: 17.0,
+        max_pe: 30.0,
+        current_percentile: 88.2,
+        discount_to_median_percent: 19.3,
+        signal: 'expensive',
+        sample_size: 12,
+      },
     }
     vi.stubGlobal(
       'fetch',
@@ -785,6 +797,8 @@ describe('getPeHistory', () => {
     expect(requestedUrl).toContain('/stocks/ticker/aapl/pe-history')
     expect(result.count).toBe(2)
     expect(result.points[0].pe).toBe(28.78)
+    expect(result.stats?.signal).toBe('expensive')
+    expect(result.stats?.current_percentile).toBe(88.2)
   })
 
   it('returns a 200 with an empty series for an uncovered symbol', async () => {
@@ -794,12 +808,19 @@ describe('getPeHistory', () => {
         Promise.resolve({
           ok: true,
           status: 200,
-          json: () => Promise.resolve({ ticker: 'ZZZZ', count: 0, points: [] }),
+          json: () =>
+            Promise.resolve({
+              ticker: 'ZZZZ',
+              count: 0,
+              points: [],
+              stats: null,
+            }),
         }),
       ),
     )
     const result = await getPeHistory('ZZZZ')
     expect(result.count).toBe(0)
     expect(result.points).toEqual([])
+    expect(result.stats).toBeNull()
   })
 })
