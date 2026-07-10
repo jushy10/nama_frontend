@@ -92,11 +92,13 @@ type MetricColumn = {
   groupStart?: boolean
 }
 
-// The metric columns, left to right. The core four (cap, P/E, trailing growth)
-// show at every width so the metric you sort by is visible; the two forward-growth
-// columns join from `lg` up (they're the newest and the most often empty, needing
-// two years of estimates) but still reveal themselves whenever they're the active
-// sort. Every header doubles as a sort toggle (see `onSort`).
+// The metric columns, left to right, revealed progressively as the screen widens so
+// the table never overflows a phone: market cap + P/E (the core valuation pair) show
+// at every width; the trailing-growth pair joins from `sm` up; the two forward-growth
+// columns from `lg` up (they're the newest and the most often empty, needing two years
+// of estimates). Any hidden column still reveals itself whenever it's the active sort,
+// so the metric you sort by is always on screen. Every header doubles as a sort toggle
+// (see `onSort`).
 const METRIC_COLUMNS: MetricColumn[] = [
   {
     key: 'market_cap',
@@ -118,6 +120,7 @@ const METRIC_COLUMNS: MetricColumn[] = [
     tip: 'Latest reported revenue growth, year over year',
     variant: 'growth',
     value: (s) => s.revenue_growth_yoy,
+    hide: HIDE_SM,
   },
   {
     key: 'eps_growth',
@@ -125,6 +128,7 @@ const METRIC_COLUMNS: MetricColumn[] = [
     tip: 'Latest reported EPS growth, year over year (consensus basis)',
     variant: 'growth',
     value: (s) => s.eps_growth_yoy,
+    hide: HIDE_SM,
   },
   {
     key: 'forward_revenue_growth',
@@ -836,11 +840,20 @@ export default function Screener() {
               setNasdaq100(values.includes('nasdaq100'))
             }}
             aria-label="Index membership"
+            // Full width on phones so it lines up with the stacked fields above;
+            // its natural width from `md` up where it sits inline.
+            sx={{ width: { xs: '100%', md: 'auto' } }}
           >
-            <ToggleButton value="sp500" sx={{ px: 2, py: 0.5 }}>
+            <ToggleButton
+              value="sp500"
+              sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
+            >
               S&amp;P 500
             </ToggleButton>
-            <ToggleButton value="nasdaq100" sx={{ px: 2, py: 0.5 }}>
+            <ToggleButton
+              value="nasdaq100"
+              sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
+            >
               Nasdaq 100
             </ToggleButton>
           </ToggleButtonGroup>
@@ -850,7 +863,11 @@ export default function Screener() {
           <Stack
             direction="row"
             spacing={0.5}
-            sx={{ alignItems: 'center', ml: { md: 'auto' } }}
+            sx={{
+              alignItems: 'center',
+              width: { xs: '100%', md: 'auto' },
+              ml: { md: 'auto' },
+            }}
           >
             <TextField
               select
@@ -861,7 +878,8 @@ export default function Screener() {
                 const v = e.target.value
                 setSort(v === NO_SORT ? null : (v as StockSearchSort))
               }}
-              sx={{ minWidth: 150 }}
+              // Fill the row on phones (leaving the arrow its space); fixed width inline.
+              sx={{ flex: { xs: 1, md: 'none' }, minWidth: 150 }}
             >
               <MenuItem value={NO_SORT}>None</MenuItem>
               {SORT_OPTIONS.map((opt) => (
