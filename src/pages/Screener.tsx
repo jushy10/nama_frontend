@@ -303,7 +303,12 @@ function IndexChips({ stock }: { stock: StockSearchResult }) {
     return <Box sx={{ color: 'text.secondary' }}>—</Box>
   }
   return (
-    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+    <Stack
+      direction="row"
+      spacing={0.5}
+      useFlexGap
+      sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
+    >
       {stock.in_sp500 && (
         <Chip label="S&P 500" size="small" variant="outlined" />
       )}
@@ -895,7 +900,7 @@ export default function Screener() {
             size="small"
             value={aiInput}
             onChange={(e) => setAiInput(e.target.value)}
-            placeholder="e.g. mega-cap technology stocks, or top S&P 500 names by revenue growth"
+            placeholder="e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth"
             disabled={aiScreen.isPending}
             sx={{ flex: '1 1 320px', minWidth: { xs: '100%', sm: 320 } }}
             slotProps={{
@@ -927,11 +932,14 @@ export default function Screener() {
             {aiScreen.isPending ? 'Screening…' : 'Screen'}
           </Button>
         </Box>
-        {/* One-tap example prompts. */}
+        {/* One-tap example prompts. `useFlexGap` so the spacing is CSS `gap`, not
+            child margins — margins don't reset on wrap, which left the chips that
+            wrapped to a new line indented out of alignment with the first. */}
         <Stack
           direction="row"
           spacing={1}
-          sx={{ mt: 1.5, flexWrap: 'wrap', rowGap: 1 }}
+          useFlexGap
+          sx={{ mt: 1.5, flexWrap: 'wrap' }}
         >
           {AI_EXAMPLES.map((ex) => (
             <Chip
