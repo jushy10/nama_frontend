@@ -4,7 +4,9 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Chip,
+  CircularProgress,
   Container,
   IconButton,
   InputAdornment,
@@ -28,17 +30,24 @@ import {
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import {
   humanizeClassification,
   stockLogoUrl,
+  type AiScreenInterpretation,
   type MarketCapTier,
   type SortOrder,
   type StockSearchResult,
   type StockSearchSort,
 } from '@/lib/api'
-import { errorMessage, useClassifications, useStockSearch } from '@/lib/queries'
+import {
+  errorMessage,
+  useAiStockScreen,
+  useClassifications,
+  useStockSearch,
+} from '@/lib/queries'
 import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
@@ -176,6 +185,20 @@ const MARKET_CAP_OPTIONS: FilterOption[] = MARKET_CAP_TIERS.map((t) => ({
 }))
 const capShort = (tier: MarketCapTier) =>
   MARKET_CAP_TIERS.find((t) => t.value === tier)?.short ?? tier
+
+// The sort keys and cap tiers the AI screen may name in its interpreted filters. The
+// API types those as raw strings (it can only ever return known slugs, but the shape
+// doesn't prove it), so validate against these before they drive the typed controls —
+// an off-vocabulary value is simply dropped rather than forced into a union.
+const VALID_SORTS = new Set<string>(SORT_OPTIONS.map((o) => o.key))
+const VALID_TIERS = new Set<string>(MARKET_CAP_TIERS.map((t) => t.value))
+
+// A few plain-English prompts, shown under the AI box as one-tap starters.
+const AI_EXAMPLES = [
+  'Mega-cap technology stocks',
+  'Top S&P 500 names by revenue growth',
+  'Cheap large-cap semiconductor companies',
+] as const
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
 // industry, indices, + the metric columns.
@@ -456,7 +479,44 @@ export default function Screener() {
   const [order, setOrder] = useState<SortOrder>('desc')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
+  // The AI-screen box: its own text (separate from the name/ticker filter, which the
+  // AI populates) and the mutation that translates it into filters.
+  const [aiInput, setAiInput] = useState('')
+  const aiScreen = useAiStockScreen()
   const navigate = useNavigate()
+
+  // Apply the AI's interpreted filters to the manual controls — a fresh screen, so it
+  // replaces every axis (clearing ones the request didn't set) rather than layering on
+  // top of whatever was there. The result then flows through the ordinary useStockSearch
+  // and the user can tweak any control. Each value is validated before it drives a typed
+  // control; an off-vocabulary sort/tier falls back to the page's default.
+  const applyInterpretation = (interp: AiScreenInterpretation) => {
+    setSearchInput(interp.query ?? '')
+    setSectors(interp.sectors)
+    setIndustries(interp.industries)
+    setMarketCaps(
+      interp.market_cap_tiers.filter((t): t is MarketCapTier =>
+        VALID_TIERS.has(t),
+      ),
+    )
+    setSp500(interp.in_sp500 === true)
+    setNasdaq100(interp.in_nasdaq100 === true)
+    setSort(
+      interp.sort && VALID_SORTS.has(interp.sort)
+        ? (interp.sort as StockSearchSort)
+        : 'market_cap',
+    )
+    setOrder(interp.direction === 'asc' ? 'asc' : 'desc')
+  }
+
+  const runAiScreen = (raw?: string) => {
+    const request = (raw ?? aiInput).trim()
+    if (!request || aiScreen.isPending) return
+    if (raw != null) setAiInput(raw) // reflect a one-tap example in the box
+    aiScreen.mutate(request, {
+      onSuccess: (data) => applyInterpretation(data.interpreted),
+    })
+  }
 
   // Any filter/sort change starts a new result set, so jump back to page 1 —
   // otherwise a narrow filter could leave you stranded past its last page.
@@ -616,11 +676,102 @@ export default function Screener() {
         </Tooltip>
       </Stack>
 
-      {/* Filter card */}
+      {/* AI screen box — ask in plain English; the model fills in the filters below,
+          which you can then tweak by hand. */}
       <Paper
         variant="outlined"
         sx={{
           mt: 4,
+          p: { xs: 1.5, sm: 2 },
+          borderRadius: 3,
+          borderColor: 'primary.dark',
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', mb: 1.5 }}
+        >
+          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.light' }} />
+          <Typography sx={{ fontWeight: 700 }}>
+            Ask AI to build a screen
+          </Typography>
+        </Stack>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            runAiScreen()
+          }}
+          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}
+        >
+          <TextField
+            size="small"
+            value={aiInput}
+            onChange={(e) => setAiInput(e.target.value)}
+            placeholder="e.g. mega-cap technology stocks, or top S&P 500 names by revenue growth"
+            disabled={aiScreen.isPending}
+            sx={{ flex: '1 1 320px', minWidth: { xs: '100%', sm: 320 } }}
+            slotProps={{
+              // aria-label on the native input (a label-less field) so it has an
+              // accessible name; the icon rides the input adornment.
+              htmlInput: { 'aria-label': 'Describe the stocks you want' },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AutoAwesomeIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={!aiInput.trim() || aiScreen.isPending}
+            startIcon={
+              aiScreen.isPending ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <AutoAwesomeIcon />
+              )
+            }
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {aiScreen.isPending ? 'Screening…' : 'Screen'}
+          </Button>
+        </Box>
+        {/* One-tap example prompts. */}
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ mt: 1.5, flexWrap: 'wrap', rowGap: 1 }}
+        >
+          {AI_EXAMPLES.map((ex) => (
+            <Chip
+              key={ex}
+              label={ex}
+              size="small"
+              variant="outlined"
+              onClick={() => runAiScreen(ex)}
+              disabled={aiScreen.isPending}
+              sx={{ cursor: 'pointer' }}
+            />
+          ))}
+        </Stack>
+        {aiScreen.isError && (
+          <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>
+            {errorMessage(aiScreen.error)}
+          </Alert>
+        )}
+      </Paper>
+
+      {/* Filter card */}
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 2,
           p: { xs: 1.5, sm: 2 },
           borderRadius: 3,
           borderColor: 'divider',

@@ -1109,6 +1109,66 @@ export async function searchStocks(
 }
 
 /**
+ * The filters an AI screen resolved a plain-English request into
+ * (`GET /stocks/ai-search`) — echoed back so the UI can show what was applied and
+ * let the user tweak it in the manual controls. Every field maps one-to-one onto a
+ * manual screener control: `sectors`/`industries` are stored slugs, `market_cap_tiers`
+ * the same tier strings, `sort`/`direction` the same sort keys. All optional/empty
+ * when the request didn't call for them (an all-unset interpretation is a neutral
+ * browse). Typed with the raw `string` unions the API can return; the caller validates
+ * them against the known control values before applying.
+ */
+export interface AiScreenInterpretation {
+  query: string | null
+  sectors: string[]
+  industries: string[]
+  in_sp500: boolean | null
+  in_nasdaq100: boolean | null
+  market_cap_tiers: string[]
+  sort: string | null
+  direction: string
+  limit: number | null
+}
+
+/**
+ * The response to an AI screen (`GET /stocks/ai-search`): the interpreted filters
+ * plus the matched page. `results` is the exact `StockSearchResponse` the manual
+ * `searchStocks` returns, so both paths render identically; `interpreted` is the
+ * AI's reading of the request, for the UI to surface and make editable.
+ */
+export interface AiScreenResponse {
+  interpreted: AiScreenInterpretation
+  results: StockSearchResponse
+}
+
+/**
+ * Screen the ≥$1B US universe from a plain-English request (`GET /stocks/ai-search`).
+ * An AI translates `query` ("mega-cap technology stocks", "top S&P 500 names by
+ * revenue growth") into the same filters `searchStocks` accepts and runs it, so the
+ * results are always real screened stocks. Returns the interpreted filters alongside
+ * the page — apply the former to the manual controls so the user sees and can edit
+ * what was applied. A blank query is a 400; a translation failure (the model couldn't
+ * parse it) a 502.
+ */
+export async function aiSearchStocks(
+  query: string,
+  opts: { limit?: number; offset?: number; signal?: AbortSignal } = {},
+): Promise<AiScreenResponse> {
+  const qs = new URLSearchParams({ q: query })
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  if (opts.offset != null) qs.set('offset', String(opts.offset))
+  const res = await fetch(`${API_BASE}/stocks/ai-search?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AiScreenResponse
+  if (!data?.interpreted || !Array.isArray(data?.results?.results)) {
+    throw new ApiError(res.status, 'Malformed AI screen response')
+  }
+  return data
+}
+
+/**
  * The distinct sector and industry slugs present in the universe — the screener's
  * filter menus (`GET /stocks/classifications`). Two flat, sorted lists; feed a
  * chosen slug back to `searchStocks`, and humanize it for display with
