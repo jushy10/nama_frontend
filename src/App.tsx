@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { NavLink, Route, Routes } from 'react-router-dom'
 import {
   AppBar,
@@ -13,19 +13,12 @@ import {
   ListItemText,
   Stack,
   Toolbar,
-  Tooltip,
   Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
-import {
-  getMarketStatus,
-  marketLabel,
-  marketTooltip,
-  type MarketPhase,
-} from '@/lib/market'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
@@ -34,7 +27,6 @@ import Sectors from '@/pages/Sectors'
 import Mag7 from '@/pages/Mag7'
 import HeatMapPage from '@/pages/HeatMap'
 import RedirectToSearch from '@/components/RedirectToSearch'
-import MarketStatusDot from '@/components/MarketStatusDot'
 
 const navItems = [
   { label: 'Home', to: '/', end: true },
@@ -107,94 +99,6 @@ function Brand({ large = false }: { large?: boolean }) {
   )
 }
 
-/** Compact phase wording for the tightest (xs) phones, where the full label
- *  won't fit beside the wordmark; the dot and tooltip carry the rest. */
-const SHORT_LABEL: Record<MarketPhase, string> = {
-  pre: 'Pre',
-  regular: 'Open',
-  after: 'After',
-  closed: 'Closed',
-}
-
-/** The current phase (drives the dot), its short label, and hover summary. */
-function useMarketStatus() {
-  const read = () => ({
-    phase: getMarketStatus(new Date()).phase,
-    label: marketLabel(new Date()),
-    tooltip: marketTooltip(new Date()),
-  })
-  const [state, setState] = useState(read)
-  useEffect(() => {
-    const tick = () => setState(read())
-    tick() // catch any drift between the initial render and mount
-    const id = window.setInterval(tick, 60_000)
-    return () => window.clearInterval(id)
-  }, [])
-  return state
-}
-
-/**
- * Small status hint beside the brand: the market's current phase as a coloured
- * dot — emerald and gently pulsing while the regular session is open, cooling
- * to amber/blue/grey off-hours — with an always-visible label ("Market Open",
- * "After Hours", …) so the status reads without a hover. A hint, not a control
- * — no click. Hover still adds the countdown (e.g. "Market Open · Closes in 2h
- * 14m"). On the tightest (xs) phones the label shrinks to a compact form
- * ("Open" / "After" / "Closed") rather than folding away, so touch — which
- * can't hover — still reads the phase. Shares MarketStatusDot with the home
- * hero so the live "heartbeat" reads the same in both places.
- */
-function MarketStatus() {
-  const { phase, label, tooltip } = useMarketStatus()
-  const shortLabel = SHORT_LABEL[phase]
-
-  return (
-    <Tooltip title={tooltip}>
-      <Box
-        role="img"
-        aria-label={tooltip}
-        sx={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: 1,
-        }}
-      >
-        <MarketStatusDot phase={phase} />
-        {/* Compact wording on xs; the full label from sm up. Both are static
-            so the phase reads on touch, where the tooltip is out of reach. */}
-        <Typography
-          component="span"
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            fontSize: '0.8125rem',
-            fontWeight: 600,
-            lineHeight: 1,
-            letterSpacing: '0.01em',
-            color: 'text.secondary',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {shortLabel}
-        </Typography>
-        <Typography
-          component="span"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            fontSize: '1rem',
-            fontWeight: 600,
-            lineHeight: 1,
-            letterSpacing: '0.01em',
-            color: 'text.secondary',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {label}
-        </Typography>
-      </Box>
-    </Tooltip>
-  )
-}
-
 /** Sun/moon icon button that flips the app between light and dark mode. */
 function ColorModeToggle() {
   const { mode, toggleColorMode } = useColorMode()
@@ -238,14 +142,7 @@ function App() {
       >
         <Container maxWidth="xl">
           <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-            <Stack
-              direction="row"
-              spacing={{ xs: 1, sm: 3, md: 5 }}
-              sx={{ alignItems: 'center' }}
-            >
-              <Brand large />
-              <MarketStatus />
-            </Stack>
+            <Brand large />
             {/* Desktop: inline nav. Mobile (xs–sm): collapses to a drawer. */}
             <Stack
               direction="row"
