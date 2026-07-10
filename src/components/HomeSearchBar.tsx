@@ -1,51 +1,33 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Autocomplete,
-  Avatar,
-  Box,
   Button,
-  Chip,
   CircularProgress,
   Stack,
   TextField,
-  Typography,
 } from '@mui/material'
 import SearchIcon from '@mui/icons-material/Search'
-import { humanizeClassification, stockLogoUrl } from '@/lib/api'
-import { useEtfSearch, useStockSearch } from '@/lib/queries'
+import {
+  renderUniverseOption,
+  SEARCH_DEBOUNCE_MS,
+  useDebounced,
+  useUniverseSearchOptions,
+  type SearchOption,
+} from '@/lib/universeSearch'
 
-// Match the Search page: settle the query a beat after the last keystroke, and
-// keep the suggestion counts modest so the dropdown reads at a glance.
-const SEARCH_DEBOUNCE_MS = 250
+// Keep the suggestion counts modest so the hero dropdown reads at a glance.
 const STOCK_SUGGESTIONS = 6
 const ETF_SUGGESTIONS = 4
-
-/** Debounce a fast-changing value (the search box) so the query settles. */
-function useDebounced<T>(value: T, delayMs: number): T {
-  const [debounced, setDebounced] = useState(value)
-  useEffect(() => {
-    const id = setTimeout(() => setDebounced(value), delayMs)
-    return () => clearTimeout(id)
-  }, [value, delayMs])
-  return debounced
-}
-
-/** One row in the dropdown — a stock or fund matched by name or ticker. */
-interface SearchOption {
-  kind: 'stock' | 'etf'
-  ticker: string
-  name: string | null
-  meta: string | null
-}
 
 /**
  * The hero's primary call to action: a live type-ahead over the whole screened
  * universe — the same stock/ETF search the dedicated Search page runs, hoisted
  * onto the landing page so the front door *is* the product. Typing surfaces
  * matching names and tickers; picking one (or hitting Enter on an exact symbol)
- * routes to `/search?symbol=…`, where the full detail loads. Kept deliberately
- * self-contained so the hero stays a thin presentational shell.
+ * routes to `/search?symbol=…`, where the full detail loads. The type-ahead
+ * logic itself lives in `@/lib/universeSearch`, shared with the Search page so
+ * the two can't drift; the hero stays a thin presentational shell.
  */
 export default function HomeSearchBar() {
   const navigate = useNavigate()
@@ -53,50 +35,10 @@ export default function HomeSearchBar() {
   const debounced = useDebounced(input, SEARCH_DEBOUNCE_MS)
   const query = debounced.trim()
 
-  const stockSearch = useStockSearch({
-    q: query || null,
-    sectors: [],
-    industries: [],
-    inSp500: false,
-    inNasdaq100: false,
-    marketCaps: [],
-    sort: 'market_cap',
-    order: 'desc',
-    limit: STOCK_SUGGESTIONS,
-    offset: 0,
-    enabled: !!query,
+  const { options, searching } = useUniverseSearchOptions(query, {
+    stockLimit: STOCK_SUGGESTIONS,
+    etfLimit: ETF_SUGGESTIONS,
   })
-  const etfSearch = useEtfSearch({
-    q: query || null,
-    categories: [],
-    sort: 'net_assets',
-    order: 'desc',
-    limit: ETF_SUGGESTIONS,
-    offset: 0,
-    enabled: !!query,
-  })
-
-  // Stocks first, then funds — the same grouped order the Search page uses.
-  const options = useMemo<SearchOption[]>(() => {
-    if (!query) return []
-    const stocks: SearchOption[] = (stockSearch.data?.results ?? []).map(
-      (s) => ({
-        kind: 'stock',
-        ticker: s.ticker,
-        name: s.name,
-        meta: s.sector,
-      }),
-    )
-    const etfs: SearchOption[] = (etfSearch.data?.results ?? []).map((e) => ({
-      kind: 'etf',
-      ticker: e.ticker,
-      name: e.name,
-      meta: e.category,
-    }))
-    return [...stocks, ...etfs]
-  }, [query, stockSearch.data, etfSearch.data])
-
-  const searching = !!query && (stockSearch.isFetching || etfSearch.isFetching)
 
   /** Route to a ticker's detail page. */
   function go(raw: string) {
@@ -138,46 +80,7 @@ export default function HomeSearchBar() {
         blurOnSelect
         autoHighlight
         noOptionsText={query ? 'No matching stocks or ETFs' : 'Start typing…'}
-        renderOption={(props, option) => {
-          const { key, ...rest } = props
-          return (
-            <Box
-              component="li"
-              key={key}
-              {...rest}
-              sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}
-            >
-              <Avatar
-                src={stockLogoUrl(option.ticker)}
-                sx={{
-                  width: 28,
-                  height: 28,
-                  fontSize: 13,
-                  bgcolor: 'action.selected',
-                  color: 'text.secondary',
-                }}
-              >
-                {option.ticker.charAt(0)}
-              </Avatar>
-              <Box sx={{ minWidth: 0, flexGrow: 1 }}>
-                <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
-                  {option.name ?? option.ticker}
-                </Typography>
-                {option.meta && (
-                  <Typography variant="caption" color="text.secondary" noWrap>
-                    {humanizeClassification(option.meta)}
-                  </Typography>
-                )}
-              </Box>
-              <Chip
-                label={option.ticker}
-                size="small"
-                variant="outlined"
-                sx={{ fontWeight: 600, flexShrink: 0 }}
-              />
-            </Box>
-          )
-        }}
+        renderOption={renderUniverseOption}
         renderInput={(params) => (
           <TextField
             {...params}
