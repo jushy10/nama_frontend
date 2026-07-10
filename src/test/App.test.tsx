@@ -14,7 +14,9 @@ describe('App routing', () => {
   it('renders the stock screener page at /screener', async () => {
     const { user } = renderWithProviders(<App />)
 
-    await user.click(screen.getByRole('link', { name: /stock screener/i }))
+    // Anchor the name so it matches the nav link, not the home page's feature
+    // tile (whose accessible name embeds a longer description).
+    await user.click(screen.getByRole('link', { name: /^stock screener$/i }))
 
     expect(
       await screen.findByRole('heading', { name: /stock screener/i }),
@@ -24,7 +26,7 @@ describe('App routing', () => {
   it('renders the ETF screener page at /etf-screener', async () => {
     const { user } = renderWithProviders(<App />)
 
-    await user.click(screen.getByRole('link', { name: /etf screener/i }))
+    await user.click(screen.getByRole('link', { name: /^etf screener$/i }))
 
     expect(
       await screen.findByRole('heading', { name: /etf screener/i }),

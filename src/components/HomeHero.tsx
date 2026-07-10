@@ -1,10 +1,14 @@
 import { Link as RouterLink } from 'react-router-dom'
-import { Box, Button, Container, Stack, Typography } from '@mui/material'
-import SearchIcon from '@mui/icons-material/Search'
+import { Box, Button, Chip, Container, Stack, Typography } from '@mui/material'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TableRowsIcon from '@mui/icons-material/TableRows'
+import BoltIcon from '@mui/icons-material/Bolt'
 import { heroWash } from '@/components/heroWash'
+import HomeSearchBar from '@/components/HomeSearchBar'
+import MarketStatusDot from '@/components/MarketStatusDot'
+import { getMarketStatus, marketLabel } from '@/lib/market'
 
-/** Today, spelled out (e.g. "Thursday, July 9") for the hero eyebrow. */
+/** Today, spelled out (e.g. "Thursday, July 10") for the hero eyebrow. */
 function todayLabel(now: Date): string {
   return now.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -13,15 +17,26 @@ function todayLabel(now: Date): string {
   })
 }
 
+/** The three trust markers under the search bar — what the engine covers. */
+const TRUST = [
+  '1,000+ US stocks & ETFs',
+  'Refreshed daily',
+  'Powered by Claude',
+]
+
 /**
- * Home-page hero: a compact, gradient-washed intro that anchors the dashboard.
- * A live status eyebrow (market phase + today's date), a two-tone headline, a
- * one-line description of what's below, and two quick jumps into the app. The
- * gradient is tuned for both themes; everything stacks and scales down cleanly
- * on phones.
+ * Home-page hero: the app's front door, built around what it is — an AI-driven
+ * stock screener. A live market-status eyebrow, a two-tone headline that states
+ * the pitch, a one-line description of the coverage, and — as the primary call
+ * to action — the universe search itself, so a visitor's first move is to look
+ * something up rather than read about it. A "Powered by Claude" badge and a few
+ * coverage chips underline the AI angle; a secondary button opens the full
+ * screener. The blue→gold wash (shared with the stock-detail hero cards) plus a
+ * faint grid gives the band depth; everything stacks and scales on phones.
  */
 export default function HomeHero() {
   const now = new Date()
+  const phase = getMarketStatus(now).phase
 
   return (
     <Box
@@ -32,21 +47,64 @@ export default function HomeHero() {
         background: (theme) => heroWash(theme),
       }}
     >
-      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 8 } }}>
-        <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 720 }}>
-          {/* Eyebrow: today's date. The live market-status dot lives in the
-              app bar. */}
-          <Typography
-            variant="caption"
-            sx={{
-              fontWeight: 700,
-              textTransform: 'uppercase',
-              letterSpacing: '0.08em',
-              color: 'text.primary',
-            }}
+      {/* A faint grid, masked to fade out toward the edges — texture behind the
+          copy without competing with it. */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          backgroundImage: (theme) =>
+            `linear-gradient(${theme.palette.divider} 1px, transparent 1px), linear-gradient(90deg, ${theme.palette.divider} 1px, transparent 1px)`,
+          backgroundSize: '44px 44px',
+          maskImage:
+            'radial-gradient(circle at 30% 0%, rgba(0,0,0,0.5), transparent 70%)',
+          WebkitMaskImage:
+            'radial-gradient(circle at 30% 0%, rgba(0,0,0,0.5), transparent 70%)',
+        }}
+      />
+
+      <Container
+        maxWidth="xl"
+        sx={{ position: 'relative', py: { xs: 5, sm: 8 } }}
+      >
+        <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 760 }}>
+          {/* Eyebrow: live market phase + today's date, reading the same phase
+              as the app-bar status dot. */}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', color: 'text.primary' }}
           >
-            {todayLabel(now)}
-          </Typography>
+            <MarketStatusDot phase={phase} />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+              }}
+            >
+              {marketLabel(now)} · {todayLabel(now)}
+            </Typography>
+          </Stack>
+
+          {/* Powered-by-Claude badge — the AI angle, stated plainly. */}
+          <Chip
+            icon={<AutoAwesomeIcon />}
+            label="AI stock screener · Powered by Claude"
+            size="small"
+            sx={{
+              alignSelf: 'flex-start',
+              fontWeight: 600,
+              color: 'text.primary',
+              bgcolor: 'background.paper',
+              border: 1,
+              borderColor: 'divider',
+              '& .MuiChip-icon': { color: 'secondary.main' },
+            }}
+          />
 
           {/* Two-tone headline: the accent phrase carries the brand gradient. */}
           <Typography
@@ -59,7 +117,7 @@ export default function HomeHero() {
               fontSize: { xs: '2.1rem', sm: '3rem', md: '3.5rem' },
             }}
           >
-            The U.S. market,{' '}
+            The stock screener,{' '}
             <Box
               component="span"
               sx={{
@@ -69,7 +127,7 @@ export default function HomeHero() {
                 backgroundClip: 'text',
               }}
             >
-              read by AI
+              driven by AI
             </Box>
             .
           </Typography>
@@ -81,34 +139,67 @@ export default function HomeHero() {
               lineHeight: 1.6,
             }}
           >
-            Live index moves, plain-language reads of the market and its
-            sectors, and the fastest-growing mega caps — all on one page.
+            Screen 1,000+ US stocks and ETFs, then let AI read each one for you
+            — fundamentals, earnings, analyst coverage and options, in plain
+            English. Start with any name below.
           </Typography>
+
+          {/* Primary action: the universe search itself. */}
+          <Box sx={{ pt: 0.5 }}>
+            <HomeSearchBar />
+          </Box>
 
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1.5}
-            sx={{ pt: 1, width: { xs: '100%', sm: 'auto' } }}
+            sx={{ pt: 0.5, width: { xs: '100%', sm: 'auto' } }}
           >
             <Button
               component={RouterLink}
               to="/screener"
-              variant="contained"
+              variant="outlined"
               size="large"
               startIcon={<TableRowsIcon />}
+              sx={{ borderColor: 'divider', color: 'text.primary' }}
             >
               Open the Screener
             </Button>
             <Button
               component={RouterLink}
-              to="/search"
+              to="/heatmap"
               variant="outlined"
               size="large"
-              startIcon={<SearchIcon />}
+              startIcon={<BoltIcon />}
               sx={{ borderColor: 'divider', color: 'text.primary' }}
             >
-              Search a Stock or ETF
+              Market heat map
             </Button>
+          </Stack>
+
+          {/* Coverage chips — quiet proof of what the engine spans. */}
+          <Stack
+            direction="row"
+            spacing={0}
+            useFlexGap
+            sx={{ pt: 1, flexWrap: 'wrap' }}
+          >
+            {TRUST.map((t) => (
+              <Typography
+                key={t}
+                variant="caption"
+                sx={{
+                  color: 'text.secondary',
+                  fontWeight: 600,
+                  '&:not(:last-of-type):after': {
+                    content: '"·"',
+                    px: 1.25,
+                    opacity: 0.5,
+                  },
+                }}
+              >
+                {t}
+              </Typography>
+            ))}
           </Stack>
         </Stack>
       </Container>
