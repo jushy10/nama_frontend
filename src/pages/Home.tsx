@@ -36,12 +36,12 @@ function Home() {
         <FeatureBento />
       </Reveal>
 
-      <Reveal>
+      <Reveal delay={80}>
         <MarketIndices />
       </Reveal>
 
       {(!marketFailed || !sectorFailed) && (
-        <Reveal>
+        <Reveal delay={80}>
           <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
             <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
               <Box
@@ -68,7 +68,7 @@ function Home() {
         </Reveal>
       )}
 
-      <Reveal>
+      <Reveal delay={80}>
         <MegaCapGrowthLeaders />
       </Reveal>
     </>

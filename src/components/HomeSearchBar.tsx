@@ -187,6 +187,12 @@ export default function HomeSearchBar() {
             }}
             slotProps={{
               ...params.slotProps,
+              // A placeholder is not a programmatic label, so name the native
+              // input for assistive tech (the field carries no visible label).
+              htmlInput: {
+                ...params.slotProps.htmlInput,
+                'aria-label': 'Search a stock or ETF',
+              },
               input: {
                 ...params.slotProps.input,
                 startAdornment: (
