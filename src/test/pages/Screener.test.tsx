@@ -80,6 +80,57 @@ function stubApi(searchPayload: unknown = SEARCH_PAGE) {
 const lastSearchUrl = (calls: string[]) =>
   [...calls].reverse().find((u) => u.includes('/stocks/ticker')) ?? ''
 
+type Interp = {
+  query: string | null
+  sectors: string[]
+  industries: string[]
+  in_sp500: boolean | null
+  in_nasdaq100: boolean | null
+  market_cap_tiers: string[]
+  sort: string | null
+  direction: string
+  limit: number | null
+}
+
+/**
+ * Like `stubApi`, but also answers /stocks/ai-search with an AiScreenResponse
+ * carrying the given interpreted filters (the search page rides along as its
+ * `results`). Everything else routes as in `stubApi`.
+ */
+function stubApiWithAi(interpreted: Interp) {
+  const calls: string[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL) => {
+      const u = String(url)
+      calls.push(u)
+      const body = u.includes('/stocks/ai-search')
+        ? { interpreted, results: SEARCH_PAGE }
+        : u.includes('/stocks/classifications')
+          ? CLASSIFICATIONS
+          : SEARCH_PAGE
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(body),
+      })
+    }),
+  )
+  return calls
+}
+
+const NEUTRAL_INTERP: Interp = {
+  query: null,
+  sectors: [],
+  industries: [],
+  in_sp500: null,
+  in_nasdaq100: null,
+  market_cap_tiers: [],
+  sort: null,
+  direction: 'desc',
+  limit: null,
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('Screener', () => {
@@ -163,7 +214,9 @@ describe('Screener', () => {
     const { user } = renderWithProviders(<Screener />)
     await screen.findByText('NVDA')
 
-    await user.click(screen.getByRole('button', { name: /s&p 500/i }))
+    // Exact name: the AI-screen box also offers an example chip mentioning
+    // "S&P 500", so a loose regex would match two buttons.
+    await user.click(screen.getByRole('button', { name: 'S&P 500' }))
 
     await waitFor(() => expect(lastSearchUrl(calls)).toMatch(/in_sp500=true/))
   })
@@ -340,5 +393,102 @@ describe('Screener', () => {
     renderWithProviders(<Screener />)
 
     expect(await screen.findByText('Upstream is down.')).toBeInTheDocument()
+  })
+
+  it('applies the AI-interpreted filters to the manual search', async () => {
+    const calls = stubApiWithAi({
+      ...NEUTRAL_INTERP,
+      sectors: ['technology'],
+      market_cap_tiers: ['mega'],
+      sort: 'market_cap',
+      direction: 'desc',
+    })
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.type(
+      screen.getByRole('textbox', { name: /describe the stocks/i }),
+      'big tech',
+    )
+    await user.click(screen.getByRole('button', { name: /^screen$/i }))
+
+    // The request went to the AI endpoint, and its interpreted filters then flow
+    // into the ordinary /stocks/ticker search.
+    await waitFor(() =>
+      expect(calls.some((u) => u.includes('/stocks/ai-search'))).toBe(true),
+    )
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/[?&]sector=technology(&|$)/)
+      expect(url).toMatch(/[?&]market_cap=mega(&|$)/)
+    })
+    // The applied filters surface as removable chips (the interpretation is visible
+    // and editable, not a black box).
+    expect(screen.getByText('Mega-cap')).toBeInTheDocument()
+  })
+
+  it('runs an example prompt in one tap', async () => {
+    const calls = stubApiWithAi({
+      ...NEUTRAL_INTERP,
+      in_sp500: true,
+      sort: 'revenue_growth',
+    })
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.click(
+      screen.getByRole('button', {
+        name: 'Top S&P 500 names by revenue growth',
+      }),
+    )
+
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/[?&]in_sp500=true(&|$)/)
+      expect(url).toMatch(/[?&]sort=revenue_growth(&|$)/)
+    })
+  })
+
+  it('surfaces an AI translation failure without breaking the list', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        const u = String(url)
+        calls.push(u)
+        if (u.includes('/stocks/ai-search')) {
+          return Promise.resolve({
+            ok: false,
+            status: 502,
+            json: () =>
+              Promise.resolve({
+                detail: 'AI stock screening is temporarily unavailable.',
+              }),
+          })
+        }
+        const body = u.includes('/stocks/classifications')
+          ? CLASSIFICATIONS
+          : SEARCH_PAGE
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    await user.type(
+      screen.getByRole('textbox', { name: /describe the stocks/i }),
+      'something',
+    )
+    await user.click(screen.getByRole('button', { name: /^screen$/i }))
+
+    // The error shows in the AI box; the list stays intact.
+    expect(
+      await screen.findByText(/AI stock screening is temporarily unavailable/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText('NVDA')).toBeInTheDocument()
   })
 })

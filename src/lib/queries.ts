@@ -9,12 +9,15 @@
  */
 import {
   keepPreviousData,
+  useMutation,
   useQueries,
   useQuery,
+  type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query'
 import {
   ApiError,
+  aiSearchStocks,
   getAnnualEarnings,
   getCandles,
   getClassifications,
@@ -42,6 +45,7 @@ import {
   getTickerType,
   searchEtfs,
   searchStocks,
+  type AiScreenResponse,
   type AnalystInfo,
   type AnnualEarnings,
   type CandleSeries,
@@ -545,6 +549,25 @@ export function useStockSearch(
       }),
     placeholderData: keepPreviousData,
     enabled: params.enabled ?? true,
+  })
+}
+
+/**
+ * The AI-driven screen (`GET /stocks/ai-search`) as a mutation — it's an imperative
+ * action (fired when the user submits a plain-English request), not a reactive query,
+ * so a `useMutation` fits: call `.mutate(query)` (or `.mutateAsync`) and read
+ * `.isPending` / `.error` for the button state. The result carries the interpreted
+ * filters, which the page applies to its manual controls (so the ordinary
+ * `useStockSearch` then renders the results and the user can tweak the filters). A
+ * blank query is a 400 and a translation failure a 502 — both surface via `.error`.
+ */
+export function useAiStockScreen(): UseMutationResult<
+  AiScreenResponse,
+  Error,
+  string
+> {
+  return useMutation({
+    mutationFn: (query: string) => aiSearchStocks(query),
   })
 }
 
