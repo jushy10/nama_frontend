@@ -695,7 +695,7 @@ export default function Screener() {
         >
           <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.light' }} />
           <Typography sx={{ fontWeight: 700 }}>
-            Ask AI to build a screen
+            Ask AI to Build a Screen
           </Typography>
         </Stack>
         <Box
