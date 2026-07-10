@@ -121,22 +121,19 @@ export default function HomeHero() {
             }}
           >
             The stock screener,{' '}
-            {/* Keep "driven by AI." together so the accent phrase never breaks
-                mid-line (and "AI" never lands alone or clipped). */}
-            <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
-              <Box
-                component="span"
-                sx={{
-                  background:
-                    'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                }}
-              >
-                driven by AI
-              </Box>
-              .
+            {/* Keep the accent phrase "driven by AI" on one line so it never
+                breaks mid-phrase (or clips "AI"). */}
+            <Box
+              component="span"
+              sx={{
+                whiteSpace: 'nowrap',
+                background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text',
+              }}
+            >
+              driven by AI
             </Box>
           </Typography>
 
