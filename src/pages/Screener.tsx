@@ -27,6 +27,8 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
@@ -301,7 +303,12 @@ function IndexChips({ stock }: { stock: StockSearchResult }) {
     return <Box sx={{ color: 'text.secondary' }}>—</Box>
   }
   return (
-    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', rowGap: 0.5 }}>
+    <Stack
+      direction="row"
+      spacing={0.5}
+      useFlexGap
+      sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
+    >
       {stock.in_sp500 && (
         <Chip label="S&P 500" size="small" variant="outlined" />
       )}
@@ -461,6 +468,179 @@ function SkeletonRow({ sort }: { sort: StockSearchSort | null }) {
   )
 }
 
+/** Mobile card for one screened name: logo, ticker/name and index badges up top,
+ *  the sector·industry classification beneath, then every metric in a tidy 3-column
+ *  grid — the full row's worth of data, sized for a phone (the table's per-column
+ *  hiding and horizontal scroll don't apply here). The metric grid maps the same
+ *  `METRIC_COLUMNS` the table reads, so the two never drift. Clicking opens the
+ *  stock's detail page. */
+function StockListCard({
+  stock,
+  onSelect,
+}: {
+  stock: StockSearchResult
+  onSelect: (ticker: string) => void
+}) {
+  const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
+  const industryLabel = stock.industry
+    ? humanizeClassification(stock.industry)
+    : null
+  const classLine = [sectorLabel, industryLabel].filter(Boolean).join(' · ')
+  const inIndex = stock.in_sp500 || stock.in_nasdaq100
+  return (
+    <Box
+      onClick={() => onSelect(stock.ticker)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(stock.ticker)
+        }
+      }}
+      tabIndex={0}
+      role="link"
+      aria-label={`View ${stock.ticker} details`}
+      sx={{
+        px: 1.5,
+        py: 1.5,
+        cursor: 'pointer',
+        borderBottom: 1,
+        borderColor: 'divider',
+        transition: 'background-color 120ms ease',
+        '&:last-of-type': { borderBottom: 0 },
+        '&:hover, &:focus-visible': { bgcolor: 'action.hover' },
+        outline: 'none',
+      }}
+    >
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <StockLogo symbol={stock.ticker} size={40} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+          >
+            <Typography
+              sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}
+            >
+              {stock.ticker}
+            </Typography>
+            {inIndex && <IndexChips stock={stock} />}
+          </Stack>
+          {stock.name && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {stock.name}
+            </Typography>
+          )}
+        </Box>
+      </Stack>
+
+      {classLine && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            mt: 0.75,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {classLine}
+        </Typography>
+      )}
+
+      <Box
+        sx={{
+          mt: 1.25,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          columnGap: 1,
+          rowGap: 1.25,
+        }}
+      >
+        {METRIC_COLUMNS.map((col) => {
+          const value = col.value(stock)
+          return (
+            <Box key={col.key} sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.6rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.4,
+                }}
+              >
+                {col.label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: metricValueColor(col.variant, value),
+                }}
+              >
+                {fmtMetric(col.variant, value)}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Box>
+  )
+}
+
+/** Placeholder card shown per expected result while the first mobile page loads. */
+function SkeletonCard() {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1.5,
+        borderBottom: 1,
+        borderColor: 'divider',
+        '&:last-of-type': { borderBottom: 0 },
+      }}
+    >
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Skeleton variant="rounded" width={40} height={40} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton width={64} />
+          <Skeleton width={120} />
+        </Box>
+      </Stack>
+      <Box
+        sx={{
+          mt: 1.25,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          columnGap: 1,
+          rowGap: 1.25,
+        }}
+      >
+        {METRIC_COLUMNS.map((col) => (
+          <Box key={col.key}>
+            <Skeleton width={40} />
+            <Skeleton width={52} />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
 /**
  * Screener page: search and filter the screened ≥$1B US universe by name/ticker,
  * one or more sectors and industries, market-cap tier(s), and index membership.
@@ -488,6 +668,12 @@ export default function Screener() {
   const [aiInput, setAiInput] = useState('')
   const aiScreen = useAiStockScreen()
   const navigate = useNavigate()
+
+  const theme = useTheme()
+  // Below `sm` the wide metrics table gives way to a card list that shows every
+  // field (logo included) without a horizontal scroll. useMediaQuery has no
+  // matchMedia under jsdom, so this stays false in tests and the table renders.
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
   // Apply the AI's interpreted filters to the manual controls — a fresh screen, so it
   // replaces every axis (clearing ones the request didn't set) rather than layering on
@@ -714,7 +900,7 @@ export default function Screener() {
             size="small"
             value={aiInput}
             onChange={(e) => setAiInput(e.target.value)}
-            placeholder="e.g. mega-cap technology stocks, or top S&P 500 names by revenue growth"
+            placeholder="e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth"
             disabled={aiScreen.isPending}
             sx={{ flex: '1 1 320px', minWidth: { xs: '100%', sm: 320 } }}
             slotProps={{
@@ -746,11 +932,14 @@ export default function Screener() {
             {aiScreen.isPending ? 'Screening…' : 'Screen'}
           </Button>
         </Box>
-        {/* One-tap example prompts. */}
+        {/* One-tap example prompts. `useFlexGap` so the spacing is CSS `gap`, not
+            child margins — margins don't reset on wrap, which left the chips that
+            wrapped to a new line indented out of alignment with the first. */}
         <Stack
           direction="row"
           spacing={1}
-          sx={{ mt: 1.5, flexWrap: 'wrap', rowGap: 1 }}
+          useFlexGap
+          sx={{ mt: 1.5, flexWrap: 'wrap' }}
         >
           {AI_EXAMPLES.map((ex) => (
             <Chip
@@ -935,135 +1124,172 @@ export default function Screener() {
 
       {!showError && (
         <>
-          <TableContainer
-            sx={{
-              mt: 1.5,
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 3,
-              bgcolor: 'background.paper',
-              overflow: 'auto',
-              // Cap the height on desktop so a long page scrolls inside the card
-              // with the header pinned; on phones (xs) drop the cap so the page
-              // scrolls naturally instead of trapping a short inner scroll region.
-              maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
-              // Dim while a new page/sort loads (previous rows stay put).
-              transition: 'opacity 150ms ease',
-              opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
-            }}
-          >
-            <Table
-              size="small"
-              stickyHeader
+          {isMobile && (
+            <Box
               sx={{
-                '& td, & th': {
-                  borderColor: 'divider',
-                  px: { xs: 1, sm: 2 },
-                  whiteSpace: 'nowrap',
-                },
-                // A hovered row lifts on a subtle tint so the whole line reads as
-                // one clickable target.
-                '& tbody tr:hover': { bgcolor: 'action.hover' },
-                // Pin the first column (ticker/name) so a row keeps its identity
-                // while the metric columns scroll horizontally on a narrow screen.
-                // The header corner (z-3) sits above both the sticky header row
-                // (z-2) and the pinned body cells (z-1); the pinned body cell
-                // carries an opaque background — matched to the row-hover tint —
-                // so scrolled metrics never show through it.
-                '& thead th:first-of-type': {
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 3,
-                },
-                '& tbody td:first-of-type': {
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
-                  bgcolor: 'background.paper',
-                },
-                '& tbody tr:hover td:first-of-type': {
-                  bgcolor: 'action.hover',
-                },
+                mt: 1.5,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                overflow: 'hidden',
+                // Dim while a new page/sort loads (previous cards stay put).
+                transition: 'opacity 150ms ease',
+                opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
               }}
             >
-              <TableHead>
-                <TableRow
-                  sx={{
-                    '& th': {
-                      color: 'text.secondary',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      fontSize: { xs: '0.75rem', sm: '0.7rem' },
-                      // Opaque so scrolled rows don't bleed through the pinned
-                      // header; a firmer bottom rule sets it off from the body.
-                      backgroundColor: 'background.paper',
-                      borderBottom: 2,
-                      borderBottomColor: 'divider',
-                    },
-                  }}
-                >
-                  <TableCell>Symbol</TableCell>
-                  <TableCell sx={HIDE_MD}>Sector</TableCell>
-                  <TableCell sx={HIDE_LG}>Industry</TableCell>
-                  <TableCell sx={HIDE_SM}>Index</TableCell>
-                  {METRIC_COLUMNS.map((col) => {
-                    const active = sort === col.key
-                    return (
-                      <TableCell
-                        key={col.key}
-                        align="right"
-                        sortDirection={active ? order : false}
-                        sx={metricColumnSx(col, active)}
-                      >
-                        <Tooltip
-                          title={col.tip}
-                          enterDelay={400}
-                          placement="top"
-                        >
-                          <TableSortLabel
-                            active={active}
-                            direction={active ? order : 'desc'}
-                            onClick={() => onSort(col.key)}
-                          >
-                            {col.label}
-                          </TableSortLabel>
-                        </Tooltip>
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {query.isLoading &&
-                  Array.from({ length: Math.min(rowsPerPage, 10) }).map(
-                    (_, i) => <SkeletonRow key={i} sort={sort} />,
-                  )}
-                {data && rows.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={COLSPAN}
-                      sx={{
-                        py: 5,
-                        textAlign: 'center',
-                        color: 'text.secondary',
-                      }}
-                    >
-                      No stocks match these filters.
-                    </TableCell>
-                  </TableRow>
+              {query.isLoading &&
+                Array.from({ length: Math.min(rowsPerPage, 10) }).map(
+                  (_, i) => <SkeletonCard key={i} />,
                 )}
-                {rows.map((stock) => (
-                  <StockRow
-                    key={stock.ticker}
-                    stock={stock}
-                    onSelect={openStock}
-                    sort={sort}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              {data && rows.length === 0 && (
+                <Box
+                  sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}
+                >
+                  No stocks match these filters.
+                </Box>
+              )}
+              {rows.map((stock) => (
+                <StockListCard
+                  key={stock.ticker}
+                  stock={stock}
+                  onSelect={openStock}
+                />
+              ))}
+            </Box>
+          )}
+
+          {!isMobile && (
+            <TableContainer
+              sx={{
+                mt: 1.5,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                overflow: 'auto',
+                // Cap the height on desktop so a long page scrolls inside the card
+                // with the header pinned; on phones (xs) drop the cap so the page
+                // scrolls naturally instead of trapping a short inner scroll region.
+                maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
+                // Dim while a new page/sort loads (previous rows stay put).
+                transition: 'opacity 150ms ease',
+                opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
+              }}
+            >
+              <Table
+                size="small"
+                stickyHeader
+                sx={{
+                  '& td, & th': {
+                    borderColor: 'divider',
+                    px: { xs: 1, sm: 2 },
+                    whiteSpace: 'nowrap',
+                  },
+                  // A hovered row lifts on a subtle tint so the whole line reads as
+                  // one clickable target.
+                  '& tbody tr:hover': { bgcolor: 'action.hover' },
+                  // Pin the first column (ticker/name) so a row keeps its identity
+                  // while the metric columns scroll horizontally on a narrow screen.
+                  // The header corner (z-3) sits above both the sticky header row
+                  // (z-2) and the pinned body cells (z-1); the pinned body cell
+                  // carries an opaque background — matched to the row-hover tint —
+                  // so scrolled metrics never show through it.
+                  '& thead th:first-of-type': {
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 3,
+                  },
+                  '& tbody td:first-of-type': {
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    bgcolor: 'background.paper',
+                  },
+                  '& tbody tr:hover td:first-of-type': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow
+                    sx={{
+                      '& th': {
+                        color: 'text.secondary',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        fontSize: { xs: '0.75rem', sm: '0.7rem' },
+                        // Opaque so scrolled rows don't bleed through the pinned
+                        // header; a firmer bottom rule sets it off from the body.
+                        backgroundColor: 'background.paper',
+                        borderBottom: 2,
+                        borderBottomColor: 'divider',
+                      },
+                    }}
+                  >
+                    <TableCell>Symbol</TableCell>
+                    <TableCell sx={HIDE_MD}>Sector</TableCell>
+                    <TableCell sx={HIDE_LG}>Industry</TableCell>
+                    <TableCell sx={HIDE_SM}>Index</TableCell>
+                    {METRIC_COLUMNS.map((col) => {
+                      const active = sort === col.key
+                      return (
+                        <TableCell
+                          key={col.key}
+                          align="right"
+                          sortDirection={active ? order : false}
+                          sx={metricColumnSx(col, active)}
+                        >
+                          <Tooltip
+                            title={col.tip}
+                            enterDelay={400}
+                            placement="top"
+                          >
+                            <TableSortLabel
+                              active={active}
+                              direction={active ? order : 'desc'}
+                              onClick={() => onSort(col.key)}
+                            >
+                              {col.label}
+                            </TableSortLabel>
+                          </Tooltip>
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {query.isLoading &&
+                    Array.from({ length: Math.min(rowsPerPage, 10) }).map(
+                      (_, i) => <SkeletonRow key={i} sort={sort} />,
+                    )}
+                  {data && rows.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={COLSPAN}
+                        sx={{
+                          py: 5,
+                          textAlign: 'center',
+                          color: 'text.secondary',
+                        }}
+                      >
+                        No stocks match these filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {rows.map((stock) => (
+                    <StockRow
+                      key={stock.ticker}
+                      stock={stock}
+                      onSelect={openStock}
+                      sort={sort}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
 
           <TablePagination
             component="div"
