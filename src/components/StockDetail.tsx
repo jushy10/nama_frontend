@@ -36,7 +36,6 @@ import {
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import AnalysisCard from '@/components/AnalysisCard'
 import StockCard from '@/components/StockCard'
-import PerformanceCard from '@/components/PerformanceCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import PegCard from '@/components/PegCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
@@ -172,18 +171,14 @@ export default function StockDetail({ symbol }: { symbol: string }) {
 
       {tab === 'overview' && (
         <Stack spacing={3} role="tabpanel">
-          {/* Identity, price and the key stats — what this is and where it
-              trades — lead the tab, full width. */}
-          <StockCard stock={stock} />
-
-          {/* The trailing-return strip: a quick read on how it's performed,
-              riding the loaded snapshot (5Y fills in a beat later). */}
-          {stock.performance && (
-            <PerformanceCard
-              perf={stock.performance}
-              fiveYearReturn={fiveYearReturn}
-            />
-          )}
+          {/* The snapshot hero leads the tab, full width: what this is and
+              where it trades, the key stats, and the trailing-return strip —
+              all in one card (5Y fills in a beat later). */}
+          <StockCard
+            stock={stock}
+            perf={stock.performance}
+            fiveYearReturn={fiveYearReturn}
+          />
 
           {/* The AI take — a plain-language buy/hold/sell read — the headline
               synthesis. It's fetched on its own since the model call is the

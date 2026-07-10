@@ -8,12 +8,16 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import {
   humanizeClassification,
   stockLogoUrl,
+  PERF_WINDOWS,
+  type StockPerformance,
   type TickerCard,
 } from '@/lib/api'
 import { heroWash } from '@/components/heroWash'
+import SectionHeading from '@/components/SectionHeading'
 
 const fmt = (n: number | null) =>
   n == null
@@ -41,6 +45,10 @@ const fmtDollars = (n: number | null) => (n == null ? '—' : `$${fmt(n)}`)
 
 /** A bare valuation multiple, e.g. a P/E of 46.5 → "46.50". */
 const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
+
+/** Signed percent for directional figures — a trailing return reads its sign. */
+const fmtPct = (n: number | null) =>
+  n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 
 /** The "Sector · Industry" summary line, skipping whichever side is absent. */
 const classificationLine = (
@@ -102,12 +110,73 @@ function Stat({ label, value }: { label: string; value: string }) {
   )
 }
 
-export default function StockCard({ stock }: { stock: TickerCard }) {
+/** A single color-coded trailing-return pill in the performance strip. */
+function PerfPill({ label, value }: { label: string; value: number | null }) {
+  const color =
+    value == null
+      ? 'text.secondary'
+      : value >= 0
+        ? 'success.main'
+        : 'error.main'
+  return (
+    <Box
+      sx={{
+        borderRadius: 2,
+        bgcolor: 'action.hover',
+        px: 1,
+        py: 0.75,
+        textAlign: 'center',
+      }}
+    >
+      <Typography
+        variant="caption"
+        sx={{ color: 'text.secondary', display: 'block' }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontWeight: 600,
+          color,
+          fontVariantNumeric: 'tabular-nums',
+          fontSize: '0.85rem',
+        }}
+      >
+        {fmtPct(value)}
+      </Typography>
+    </Box>
+  )
+}
+
+/**
+ * The identity + snapshot hero: what the stock is, where it trades, its live
+ * quote and key stats, and — when the snapshot carries them — the trailing
+ * returns. The performance strip rides the same card so the whole read lands as
+ * one hero rather than two stacked panels; `perf` is the snapshot's own
+ * `performance` block and `fiveYearReturn` arrives a beat later off 5Y candles.
+ */
+export default function StockCard({
+  stock,
+  perf,
+  fiveYearReturn,
+}: {
+  stock: TickerCard
+  perf?: StockPerformance | null
+  fiveYearReturn?: number | null
+}) {
   const up = (stock.change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
   const classification = classificationLine(stock.sector, stock.industry)
   const metrics = stock.metrics
+  // 1W…1Y ride the snapshot's performance block; 5Y is derived upstream and
+  // passed in, so it shows a dash until it lands.
+  const perfEntries = perf
+    ? [
+        ...PERF_WINDOWS.map(({ key, label }) => ({ label, value: perf[key] })),
+        { label: '5Y', value: fiveYearReturn ?? null },
+      ]
+    : []
 
   return (
     <Card
@@ -281,16 +350,14 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
 
         <Divider sx={{ mt: 2.5, mb: 2.5 }} />
 
-        {/* Key stats fill the height the snapshot borrows from the taller
-            Performance + Profitability stack beside it: a 2×2 grid whose rows
-            stretch (gridAutoRows 1fr) so the tiles grow to occupy the card
-            rather than leaving a gap. P/E rides the card's `metrics` block and
-            shows a dash when it's absent. */}
+        {/* Key stats: a 2×2 grid of the figures that frame the quote — size,
+            valuation, and the dividend. Rows stretch (gridAutoRows 1fr) so the
+            tiles stay even. P/E rides the card's `metrics` block and shows a
+            dash when it's absent. */}
         <Box
           component="dl"
           sx={{
             m: 0,
-            flexGrow: 1,
             display: 'grid',
             gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
             gridAutoRows: '1fr',
@@ -308,6 +375,37 @@ export default function StockCard({ stock }: { stock: TickerCard }) {
             value={fmtDollars(stock.dividend?.per_share ?? null)}
           />
         </Box>
+
+        {/* The trailing-return strip, folded into the hero so how it's performed
+            reads as part of the same snapshot rather than a second panel below.
+            Pills are green/red by sign; only shown when the snapshot carries a
+            performance block. */}
+        {perf && (
+          <>
+            <Divider sx={{ mt: 2.5, mb: 2.5 }} />
+            <SectionHeading
+              component="h3"
+              icon={<TrendingUpIcon fontSize="small" />}
+              title="Performance"
+              subtitle="Trailing total return by window"
+            />
+            <Box
+              sx={{
+                mt: 2,
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: 'repeat(3, minmax(0, 1fr))',
+                  sm: 'repeat(7, minmax(0, 1fr))',
+                },
+                gap: 1,
+              }}
+            >
+              {perfEntries.map((e) => (
+                <PerfPill key={e.label} label={e.label} value={e.value} />
+              ))}
+            </Box>
+          </>
+        )}
       </CardContent>
     </Card>
   )
