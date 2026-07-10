@@ -69,7 +69,10 @@ export default function HomeHero() {
         maxWidth="xl"
         sx={{ position: 'relative', py: { xs: 5, sm: 8 } }}
       >
-        <Stack spacing={{ xs: 2, sm: 2.5 }} sx={{ maxWidth: 760 }}>
+        <Stack
+          spacing={{ xs: 2, sm: 2.5 }}
+          sx={{ maxWidth: { xs: '100%', md: 940 } }}
+        >
           {/* Eyebrow: live market phase + today's date, reading the same phase
               as the app-bar status dot. */}
           <Stack
@@ -118,18 +121,23 @@ export default function HomeHero() {
             }}
           >
             The stock screener,{' '}
-            <Box
-              component="span"
-              sx={{
-                background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
-              }}
-            >
-              driven by AI
+            {/* Keep "driven by AI." together so the accent phrase never breaks
+                mid-line (and "AI" never lands alone or clipped). */}
+            <Box component="span" sx={{ whiteSpace: 'nowrap' }}>
+              <Box
+                component="span"
+                sx={{
+                  background:
+                    'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                  backgroundClip: 'text',
+                }}
+              >
+                driven by AI
+              </Box>
+              .
             </Box>
-            .
           </Typography>
 
           <Typography
@@ -137,6 +145,7 @@ export default function HomeHero() {
               color: 'text.secondary',
               fontSize: { xs: '1rem', sm: '1.15rem' },
               lineHeight: 1.6,
+              maxWidth: 720,
             }}
           >
             Screen 1,000+ US stocks and ETFs, then let AI read each one for you
