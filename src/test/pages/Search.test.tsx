@@ -134,6 +134,17 @@ const analystInfo = {
     trends: [],
   },
   rating_changes: [],
+  top_firms: [],
+}
+const ratingsAnalysis = {
+  symbol: 'X',
+  verdict: 'mixed',
+  confidence: 'medium',
+  summary: 'A balanced read on the analyst coverage.',
+  findings: ['Coverage is thin'],
+  disclaimer: 'Not financial advice.',
+  model: 'claude-haiku-4-5',
+  generated_at: '2026-07-08T00:00:00Z',
 }
 const analysis = {
   symbol: 'X',
@@ -162,15 +173,17 @@ function stubFetch(card: unknown, opts: { etfDetail?: unknown } = {}) {
           ? (opts.etfDetail ?? { detail: 'not an ETF' })
           : u.includes('/candles')
             ? candles
-            : u.includes('/analyst-info')
-              ? analystInfo
-              : u.includes('/earnings/quarterly')
-                ? emptyQuarterly
-                : u.includes('/earnings/annual')
-                  ? emptyAnnual
-                  : u.includes('/analysis')
-                    ? analysis
-                    : card
+            : u.includes('/analyst-info/analysis')
+              ? ratingsAnalysis
+              : u.includes('/analyst-info')
+                ? analystInfo
+                : u.includes('/earnings/quarterly')
+                  ? emptyQuarterly
+                  : u.includes('/earnings/annual')
+                    ? emptyAnnual
+                    : u.includes('/analysis')
+                      ? analysis
+                      : card
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -213,6 +226,21 @@ describe('Search (unified)', () => {
     expect(await screen.findByText('AI Analysis')).toBeInTheDocument()
     // No ETF badge / holdings for a stock.
     expect(screen.queryByText('Top Holdings')).not.toBeInTheDocument()
+  })
+
+  it('shows the AI ratings review on the Analysts tab', async () => {
+    stubFetch(stockCard)
+    const { user } = renderWithProviders(<Search />)
+
+    await user.type(screen.getByLabelText(/name or ticker/i), 'nvda')
+    await user.click(screen.getByRole('button', { name: /search/i }))
+    await screen.findByRole('heading', { name: 'NVDA' })
+
+    // The ratings review is gated on the Analysts tab being open, so it only
+    // fires once the user switches to it.
+    await user.click(screen.getByRole('tab', { name: /analysts/i }))
+    expect(await screen.findByText('Ratings Analysis')).toBeInTheDocument()
+    expect(screen.getByText('Mixed')).toBeInTheDocument()
   })
 
   it('renders the fund detail inline for an ETF ticker', async () => {
