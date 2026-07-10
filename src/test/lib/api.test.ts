@@ -16,28 +16,11 @@ import {
   optionsLevel,
   optionsSentiment,
   optionsSignal,
-  pegVerdict,
   profitabilityVerdict,
   rangeReturnPct,
   type Candle,
   type CandleSeries,
 } from '@/lib/api'
-
-describe('pegVerdict', () => {
-  it('mirrors the under-1 / over-2 PEG bands, edges inclusive of the middle', () => {
-    expect(pegVerdict(0.27)).toBe('Cheap for Its Growth')
-    expect(pegVerdict(0.99)).toBe('Cheap for Its Growth')
-    expect(pegVerdict(1)).toBe('Fairly Priced')
-    expect(pegVerdict(2)).toBe('Fairly Priced')
-    expect(pegVerdict(2.01)).toBe('Pricey for Its Growth')
-  })
-
-  it('labels a non-positive ratio Not Meaningful and passes null through', () => {
-    expect(pegVerdict(0)).toBe('Not Meaningful')
-    expect(pegVerdict(-1.2)).toBe('Not Meaningful')
-    expect(pegVerdict(null)).toBeNull()
-  })
-})
 
 describe('humanizeClassification', () => {
   it('title-cases a snake_case slug into a display label', () => {

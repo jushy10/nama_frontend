@@ -26,8 +26,6 @@ const stockCard = {
   },
   metrics: {
     pe: 46.5,
-    peg: 1.19,
-    forward_peg: 1.42,
     gross_margin: 47.9,
     operating_margin: 32.6,
     net_margin: 27.2,

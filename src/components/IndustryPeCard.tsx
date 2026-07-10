@@ -9,8 +9,8 @@ import {
 import InfoHint from '@/components/InfoHint'
 
 // Cheaper-than-peers reads green, in-line amber, pricier red — the same
-// valuation palette the PEG card uses, so "green = cheap" stays consistent down
-// the page. Amber is the shared neutral the verdict cards land on.
+// valuation palette the other verdict cards use, so "green = cheap" stays consistent
+// down the page. Amber is the shared neutral the verdict cards land on.
 const STANCE: Record<IndustryPeStance, { color: string; label: string }> = {
   below: { color: 'success.main', label: 'Below Peers' },
   in_line: { color: '#fbbf24', label: 'In Line' },
