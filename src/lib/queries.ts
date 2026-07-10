@@ -31,6 +31,7 @@ import {
   getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
+  getRatingsAnalysis,
   getScreener,
   getSectorAnalysis,
   getSectors,
@@ -47,6 +48,7 @@ import {
   type ChartRange,
   type Classifications,
   type EarningsAnalysis,
+  type RatingsAnalysis,
   type EmaSeries,
   type EtfAnalysis,
   type EtfCategories,
@@ -355,6 +357,27 @@ export function useEarningsAnalysis(
     // so toggling away from the Earnings tab and back doesn't re-fire this slow,
     // paid model call (a disabled-then-re-enabled query would otherwise refetch
     // the moment it's stale, which with the default staleTime is immediately).
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * The AI ratings review for a ticker
+ * (`GET /stocks/ticker/{ticker}/analyst-info/analysis`) — a plain-language read
+ * of what Wall Street thinks (an overall verdict + a few findings) the Analysts
+ * tab shows in a card above the ratings. Like `useEarningsAnalysis` it's a live
+ * (slow, paid) model call gated on the tab being open, held fresh for five
+ * minutes so toggling away and back doesn't re-fire it. Idle until `symbol` is
+ * set *and* `enabled` is true.
+ */
+export function useRatingsAnalysis(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<RatingsAnalysis> {
+  return useQuery({
+    queryKey: ['ratings-analysis', symbol],
+    queryFn: ({ signal }) => getRatingsAnalysis(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
     staleTime: 5 * 60 * 1000,
   })
 }

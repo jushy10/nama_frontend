@@ -29,6 +29,7 @@ import {
   usePeHistory,
   useAnalystInfo,
   useQuarterlyEarnings,
+  useRatingsAnalysis,
   useStockAnalysis,
   useSupportLevels,
   useTickerCard,
@@ -44,6 +45,7 @@ import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
+import RatingsReviewCard from '@/components/RatingsReviewCard'
 import EarningsCard from '@/components/EarningsCard'
 import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
 import AnalysisLoadingCard from '@/components/AnalysisLoadingCard'
@@ -115,6 +117,14 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const earningsAnalysisQuery = useEarningsAnalysis(
     loadedSymbol,
     tab === 'earnings',
+  )
+  // The Analysts-tab AI read — a plain-language take on the sell-side coverage,
+  // gated on the tab being open (the same slow/paid model-call discipline as the
+  // earnings analysis, held fresh across tab switches). Best-effort: an error or
+  // an uncovered symbol just omits the card.
+  const ratingsAnalysisQuery = useRatingsAnalysis(
+    loadedSymbol,
+    tab === 'analysts',
   )
   // The industry P/E benchmark rides the loaded card's own industry slug (idle
   // until it resolves; never fires for an unclassified stock). Best-effort — it
@@ -362,12 +372,32 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Sell-side ratings on their own tab: the consensus verdict, the analyst
-          distribution, the month-over-month drift, the 12-month price target and
-          the recent upgrade/downgrade feed — all riding the loaded ticker's
-          analyst-info read. */}
+      {/* Sell-side ratings on their own tab: an AI take on the coverage leads,
+          then the consensus verdict, the analyst distribution, the
+          month-over-month drift, the 12-month price target and the most credible
+          firms' current stance — all riding the loaded ticker's analyst-info
+          read. */}
       {tab === 'analysts' && (
-        <Box role="tabpanel">
+        <Stack spacing={3} role="tabpanel">
+          {/* The AI ratings take leads the tab — a plain-language read of what
+              the sell-side thinks. Its own slow model call, gated on the tab, so
+              it shows a loading card then fills in; a failure degrades to a
+              warning rather than sinking the ratings below. */}
+          {ratingsAnalysisQuery.isLoading && (
+            <AnalysisLoadingCard title="Ratings Analysis" />
+          )}
+          {ratingsAnalysisQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                ratingsAnalysisQuery.error,
+                'Could not load the ratings analysis.',
+              )}
+            </Alert>
+          )}
+          {ratingsAnalysisQuery.data && (
+            <RatingsReviewCard analysis={ratingsAnalysisQuery.data} />
+          )}
+
           {analystQuery.isLoading && (
             <Stack sx={{ alignItems: 'center', py: 2 }}>
               <CircularProgress size={28} />
@@ -384,11 +414,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           {analystQuery.data && (
             <AnalystCard
               recommendations={analystQuery.data.recommendations}
-              ratingChanges={analystQuery.data.rating_changes}
+              topFirms={analystQuery.data.top_firms}
               price={stock.price}
             />
           )}
-        </Box>
+        </Stack>
       )}
 
       {/* Earnings and valuation live in one card now: the plain-language beat

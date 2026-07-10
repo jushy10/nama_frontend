@@ -2015,17 +2015,37 @@ export interface RatingChange {
 }
 
 /**
+ * One credible firm's current stance — a row of the card's "top firms" read.
+ * `firm` is the research house and `rank` its position in the backend's curated
+ * credibility ranking (0 = most credible, so the list arrives best-first).
+ * `rating` is the grade it now holds, `action` the move that set it, `target`
+ * its current price target (null when it published none), and `published_at`
+ * when it last acted. Derived from the rating-change events, so it's empty when
+ * none of the covering firms is ranked.
+ */
+export interface TopFirmRating {
+  firm: string
+  rank: number
+  rating: string | null
+  action: string | null
+  target: number | null
+  published_at: string // ISO date the firm last acted
+}
+
+/**
  * A stock's full analyst coverage in one payload — the response of
  * `GET /stocks/ticker/{ticker}/analyst-info`. `recommendations` is the
  * buy/hold/sell trend block (with consensus + price targets); `rating_changes`
- * is the discrete upgrade/downgrade event feed, newest first. Both are
- * best-effort: an uncovered stock carries an empty `trends` and an empty
- * `rating_changes`.
+ * is the discrete upgrade/downgrade event feed, newest first; `top_firms` is the
+ * most credible covering firms and their current stance, best-first. All
+ * best-effort: an uncovered stock carries an empty `trends`, `rating_changes`,
+ * and `top_firms`.
  */
 export interface AnalystInfo {
   ticker: string
   recommendations: AnalystRecommendations
   rating_changes: RatingChange[]
+  top_firms: TopFirmRating[]
 }
 
 /**
@@ -2047,6 +2067,60 @@ export async function getAnalystInfo(
     !Array.isArray(data?.rating_changes)
   ) {
     throw new ApiError(res.status, 'Malformed analyst-info response')
+  }
+  // `top_firms` was added to this endpoint after the fields above; tolerate a
+  // backend that predates it (deploy skew) by defaulting to an empty list rather
+  // than failing the whole card.
+  if (!Array.isArray(data.top_firms)) data.top_firms = []
+  return data
+}
+
+/** The overall read of a stock's analyst coverage — the AI ratings verdict. */
+export type RatingsVerdict = 'bullish' | 'mixed' | 'cautious'
+
+/**
+ * An AI-generated, plain-language read of a stock's *analyst coverage*
+ * (`GET /stocks/ticker/{ticker}/analyst-info/analysis`) — the analyst-ratings
+ * sibling of `EarningsAnalysis`. `verdict` is the overall read (bullish / mixed /
+ * cautious) and `confidence` how firmly it's held; `summary` is the everyday-
+ * language headline and `findings` a few short, concrete takeaways. `disclaimer`
+ * is a fixed not-financial-advice reminder authored by the service — render it as
+ * a footnote — and `model`/`generated_at` record what produced the read. Reasoned
+ * only over the consensus, targets, and top firms the card shows; descriptive,
+ * not advice, and regenerated at most every few minutes (the endpoint caches).
+ */
+export interface RatingsAnalysis {
+  symbol: string
+  verdict: RatingsVerdict
+  confidence: AnalysisConfidence
+  summary: string
+  findings: string[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Fetch the AI ratings review for a ticker
+ * (`GET /stocks/ticker/{ticker}/analyst-info/analysis`). The backend runs a
+ * language model over the stock's analyst coverage (consensus, targets, top
+ * firms), so this is a slow read — seconds, not milliseconds — which is why the
+ * Analysts tab fetches it on its own and shows the card once it lands. Throws an
+ * `ApiError` when the read is unavailable (a symbol with no coverage on file, or
+ * the backend isn't configured for AI analysis).
+ */
+export async function getRatingsAnalysis(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<RatingsAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/analyst-info/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as RatingsAnalysis
+  if (typeof data?.summary !== 'string' || !Array.isArray(data?.findings)) {
+    throw new ApiError(res.status, 'Malformed ratings analysis response')
   }
   return data
 }

@@ -15,9 +15,9 @@ import {
   priceTargetUpside,
   type AnalystPriceTargets,
   type AnalystRecommendations,
-  type RatingChange,
   type Recommendation,
   type RecommendationTrend,
+  type TopFirmRating,
 } from '@/lib/api'
 
 // Amber for the neutral "Hold" call — the theme defines only green (up) and red
@@ -87,8 +87,8 @@ const DIRECTION = {
   },
 } as const
 
-// A rating action's grade action → a human label, for when the row has no
-// explicit from→to grade move to show (an initiation, a reiteration, …).
+// A firm's grade action → a human label, used when a top-firm row has no explicit
+// rating grade to show (an initiation, a reiteration, …).
 const ACTION_LABEL: Record<string, string> = {
   up: 'Upgrade',
   down: 'Downgrade',
@@ -96,9 +96,6 @@ const ACTION_LABEL: Record<string, string> = {
   main: 'Maintained',
   reit: 'Reiterated',
 }
-
-// How many rating-change events to list before collapsing the rest into a count.
-const MAX_RATING_CHANGES = 6
 
 /** "Jun 2026" from the snapshot's ISO period. Parsed as a *local* date so a
  *  UTC-midnight ISO string doesn't format a day early in negative offsets — the
@@ -408,89 +405,98 @@ function PriceTargets({
   )
 }
 
-/** The grade/target detail line for one rating action, e.g. "Hold → Buy ·
- *  $335.00 → $350.00". Falls back to the action label when there's no explicit
- *  grade move, and shows just the current target when there's no prior one. */
-function changeDetail(change: RatingChange): string | null {
-  const grades =
-    change.from_grade && change.to_grade
-      ? `${change.from_grade} → ${change.to_grade}`
-      : (change.to_grade ??
-        (change.action ? (ACTION_LABEL[change.action] ?? null) : null))
-  const target =
-    change.target_prior != null && change.target_current != null
-      ? `${fmtDollars(change.target_prior)} → ${fmtDollars(
-          change.target_current,
-        )}`
-      : change.target_current != null
-        ? fmtDollars(change.target_current)
-        : null
-  const parts = [grades, target].filter(Boolean)
-  return parts.length ? parts.join(' · ') : null
-}
-
-/** One rating action: a direction-coloured trend icon, the firm and date, and
- *  the grade/target move beneath. */
-function RatingChangeRow({ change }: { change: RatingChange }) {
-  const color = change.is_upgrade
-    ? 'success.main'
-    : change.is_downgrade
-      ? 'error.main'
-      : 'text.secondary'
-  const Icon = change.is_upgrade
-    ? TrendingUpIcon
-    : change.is_downgrade
-      ? TrendingDownIcon
-      : TrendingFlatIcon
-  const detail = changeDetail(change)
+/** One credible firm's current stance: its name and price target on the top
+ *  line, its rating and the date beneath, with the target's upside vs the live
+ *  price on the right when both are known. */
+function TopFirmRow({
+  firm,
+  price,
+}: {
+  firm: TopFirmRating
+  price: number | null
+}) {
+  const upside =
+    firm.target != null && price != null && price > 0
+      ? ((firm.target - price) / price) * 100
+      : null
+  const rating =
+    firm.rating ?? (firm.action ? (ACTION_LABEL[firm.action] ?? null) : null)
   return (
-    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
-      <Icon fontSize="small" sx={{ color, mt: '2px', flexShrink: 0 }} />
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+    <Box sx={{ minWidth: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 600,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
         >
+          {firm.firm}
+        </Typography>
+        {firm.target != null && (
           <Typography
             variant="body2"
             sx={{
-              fontWeight: 600,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
+              fontWeight: 700,
+              flexShrink: 0,
+              fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {change.firm}
-          </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ flexShrink: 0 }}
-          >
-            {dayLabel(change.published_at)}
-          </Typography>
-        </Stack>
-        {detail && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ fontVariantNumeric: 'tabular-nums' }}
-          >
-            {detail}
+            {fmtDollars(firm.target)}
           </Typography>
         )}
-      </Box>
-    </Stack>
+      </Stack>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+      >
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {rating ? `${rating} · ` : ''}
+          {dayLabel(firm.published_at)}
+        </Typography>
+        {upside != null && (
+          <Typography
+            variant="caption"
+            sx={{
+              fontWeight: 700,
+              flexShrink: 0,
+              color: upside >= 0 ? 'success.main' : 'error.main',
+              fontVariantNumeric: 'tabular-nums',
+            }}
+          >
+            {signedPct(upside)}
+          </Typography>
+        )}
+      </Stack>
+    </Box>
   )
 }
 
-/** The recent upgrade/downgrade feed — the discrete actions behind the monthly
- *  trend, newest first, capped at `MAX_RATING_CHANGES` with the remainder
- *  collapsed to a count. */
-function RatingChanges({ changes }: { changes: RatingChange[] }) {
-  const shown = changes.slice(0, MAX_RATING_CHANGES)
-  const extra = changes.length - shown.length
+/** The most credible firms covering the stock and their current stance —
+ *  best-first (by the backend's curated credibility ranking), replacing the raw
+ *  recent-changes feed with the handful of reads worth trusting. */
+function TopFirms({
+  firms,
+  price,
+}: {
+  firms: TopFirmRating[]
+  price: number | null
+}) {
   return (
     <Box sx={{ mt: 2.5 }}>
       <Divider sx={{ mb: 2 }} />
@@ -502,36 +508,24 @@ function RatingChanges({ changes }: { changes: RatingChange[] }) {
           letterSpacing: '0.05em',
         }}
       >
-        Recent Rating Changes
+        Top Firms
       </Typography>
       <Stack spacing={1.5} sx={{ mt: 1.5 }}>
-        {shown.map((c, i) => (
-          <RatingChangeRow
-            key={`${c.firm}-${c.published_at}-${i}`}
-            change={c}
-          />
+        {firms.map((f, i) => (
+          <TopFirmRow key={`${f.firm}-${i}`} firm={f} price={price} />
         ))}
       </Stack>
-      {extra > 0 && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: 'block', mt: 1.5 }}
-        >
-          +{extra} more
-        </Typography>
-      )}
     </Box>
   )
 }
 
 export default function AnalystCard({
   recommendations,
-  ratingChanges = [],
+  topFirms = [],
   price = null,
 }: {
   recommendations: AnalystRecommendations
-  ratingChanges?: RatingChange[]
+  topFirms?: TopFirmRating[]
   price?: number | null
 }) {
   const latest = recommendations.latest
@@ -555,12 +549,12 @@ export default function AnalystCard({
       : null
 
   // What the card has to show. The trend distribution, the price target, and the
-  // rating-change feed are independent best-effort blocks; the empty state only
+  // top-firms read are independent best-effort blocks; the empty state only
   // stands in when none of them has anything.
   const hasTrends = !!latest && total > 0
   const hasTargets = recommendations.price_targets?.mean != null
-  const hasChanges = ratingChanges.length > 0
-  const hasAny = hasTrends || hasTargets || hasChanges
+  const hasFirms = topFirms.length > 0
+  const hasAny = hasTrends || hasTargets || hasFirms
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -673,7 +667,7 @@ export default function AnalystCard({
                 price={price}
               />
             )}
-            {hasChanges && <RatingChanges changes={ratingChanges} />}
+            {hasFirms && <TopFirms firms={topFirms} price={price} />}
           </>
         ) : (
           <Typography color="text.secondary" sx={{ mt: 2 }}>

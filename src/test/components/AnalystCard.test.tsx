@@ -3,9 +3,9 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import AnalystCard from '@/components/AnalystCard'
 import type {
   AnalystRecommendations,
-  RatingChange,
   Recommendation,
   RecommendationTrend,
+  TopFirmRating,
 } from '@/lib/api'
 
 function trend(
@@ -55,28 +55,22 @@ const empty: AnalystRecommendations = {
   trends: [],
 }
 
-const ratingChanges: RatingChange[] = [
+const topFirms: TopFirmRating[] = [
   {
-    firm: 'TD Cowen',
-    published_at: '2026-06-09',
-    action: 'up',
-    from_grade: 'Hold',
-    to_grade: 'Buy',
-    target_current: 350,
-    target_prior: 335,
-    is_upgrade: true,
-    is_downgrade: false,
+    firm: 'RBC Capital',
+    rank: 1,
+    rating: 'Outperform',
+    action: 'main',
+    target: 270,
+    published_at: '2026-05-21',
   },
   {
-    firm: 'KGI Securities',
-    published_at: '2026-05-01',
-    action: 'down',
-    from_grade: 'Buy',
-    to_grade: 'Hold',
-    target_current: null,
-    target_prior: null,
-    is_upgrade: false,
-    is_downgrade: true,
+    firm: 'Evercore ISI Group',
+    rank: 2,
+    rating: 'Outperform',
+    action: 'main',
+    target: 413,
+    published_at: '2026-05-21',
   },
 ]
 
@@ -165,32 +159,36 @@ describe('AnalystCard', () => {
     expect(screen.queryByText('12-Month Price Target')).not.toBeInTheDocument()
   })
 
-  it('lists recent rating changes with the firm, grade move and target', () => {
+  it('lists the top firms with their rating, target and upside', () => {
     renderWithProviders(
-      <AnalystCard recommendations={base} ratingChanges={ratingChanges} />,
+      <AnalystCard recommendations={base} topFirms={topFirms} price={200} />,
     )
-    expect(screen.getByText('Recent Rating Changes')).toBeInTheDocument()
-    expect(screen.getByText('TD Cowen')).toBeInTheDocument()
-    expect(
-      screen.getByText('Hold → Buy · $335.00 → $350.00'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('KGI Securities')).toBeInTheDocument()
-    expect(screen.getByText('Buy → Hold')).toBeInTheDocument()
+    expect(screen.getByText('Top Firms')).toBeInTheDocument()
+    expect(screen.getByText('RBC Capital')).toBeInTheDocument()
+    expect(screen.getByText('Evercore ISI Group')).toBeInTheDocument()
+    expect(screen.getByText('$270.00')).toBeInTheDocument() // RBC target
+    expect(screen.getByText('$413.00')).toBeInTheDocument() // Evercore target
+    // (270 - 200) / 200 = +35%
+    expect(screen.getByText('+35%')).toBeInTheDocument()
+    // the rating + date line, one per firm
+    expect(screen.getAllByText(/Outperform/)).toHaveLength(2)
   })
 
-  it('omits the rating-changes section when there are none', () => {
+  it('omits the top-firms section when there are none', () => {
     renderWithProviders(<AnalystCard recommendations={base} />)
+    expect(screen.queryByText('Top Firms')).not.toBeInTheDocument()
+    // and the old recent-changes feed is gone entirely
     expect(screen.queryByText('Recent Rating Changes')).not.toBeInTheDocument()
   })
 
-  it('shows rating changes even without trend coverage', () => {
+  it('shows the top firms even without trend coverage', () => {
     renderWithProviders(
-      <AnalystCard recommendations={empty} ratingChanges={ratingChanges} />,
+      <AnalystCard recommendations={empty} topFirms={topFirms} price={200} />,
     )
-    // no trend distribution, but the events still render and the empty-state
-    // text does not stand in
-    expect(screen.getByText('Recent Rating Changes')).toBeInTheDocument()
-    expect(screen.getByText('TD Cowen')).toBeInTheDocument()
+    // no trend distribution, but the firms still render and the empty-state text
+    // does not stand in
+    expect(screen.getByText('Top Firms')).toBeInTheDocument()
+    expect(screen.getByText('RBC Capital')).toBeInTheDocument()
     expect(screen.queryByText(/no analyst coverage/i)).not.toBeInTheDocument()
   })
 })

@@ -8,6 +8,7 @@ import {
   getEtfAnalysis,
   getIndustryValuation,
   getPeHistory,
+  getRatingsAnalysis,
   getStockAnalysis,
   getSupportLevels,
   humanizeClassification,
@@ -625,6 +626,58 @@ describe('getStockAnalysis', () => {
     )
     await expect(getStockAnalysis('AAPL')).rejects.toThrow(
       /analysis model call failed/,
+    )
+  })
+})
+
+describe('getRatingsAnalysis', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests the ratings-review endpoint and returns the parsed read', async () => {
+    let requestedUrl = ''
+    const body = {
+      symbol: 'NVDA',
+      verdict: 'bullish',
+      confidence: 'high',
+      summary: 'Analysts are overwhelmingly positive.',
+      findings: ['95% rate it buy or better'],
+      disclaimer: 'Not financial advice.',
+      model: 'claude-haiku-4-5',
+      generated_at: '2026-07-09T00:00:00Z',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getRatingsAnalysis('NVDA')
+
+    expect(requestedUrl).toContain('/stocks/ticker/NVDA/analyst-info/analysis')
+    expect(result.verdict).toBe('bullish')
+    expect(result.findings).toEqual(['95% rate it buy or better'])
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 502,
+          json: () =>
+            Promise.resolve({ detail: 'no analyst coverage to analyse' }),
+        }),
+      ),
+    )
+    await expect(getRatingsAnalysis('NVDA')).rejects.toThrow(
+      /no analyst coverage/,
     )
   })
 })
