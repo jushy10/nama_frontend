@@ -15,6 +15,7 @@ import {
   priceTargetUpside,
   type AnalystPriceTargets,
   type AnalystRecommendations,
+  type RatingChange,
   type Recommendation,
   type RecommendationTrend,
 } from '@/lib/api'
@@ -86,6 +87,19 @@ const DIRECTION = {
   },
 } as const
 
+// A rating action's grade action → a human label, for when the row has no
+// explicit from→to grade move to show (an initiation, a reiteration, …).
+const ACTION_LABEL: Record<string, string> = {
+  up: 'Upgrade',
+  down: 'Downgrade',
+  init: 'Initiated',
+  main: 'Maintained',
+  reit: 'Reiterated',
+}
+
+// How many rating-change events to list before collapsing the rest into a count.
+const MAX_RATING_CHANGES = 6
+
 /** "Jun 2026" from the snapshot's ISO period. Parsed as a *local* date so a
  *  UTC-midnight ISO string doesn't format a day early in negative offsets — the
  *  same care EarningsCard takes with date-only fields. */
@@ -93,6 +107,17 @@ function monthLabel(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d).toLocaleDateString('en-US', {
     month: 'short',
+    year: 'numeric',
+  })
+}
+
+/** "Jun 9, 2026" from an ISO date — the rating-change event stamp. Parsed as a
+ *  local date, same reasoning as `monthLabel`. */
+function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
     year: 'numeric',
   })
 }
@@ -383,11 +408,130 @@ function PriceTargets({
   )
 }
 
+/** The grade/target detail line for one rating action, e.g. "Hold → Buy ·
+ *  $335.00 → $350.00". Falls back to the action label when there's no explicit
+ *  grade move, and shows just the current target when there's no prior one. */
+function changeDetail(change: RatingChange): string | null {
+  const grades =
+    change.from_grade && change.to_grade
+      ? `${change.from_grade} → ${change.to_grade}`
+      : (change.to_grade ??
+        (change.action ? (ACTION_LABEL[change.action] ?? null) : null))
+  const target =
+    change.target_prior != null && change.target_current != null
+      ? `${fmtDollars(change.target_prior)} → ${fmtDollars(
+          change.target_current,
+        )}`
+      : change.target_current != null
+        ? fmtDollars(change.target_current)
+        : null
+  const parts = [grades, target].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
+/** One rating action: a direction-coloured trend icon, the firm and date, and
+ *  the grade/target move beneath. */
+function RatingChangeRow({ change }: { change: RatingChange }) {
+  const color = change.is_upgrade
+    ? 'success.main'
+    : change.is_downgrade
+      ? 'error.main'
+      : 'text.secondary'
+  const Icon = change.is_upgrade
+    ? TrendingUpIcon
+    : change.is_downgrade
+      ? TrendingDownIcon
+      : TrendingFlatIcon
+  const detail = changeDetail(change)
+  return (
+    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
+      <Icon fontSize="small" sx={{ color, mt: '2px', flexShrink: 0 }} />
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}
+        >
+          <Typography
+            variant="body2"
+            sx={{
+              fontWeight: 600,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {change.firm}
+          </Typography>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ flexShrink: 0 }}
+          >
+            {dayLabel(change.published_at)}
+          </Typography>
+        </Stack>
+        {detail && (
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontVariantNumeric: 'tabular-nums' }}
+          >
+            {detail}
+          </Typography>
+        )}
+      </Box>
+    </Stack>
+  )
+}
+
+/** The recent upgrade/downgrade feed — the discrete actions behind the monthly
+ *  trend, newest first, capped at `MAX_RATING_CHANGES` with the remainder
+ *  collapsed to a count. */
+function RatingChanges({ changes }: { changes: RatingChange[] }) {
+  const shown = changes.slice(0, MAX_RATING_CHANGES)
+  const extra = changes.length - shown.length
+  return (
+    <Box sx={{ mt: 2.5 }}>
+      <Divider sx={{ mb: 2 }} />
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'text.secondary',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+        }}
+      >
+        Recent Rating Changes
+      </Typography>
+      <Stack spacing={1.5} sx={{ mt: 1.5 }}>
+        {shown.map((c, i) => (
+          <RatingChangeRow
+            key={`${c.firm}-${c.published_at}-${i}`}
+            change={c}
+          />
+        ))}
+      </Stack>
+      {extra > 0 && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: 'block', mt: 1.5 }}
+        >
+          +{extra} more
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
 export default function AnalystCard({
   recommendations,
+  ratingChanges = [],
   price = null,
 }: {
   recommendations: AnalystRecommendations
+  ratingChanges?: RatingChange[]
   price?: number | null
 }) {
   const latest = recommendations.latest
@@ -409,6 +553,14 @@ export default function AnalystCard({
     latest && total > 0
       ? Math.round(((latest.sell + latest.strong_sell) / total) * 100)
       : null
+
+  // What the card has to show. The trend distribution, the price target, and the
+  // rating-change feed are independent best-effort blocks; the empty state only
+  // stands in when none of them has anything.
+  const hasTrends = !!latest && total > 0
+  const hasTargets = recommendations.price_targets?.mean != null
+  const hasChanges = ratingChanges.length > 0
+  const hasAny = hasTrends || hasTargets || hasChanges
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -468,44 +620,52 @@ export default function AnalystCard({
           )}
         </Stack>
 
-        {latest && latest.total > 0 ? (
+        {hasAny ? (
           <>
-            <Typography variant="body2" sx={{ mt: 2.5 }}>
-              <Box
-                component="span"
-                sx={{ fontWeight: 700, color: 'success.main' }}
-              >
-                {bullPct}%
-              </Box>{' '}
-              rate it Buy or better
-              {bearPct != null && bearPct > 0 && (
-                <>
-                  {' · '}
+            {hasTrends && latest && (
+              <>
+                <Typography variant="body2" sx={{ mt: 2.5 }}>
                   <Box
                     component="span"
-                    sx={{ fontWeight: 700, color: 'error.main' }}
+                    sx={{ fontWeight: 700, color: 'success.main' }}
                   >
-                    {bearPct}%
+                    {bullPct}%
                   </Box>{' '}
-                  Sell
-                </>
-              )}
-            </Typography>
-            <Box sx={{ mt: 1.5 }}>
-              <DistributionBar trend={latest} />
-              <Legend trend={latest} />
-            </Box>
-            {direction && DirectionIcon && (
-              <Stack
-                direction="row"
-                spacing={0.75}
-                sx={{ mt: 2.5, alignItems: 'center', color: direction.color }}
-              >
-                <DirectionIcon fontSize="small" />
-                <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {direction.text}
+                  rate it Buy or better
+                  {bearPct != null && bearPct > 0 && (
+                    <>
+                      {' · '}
+                      <Box
+                        component="span"
+                        sx={{ fontWeight: 700, color: 'error.main' }}
+                      >
+                        {bearPct}%
+                      </Box>{' '}
+                      Sell
+                    </>
+                  )}
                 </Typography>
-              </Stack>
+                <Box sx={{ mt: 1.5 }}>
+                  <DistributionBar trend={latest} />
+                  <Legend trend={latest} />
+                </Box>
+                {direction && DirectionIcon && (
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    sx={{
+                      mt: 2.5,
+                      alignItems: 'center',
+                      color: direction.color,
+                    }}
+                  >
+                    <DirectionIcon fontSize="small" />
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {direction.text}
+                    </Typography>
+                  </Stack>
+                )}
+              </>
             )}
             {recommendations.price_targets && (
               <PriceTargets
@@ -513,6 +673,7 @@ export default function AnalystCard({
                 price={price}
               />
             )}
+            {hasChanges && <RatingChanges changes={ratingChanges} />}
           </>
         ) : (
           <Typography color="text.secondary" sx={{ mt: 2 }}>

@@ -28,7 +28,7 @@ import {
   getQuarterlyEarnings,
   getHeatMap,
   getMarketSummary,
-  getRecommendations,
+  getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
   getScreener,
@@ -41,7 +41,7 @@ import {
   getTickerType,
   searchEtfs,
   searchStocks,
-  type AnalystRecommendations,
+  type AnalystInfo,
   type AnnualEarnings,
   type CandleSeries,
   type ChartRange,
@@ -302,15 +302,16 @@ export function useAnnualEarnings(
 }
 
 /**
- * Analyst recommendation trends for a ticker (the buy/hold/sell split by month).
- * Idle until `symbol` is set.
+ * A ticker's full analyst coverage — the buy/hold/sell trends, the consensus
+ * price target, and the upgrade/downgrade event feed — in one read. Idle until
+ * `symbol` is set.
  */
-export function useRecommendations(
+export function useAnalystInfo(
   symbol: string | null | undefined,
-): UseQueryResult<AnalystRecommendations> {
+): UseQueryResult<AnalystInfo> {
   return useQuery({
-    queryKey: ['recommendations', symbol],
-    queryFn: ({ signal }) => getRecommendations(symbol as string, { signal }),
+    queryKey: ['analyst-info', symbol],
+    queryFn: ({ signal }) => getAnalystInfo(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

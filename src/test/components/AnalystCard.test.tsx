@@ -3,6 +3,7 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import AnalystCard from '@/components/AnalystCard'
 import type {
   AnalystRecommendations,
+  RatingChange,
   Recommendation,
   RecommendationTrend,
 } from '@/lib/api'
@@ -36,8 +37,6 @@ function trend(
 }
 
 const base: AnalystRecommendations = {
-  symbol: 'AAPL',
-  count: 2,
   direction: 'upgraded',
   latest: trend({ strong_buy: 13, buy: 24, hold: 7 }, 'Buy', 1.86),
   price_targets: null,
@@ -48,6 +47,38 @@ const withTargets: AnalystRecommendations = {
   ...base,
   price_targets: { mean: 315, high: 400, low: 215, median: 315 },
 }
+
+const empty: AnalystRecommendations = {
+  direction: null,
+  latest: null,
+  price_targets: null,
+  trends: [],
+}
+
+const ratingChanges: RatingChange[] = [
+  {
+    firm: 'TD Cowen',
+    published_at: '2026-06-09',
+    action: 'up',
+    from_grade: 'Hold',
+    to_grade: 'Buy',
+    target_current: 350,
+    target_prior: 335,
+    is_upgrade: true,
+    is_downgrade: false,
+  },
+  {
+    firm: 'KGI Securities',
+    published_at: '2026-05-01',
+    action: 'down',
+    from_grade: 'Buy',
+    to_grade: 'Hold',
+    target_current: null,
+    target_prior: null,
+    is_upgrade: false,
+    is_downgrade: true,
+  },
+]
 
 describe('AnalystCard', () => {
   it('shows the consensus chip and the analyst count', () => {
@@ -98,15 +129,7 @@ describe('AnalystCard', () => {
   })
 
   it('shows an empty state when there is no analyst coverage', () => {
-    const recs: AnalystRecommendations = {
-      symbol: 'ZZZZ',
-      count: 0,
-      direction: null,
-      latest: null,
-      price_targets: null,
-      trends: [],
-    }
-    renderWithProviders(<AnalystCard recommendations={recs} />)
+    renderWithProviders(<AnalystCard recommendations={empty} />)
     expect(screen.getByText(/no analyst coverage/i)).toBeInTheDocument()
     expect(screen.queryByText('Consensus')).not.toBeInTheDocument()
   })
@@ -140,5 +163,34 @@ describe('AnalystCard', () => {
   it('omits the price target section when there are no targets', () => {
     renderWithProviders(<AnalystCard recommendations={base} price={300} />)
     expect(screen.queryByText('12-Month Price Target')).not.toBeInTheDocument()
+  })
+
+  it('lists recent rating changes with the firm, grade move and target', () => {
+    renderWithProviders(
+      <AnalystCard recommendations={base} ratingChanges={ratingChanges} />,
+    )
+    expect(screen.getByText('Recent Rating Changes')).toBeInTheDocument()
+    expect(screen.getByText('TD Cowen')).toBeInTheDocument()
+    expect(
+      screen.getByText('Hold → Buy · $335.00 → $350.00'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('KGI Securities')).toBeInTheDocument()
+    expect(screen.getByText('Buy → Hold')).toBeInTheDocument()
+  })
+
+  it('omits the rating-changes section when there are none', () => {
+    renderWithProviders(<AnalystCard recommendations={base} />)
+    expect(screen.queryByText('Recent Rating Changes')).not.toBeInTheDocument()
+  })
+
+  it('shows rating changes even without trend coverage', () => {
+    renderWithProviders(
+      <AnalystCard recommendations={empty} ratingChanges={ratingChanges} />,
+    )
+    // no trend distribution, but the events still render and the empty-state
+    // text does not stand in
+    expect(screen.getByText('Recent Rating Changes')).toBeInTheDocument()
+    expect(screen.getByText('TD Cowen')).toBeInTheDocument()
+    expect(screen.queryByText(/no analyst coverage/i)).not.toBeInTheDocument()
   })
 })

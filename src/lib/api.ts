@@ -1998,16 +1998,14 @@ export interface AnalystPriceTargets {
 }
 
 /**
- * Analyst recommendation trends for a symbol, newest snapshot first. `latest`
- * is the current month's split and `direction` how the consensus shifted from
- * the prior month (null until there are two snapshots to compare) — the
- * forward-looking part. `price_targets` is the current consensus 12-month target
- * block (null when the source serves none). An empty `trends` means no analyst
- * covers the symbol.
+ * The recommendation-trend block of `AnalystInfo`, newest snapshot first.
+ * `latest` is the current month's split and `direction` how the consensus
+ * shifted from the prior month (null until there are two snapshots to compare) —
+ * the forward-looking part. `price_targets` is the current consensus 12-month
+ * target block (null when the source serves none). An empty `trends` means no
+ * analyst covers the symbol.
  */
 export interface AnalystRecommendations {
-  symbol: string
-  count: number
   direction: RecommendationDirection | null
   latest: RecommendationTrend | null
   price_targets: AnalystPriceTargets | null
@@ -2028,19 +2026,59 @@ export function priceTargetUpside(
   return ((targets.mean - price) / price) * 100
 }
 
-/** Fetch analyst recommendation trends for a ticker (newest snapshot first). */
-export async function getRecommendations(
+/**
+ * One published sell-side rating action — the discrete event behind the trend.
+ * `firm` and `published_at` identify it; `action` is the vendor's grade action
+ * (`up`/`down`/`init`/`main`/`reit`), `from_grade`→`to_grade` the move, and
+ * `target_current`/`target_prior` the price target it set vs. the one it replaced
+ * (any null when the source omits it). `is_upgrade`/`is_downgrade` surface the
+ * direction so the UI doesn't re-derive it from `action`.
+ */
+export interface RatingChange {
+  firm: string
+  published_at: string // ISO date the action was published
+  action: string | null
+  from_grade: string | null
+  to_grade: string | null
+  target_current: number | null
+  target_prior: number | null
+  is_upgrade: boolean
+  is_downgrade: boolean
+}
+
+/**
+ * A stock's full analyst coverage in one payload — the response of
+ * `GET /stocks/ticker/{ticker}/analyst-info`. `recommendations` is the
+ * buy/hold/sell trend block (with consensus + price targets); `rating_changes`
+ * is the discrete upgrade/downgrade event feed, newest first. Both are
+ * best-effort: an uncovered stock carries an empty `trends` and an empty
+ * `rating_changes`.
+ */
+export interface AnalystInfo {
+  ticker: string
+  recommendations: AnalystRecommendations
+  rating_changes: RatingChange[]
+}
+
+/**
+ * Fetch a ticker's full analyst coverage — recommendation trends (+ price
+ * targets) and the rating-change feed — in one read (newest first).
+ */
+export async function getAnalystInfo(
   symbol: string,
   opts: { signal?: AbortSignal } = {},
-): Promise<AnalystRecommendations> {
+): Promise<AnalystInfo> {
   const res = await fetch(
-    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/recommendations`,
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/analyst-info`,
     { signal: opts.signal },
   )
   if (!res.ok) throw await toApiError(res)
-  const data = (await res.json()) as AnalystRecommendations
-  if (!Array.isArray(data?.trends)) {
-    throw new ApiError(res.status, 'Malformed recommendations response')
+  const data = (await res.json()) as AnalystInfo
+  if (
+    !Array.isArray(data?.recommendations?.trends) ||
+    !Array.isArray(data?.rating_changes)
+  ) {
+    throw new ApiError(res.status, 'Malformed analyst-info response')
   }
   return data
 }
