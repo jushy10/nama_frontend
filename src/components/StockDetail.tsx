@@ -37,7 +37,6 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import AnalysisCard from '@/components/AnalysisCard'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
-import PegCard from '@/components/PegCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
@@ -50,8 +49,8 @@ import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
 import AnalysisLoadingCard from '@/components/AnalysisLoadingCard'
 
 // The card carries everything the stock detail draws off in one request: the
-// snapshot's dividend, the performance windows, the metrics (profitability +
-// PEG), and the options read.
+// snapshot's dividend, the performance windows, the metrics (profitability),
+// and the options read.
 const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
   'dividend',
   'performance',
@@ -61,8 +60,8 @@ const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
 
 // A small tab menu splits the detail into focused sections so it isn't one long
 // scroll: Overview (snapshot, performance, the AI take and price chart),
-// Valuation (profitability + the PEG and industry-P/E reads), Analysts (the
-// sell-side ratings), Earnings, and Options.
+// Valuation (profitability + the industry-P/E and P/E-history reads), Analysts
+// (the sell-side ratings), Earnings, and Options.
 type StockDetailTab =
   | 'overview'
   | 'valuation'
@@ -72,7 +71,7 @@ type StockDetailTab =
 
 /**
  * The stock detail view — the snapshot card plus the performance/profitability/
- * PEG/options reads, analyst ratings, the price chart, and the earnings +
+ * options reads, analyst ratings, the price chart, and the earnings +
  * forward-P/E row. The Search page hands it a symbol once the classifier calls
  * the ticker an equity; it fetches that ticker's card (with every block) itself,
  * and the chart, 5Y pill, ratings, and earnings ride the loaded ticker.
@@ -87,7 +86,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The chart, 5Y pill, ratings, and earnings ride the *loaded* ticker, so they
   // only fire once the card resolves — a bad symbol never kicks off more doomed
   // requests. The earnings card runs off the consolidated quarterly endpoint;
-  // the profitability and PEG reads ride on the card's `metrics` block, and the
+  // the profitability read rides on the card's `metrics` block, and the
   // annual series (best-effort) backs the card's Quarterly/Annual toggle.
   const loadedSymbol = stock?.ticker ?? null
   const candleQuery = useCandles(loadedSymbol, range)
@@ -306,9 +305,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       )}
 
       {/* Valuation gathers the analytical reads that used to crowd the old
-          General tab: the profitability gauge, the growth-adjusted PEG, and the
-          peer P/E benchmark. All ride the card's metrics block (the industry
-          read its own best-effort query), so switching in is instant. */}
+          General tab: the profitability gauge and the peer P/E benchmark. All
+          ride the card's metrics block (the industry read its own best-effort
+          query), so switching in is instant. */}
       {tab === 'valuation' && (
         <Stack spacing={3} role="tabpanel">
           {/* "Is it making money?" — the trailing net-margin read. */}
@@ -317,14 +316,6 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               netMargin={stock.metrics.net_margin}
               grossMargin={stock.metrics.gross_margin}
               operatingMargin={stock.metrics.operating_margin}
-            />
-          )}
-
-          {/* "Is the price fair for the growth?" — the growth-adjusted read. */}
-          {stock.metrics && (
-            <PegCard
-              peg={stock.metrics.peg}
-              forwardPeg={stock.metrics.forward_peg}
             />
           )}
 

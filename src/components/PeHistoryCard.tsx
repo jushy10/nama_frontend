@@ -21,7 +21,7 @@ import InfoHint from '@/components/InfoHint'
 // comes back with an empty/near-empty series from the best-effort endpoint).
 const MIN_POINTS = 3
 
-// The same valuation palette the Industry P/E and PEG cards use — cheaper-than-usual
+// The same valuation palette the Industry P/E card uses — cheaper-than-usual
 // reads green, in its usual band amber, pricier-than-usual red — so "green = cheap"
 // stays consistent down the Valuation tab. The difference: this compares the stock
 // against *its own* history, not its peers.

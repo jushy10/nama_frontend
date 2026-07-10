@@ -206,7 +206,7 @@ describe('EarningsCard', () => {
   it('carries no metric or ratio tile grids — the card is charts only', () => {
     renderWithProviders(<EarningsCard earnings={base} />)
     // The margin stack moved behind the Profitability card and the health
-    // ratios were dropped; PEG and P/E anchor their own cards.
+    // ratios were dropped; P/E anchors its own card.
     expect(screen.queryByText('Trailing metrics')).not.toBeInTheDocument()
     expect(screen.queryByText('Gross Margin')).not.toBeInTheDocument()
     expect(screen.queryByText('Financial health')).not.toBeInTheDocument()

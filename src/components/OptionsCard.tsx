@@ -9,8 +9,8 @@ import {
   type OptionsSignal,
 } from '@/lib/api'
 
-// Amber for every unremarkable middle read — matches the Profitability/PEG
-// cards' neutral call.
+// Amber for every unremarkable middle read — matches the Profitability card's
+// neutral call.
 const MID_COLOR = '#fbbf24' // amber-400
 
 // Traffic-light colour per low/mid/high read: low is the easy green end
