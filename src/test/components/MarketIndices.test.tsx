@@ -42,23 +42,72 @@ function candleSeries(symbol: string) {
 }
 
 /**
- * Answers /stocks/ticker/SYMBOL/candles with a small series and the index-tile quotes
- * from BY_SYMBOL. The tiles quote each fund through the ETF endpoint
- * (/stocks/etf/SYMBOL), not the stock ticker card; 404s the rest.
+ * Three EMA lines (9/21/50) whose points land on the two candles' own times, so
+ * the overlay maps onto real bars and its legend chips render. Values sit inside
+ * the candles' visible range so the lines draw within the plot.
+ */
+function emaSeries(symbol: string) {
+  const point = (hourUtc: number, value: number) => ({
+    time: Date.UTC(2026, 6, 1, hourUtc) / 1000,
+    timestamp: new Date(Date.UTC(2026, 6, 1, hourUtc)).toISOString(),
+    value,
+  })
+  const line = (period: number) => ({
+    period,
+    count: 2,
+    latest: 730.6,
+    points: [point(15, 730.4), point(16, 730.6)],
+  })
+  return { symbol, timeframe: '5Min', lines: [line(9), line(21), line(50)] }
+}
+
+/**
+ * One strong support level at 730.50 — inside the candles' padded visible range
+ * (~[728.8, 733.2]), so its price tag renders, and non-empty so the chart shows
+ * the "Support levels" toggle.
+ */
+function supportLevels(symbol: string) {
+  return {
+    symbol,
+    timeframe: '1Day',
+    reference_price: 732,
+    count: 1,
+    levels: [
+      {
+        price: 730.5,
+        touches: 3,
+        last_touched: '2026-06-25',
+        strength: 'strong',
+        distance_percent: -0.2,
+      },
+    ],
+  }
+}
+
+/**
+ * Answers the chart's reads for the selected proxy — /candles, /ema and
+ * /support-levels (all under /stocks/ticker/SYMBOL) — plus the index-tile quotes
+ * from BY_SYMBOL, which come through the ETF endpoint (/stocks/etf/SYMBOL), not
+ * the stock ticker card. 404s anything else (e.g. an unstubbed tile symbol).
  */
 function stubFetch() {
   const mock = vi.fn((url: string | URL) => {
     const u = String(url)
-    const isCandles = u.includes('/candles')
-    const symbol =
-      (isCandles
-        ? u.match(/\/stocks\/ticker\/([^/?]+)\/candles/)
-        : u.match(/\/stocks\/etf\/([^/?]+)/))?.[1] ?? ''
-    const data = isCandles ? candleSeries(symbol) : BY_SYMBOL[symbol]
+    let data: unknown
+    let m: RegExpMatchArray | null
+    if ((m = u.match(/\/stocks\/ticker\/([^/?]+)\/candles/))) {
+      data = candleSeries(m[1])
+    } else if ((m = u.match(/\/stocks\/ticker\/([^/?]+)\/support-levels/))) {
+      data = supportLevels(m[1])
+    } else if ((m = u.match(/\/stocks\/ticker\/([^/?]+)\/ema/))) {
+      data = emaSeries(m[1])
+    } else if ((m = u.match(/\/stocks\/etf\/([^/?]+)/))) {
+      data = BY_SYMBOL[m[1]]
+    }
     return Promise.resolve({
       ok: data != null,
       status: data != null ? 200 : 404,
-      json: () => Promise.resolve(data ?? { detail: `No data for ${symbol}.` }),
+      json: () => Promise.resolve(data ?? { detail: 'No data.' }),
     })
   })
   vi.stubGlobal('fetch', mock)
@@ -151,6 +200,48 @@ describe('MarketIndices', () => {
         expect.stringMatching(/\/stocks\/ticker\/SPY\/candles\?.*range=7D/),
         expect.anything(),
       ),
+    )
+  })
+
+  it('overlays moving averages and support levels like the stock page', async () => {
+    stubFetch()
+    renderWithProviders(<MarketIndices />)
+
+    // The chart carries both overlay toggles, defaulted on to match the stock
+    // page.
+    expect(
+      await screen.findByRole('img', { name: /candlestick price chart/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByLabelText('Moving averages')).toBeChecked()
+    expect(await screen.findByLabelText('Support levels')).toBeChecked()
+
+    // The EMA legend chips render (one per line) and the in-range support level
+    // draws its price tag on the axis.
+    expect(await screen.findByText('EMA 9')).toBeInTheDocument()
+    expect(screen.getByText('EMA 21')).toBeInTheDocument()
+    expect(screen.getByText('EMA 50')).toBeInTheDocument()
+    expect(screen.getByText('730.50')).toBeInTheDocument()
+  })
+
+  it('drops each overlay when its toggle is switched off', async () => {
+    stubFetch()
+    const { user } = renderWithProviders(<MarketIndices />)
+
+    // Wait for both overlays to land.
+    expect(await screen.findByText('EMA 9')).toBeInTheDocument()
+    expect(screen.getByText('730.50')).toBeInTheDocument()
+
+    // Switching Moving averages off pulls the EMA legend; support stays.
+    await user.click(screen.getByLabelText('Moving averages'))
+    await waitFor(() =>
+      expect(screen.queryByText('EMA 9')).not.toBeInTheDocument(),
+    )
+    expect(screen.getByText('730.50')).toBeInTheDocument()
+
+    // Switching Support levels off pulls its price tag too.
+    await user.click(screen.getByLabelText('Support levels'))
+    await waitFor(() =>
+      expect(screen.queryByText('730.50')).not.toBeInTheDocument(),
     )
   })
 })
