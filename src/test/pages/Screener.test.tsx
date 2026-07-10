@@ -105,7 +105,7 @@ function stubApiWithAi(interpreted: Interp) {
       const u = String(url)
       calls.push(u)
       const body = u.includes('/stocks/ai-search')
-        ? { interpreted, results: SEARCH_PAGE }
+        ? { interpreted } // the endpoint returns only the interpreted filters
         : u.includes('/stocks/classifications')
           ? CLASSIFICATIONS
           : SEARCH_PAGE

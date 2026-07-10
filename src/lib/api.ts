@@ -1131,38 +1131,34 @@ export interface AiScreenInterpretation {
 }
 
 /**
- * The response to an AI screen (`GET /stocks/ai-search`): the interpreted filters
- * plus the matched page. `results` is the exact `StockSearchResponse` the manual
- * `searchStocks` returns, so both paths render identically; `interpreted` is the
- * AI's reading of the request, for the UI to surface and make editable.
+ * The response to an AI screen (`GET /stocks/ai-search`): the AI's reading of the
+ * request as a set of filters, for the UI to surface and apply to the manual controls
+ * (which then run the ordinary universe search). The endpoint returns only this — it
+ * doesn't run the search itself, so there is no result page here.
  */
 export interface AiScreenResponse {
   interpreted: AiScreenInterpretation
-  results: StockSearchResponse
 }
 
 /**
  * Screen the ≥$1B US universe from a plain-English request (`GET /stocks/ai-search`).
  * An AI translates `query` ("mega-cap technology stocks", "top S&P 500 names by
- * revenue growth") into the same filters `searchStocks` accepts and runs it, so the
- * results are always real screened stocks. Returns the interpreted filters alongside
- * the page — apply the former to the manual controls so the user sees and can edit
- * what was applied. A blank query is a 400; a translation failure (the model couldn't
- * parse it) a 502.
+ * revenue growth") into the same filters `searchStocks` accepts. Returns just the
+ * interpreted filters — apply them to the manual controls so the user sees and can edit
+ * what was applied, and the ordinary search then fetches the rows. A blank query is a
+ * 400; a translation failure (the model couldn't parse it) a 502.
  */
 export async function aiSearchStocks(
   query: string,
-  opts: { limit?: number; offset?: number; signal?: AbortSignal } = {},
+  opts: { signal?: AbortSignal } = {},
 ): Promise<AiScreenResponse> {
   const qs = new URLSearchParams({ q: query })
-  if (opts.limit != null) qs.set('limit', String(opts.limit))
-  if (opts.offset != null) qs.set('offset', String(opts.offset))
   const res = await fetch(`${API_BASE}/stocks/ai-search?${qs}`, {
     signal: opts.signal,
   })
   if (!res.ok) throw await toApiError(res)
   const data = (await res.json()) as AiScreenResponse
-  if (!data?.interpreted || !Array.isArray(data?.results?.results)) {
+  if (!data?.interpreted) {
     throw new ApiError(res.status, 'Malformed AI screen response')
   }
   return data
