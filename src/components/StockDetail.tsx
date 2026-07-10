@@ -27,8 +27,8 @@ import {
   useFiveYearReturn,
   useIndustryValuation,
   usePeHistory,
+  useAnalystInfo,
   useQuarterlyEarnings,
-  useRecommendations,
   useStockAnalysis,
   useSupportLevels,
   useTickerCard,
@@ -100,7 +100,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // leaves the overlay off, never disturbs the price chart.
   const emaQuery = useEma(loadedSymbol, range, showEma)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
-  const recommendationsQuery = useRecommendations(loadedSymbol)
+  const analystQuery = useAnalystInfo(loadedSymbol)
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
   // The AI take is the slowest read (a live model call), so it rides the loaded
@@ -372,26 +372,28 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       )}
 
       {/* Sell-side ratings on their own tab: the consensus verdict, the analyst
-          distribution, the month-over-month drift and the 12-month price
-          target — all riding the loaded ticker's recommendations read. */}
+          distribution, the month-over-month drift, the 12-month price target and
+          the recent upgrade/downgrade feed — all riding the loaded ticker's
+          analyst-info read. */}
       {tab === 'analysts' && (
         <Box role="tabpanel">
-          {recommendationsQuery.isLoading && (
+          {analystQuery.isLoading && (
             <Stack sx={{ alignItems: 'center', py: 2 }}>
               <CircularProgress size={28} />
             </Stack>
           )}
-          {recommendationsQuery.isError && (
+          {analystQuery.isError && (
             <Alert severity="warning" variant="outlined">
               {errorMessage(
-                recommendationsQuery.error,
+                analystQuery.error,
                 'Could not load analyst ratings.',
               )}
             </Alert>
           )}
-          {recommendationsQuery.data && (
+          {analystQuery.data && (
             <AnalystCard
-              recommendations={recommendationsQuery.data}
+              recommendations={analystQuery.data.recommendations}
+              ratingChanges={analystQuery.data.rating_changes}
               price={stock.price}
             />
           )}

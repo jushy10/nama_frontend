@@ -127,12 +127,15 @@ const emptyAnnual = {
   upcoming_count: 0,
   years: [],
 }
-const recommendations = {
-  symbol: 'X',
-  count: 0,
-  direction: 'unchanged',
-  latest: null,
-  trends: [],
+const analystInfo = {
+  ticker: 'X',
+  recommendations: {
+    direction: 'unchanged',
+    latest: null,
+    price_targets: null,
+    trends: [],
+  },
+  rating_changes: [],
 }
 const analysis = {
   symbol: 'X',
@@ -161,8 +164,8 @@ function stubFetch(card: unknown, opts: { etfDetail?: unknown } = {}) {
           ? (opts.etfDetail ?? { detail: 'not an ETF' })
           : u.includes('/candles')
             ? candles
-            : u.includes('/recommendations')
-              ? recommendations
+            : u.includes('/analyst-info')
+              ? analystInfo
               : u.includes('/earnings/quarterly')
                 ? emptyQuarterly
                 : u.includes('/earnings/annual')
@@ -275,8 +278,8 @@ describe('Search (unified)', () => {
               ? { ticker: 'NVDA', asset_type: 'equity' }
               : u.includes('/candles')
                 ? candles
-                : u.includes('/recommendations')
-                  ? recommendations
+                : u.includes('/analyst-info')
+                  ? analystInfo
                   : u.includes('/earnings/quarterly')
                     ? emptyQuarterly
                     : u.includes('/earnings/annual')
