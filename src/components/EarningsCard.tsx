@@ -38,8 +38,8 @@ import { heroWash } from '@/components/heroWash'
 const W_FALLBACK = 820
 const H = 300
 // `right` leaves room for the value-axis labels — wide enough for compact
-// revenue ("$120.0B"), not just EPS ("$3.27").
-const PAD = { top: 30, right: 56, bottom: 46, left: 12 }
+// revenue ("$120.0B"), not just EPS ("$3.27"). Sized for the larger axis type.
+const PAD = { top: 30, right: 60, bottom: 46, left: 12 }
 
 const fmtEps = (n: number) => `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`
 const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
@@ -47,11 +47,11 @@ const fmtPct = (n: number) => `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(1)}%`
 const fmtPctShort = (n: number) =>
   `${n >= 0 ? '+' : '-'}${Math.abs(n).toFixed(0)}%`
 
-/** Muted fill for the "estimate" marker — faint enough to sit behind the
- *  actual, and legible on both the dark and light canvas. Shared with the
- *  legend. */
+/** Stroke for the hollow "estimate" ring — clearly visible on both the dark and
+ *  light canvas without competing with the reported actual it sits beside.
+ *  Shared with the legend swatch. */
 const estimateColor = (theme: Theme) =>
-  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.18)'
+  theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.42)'
 
 /** "Q2 '24" from the fiscal period — or "FY24" for an annual row (a fiscal
  *  year with no quarter) — falling back to the report month. */
@@ -332,7 +332,7 @@ function SurpriseChart({
   // changes what the narrow chart draws.
   const narrow = W < 420
   const pad = useMemo(
-    () => (narrow ? { ...PAD, right: 40, bottom: 42, left: 8 } : PAD),
+    () => (narrow ? { ...PAD, right: 44, bottom: 42, left: 8 } : PAD),
     [narrow],
   )
   const viewForecasts = useMemo(
@@ -457,17 +457,17 @@ function SurpriseChart({
 
   // Value labels ride beneath every column, so on narrow slots (a phone-width
   // chart) the full format collides with its neighbours — swap in the tighter
-  // one. 50 units ≈ what an 11px "$130.5B" needs to clear its slot.
-  const barFmt = fmtShort && slot < 50 ? fmtShort : fmt
+  // one. 54 units ≈ what a 13px "$130.5B" needs to clear its slot.
+  const barFmt = fmtShort && slot < 54 ? fmtShort : fmt
   // The growth row shortens the same way ("+34%"), keeping the decimal for
   // the detail line above the plot.
-  const growthFmt = slot < 50 ? fmtPctShort : fmtPct
-  // Under-bar quarter labels collide once the slots get tight; below ~44 units
+  const growthFmt = slot < 54 ? fmtPctShort : fmtPct
+  // Under-bar quarter labels collide once the slots get tight; below ~48 units
   // a label no longer clears its neighbour. Keep the newest column labelled and
   // drop every other one going back — the value stays under every bar and a tap
   // fills the detail line, so the axis reads without stacking rotated text over
   // the values.
-  const labelEvery = slot >= 44
+  const labelEvery = slot >= 48
   const showBarLabel = (i: number) =>
     labelEvery || (data.length - 1 - i) % 2 === 0
 
@@ -583,7 +583,7 @@ function SurpriseChart({
           alignItems: 'baseline',
           columnGap: 1.5,
           rowGap: 0.5,
-          fontSize: '0.95rem',
+          fontSize: '1.05rem',
           fontWeight: 500,
           mb: 1.5,
           px: 1.5,
@@ -639,7 +639,7 @@ function SurpriseChart({
               stroke={grid}
               strokeWidth={1}
             />
-            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={13} fill={axis}>
+            <text x={W - pad.right + 6} y={y(t) + 4} fontSize={14} fill={axis}>
               {fmt(t)}
             </text>
           </g>
@@ -669,24 +669,22 @@ function SurpriseChart({
           />
         )}
 
-        {/* faint estimate markers — what analysts expected, tied to the
-            reported actual by a hairline so a beat/miss reads at a glance. */}
+        {/* estimate connectors — a hairline from each reported actual to the
+            estimate it's measured against, so the beat/miss gap reads at a
+            glance. The estimate ring itself is drawn on top of the actual dot
+            (further down) so it never disappears behind it. */}
         {data.map((b, i) =>
-          b.estimate == null ? null : (
-            <g key={`est-${b.key}`}>
-              {b.actual != null && (
-                <line
-                  x1={cx(i)}
-                  y1={y(b.estimate)}
-                  x2={cx(i)}
-                  y2={y(b.actual)}
-                  stroke={est}
-                  strokeWidth={1}
-                  strokeDasharray="2 3"
-                />
-              )}
-              <circle cx={cx(i)} cy={y(b.estimate)} r={3.5} fill={est} />
-            </g>
+          b.estimate == null || b.actual == null ? null : (
+            <line
+              key={`estln-${b.key}`}
+              x1={cx(i)}
+              y1={y(b.estimate)}
+              x2={cx(i)}
+              y2={y(b.actual)}
+              stroke={est}
+              strokeWidth={1.5}
+              strokeDasharray="2 3"
+            />
           ),
         )}
 
@@ -717,19 +715,53 @@ function SurpriseChart({
           />
         )}
 
-        {/* reported points: a dot coloured green/red by beat, the value above
-            it, the surprise % across the top, the quarter label beneath. */}
+        {/* reported actual dots — coloured green/red by beat. Drawn before the
+            estimate rings so a near-identical estimate still reads on top. */}
+        {data.map((b, i) =>
+          b.actual == null ? null : (
+            <circle
+              key={`act-${b.key}`}
+              cx={cx(i)}
+              cy={y(b.actual)}
+              r={6}
+              fill={b.beat == null ? lineColor : b.beat ? up : down}
+              stroke={surface}
+              strokeWidth={2.5}
+            />
+          ),
+        )}
+
+        {/* estimate rings — a hollow ring (transparent centre) laid over the
+            actual dot, so what analysts expected stays fully visible even when
+            it lands right beside the reported figure. */}
+        {data.map((b, i) =>
+          b.estimate == null ? null : (
+            <circle
+              key={`est-${b.key}`}
+              cx={cx(i)}
+              cy={y(b.estimate)}
+              r={5.5}
+              fill="none"
+              stroke={est}
+              strokeWidth={2.5}
+            />
+          ),
+        )}
+
+        {/* reported labels — value above each dot, surprise % across the top,
+            the quarter beneath, and a "no data" note for a missing quarter.
+            Drawn last so a number never sits behind an estimate ring. */}
         {data.map((b, i) => {
           const center = cx(i)
           const dotColor = b.beat == null ? lineColor : b.beat ? up : down
           const isGap = b.estimate == null && b.actual == null
           return (
-            <g key={b.key}>
-              {b.surprise != null && slot >= 34 && (
+            <g key={`lbl-${b.key}`}>
+              {b.surprise != null && slot >= 36 && (
                 <text
                   x={center}
                   y={18}
-                  fontSize={12}
+                  fontSize={14}
                   fontWeight={600}
                   fill={dotColor}
                   textAnchor="middle"
@@ -737,36 +769,24 @@ function SurpriseChart({
                   {growthFmt(b.surprise)}
                 </text>
               )}
-              {b.actual != null && (
-                <>
-                  <circle
-                    cx={center}
-                    cy={y(b.actual)}
-                    r={6}
-                    fill={dotColor}
-                    stroke={surface}
-                    strokeWidth={2.5}
-                  />
-                  {showBarLabel(i) && (
-                    <text
-                      x={center}
-                      y={y(b.actual) - 12}
-                      fontSize={14}
-                      fontWeight={600}
-                      fill={dotColor}
-                      textAnchor="middle"
-                    >
-                      {barFmt(b.actual)}
-                    </text>
-                  )}
-                </>
+              {b.actual != null && showBarLabel(i) && (
+                <text
+                  x={center}
+                  y={y(b.actual) - 13}
+                  fontSize={16}
+                  fontWeight={600}
+                  fill={dotColor}
+                  textAnchor="middle"
+                >
+                  {barFmt(b.actual)}
+                </text>
               )}
               {/* a labelled gap so a missing quarter reads as missing, not zero */}
               {isGap && (
                 <text
                   x={center}
                   y={pad.top + (H - pad.top - pad.bottom) / 2}
-                  fontSize={13}
+                  fontSize={15}
                   fill={axis}
                   textAnchor="middle"
                   dominantBaseline="middle"
@@ -778,7 +798,7 @@ function SurpriseChart({
                 <text
                   x={center}
                   y={H - 12}
-                  fontSize={13}
+                  fontSize={15}
                   fill={axis}
                   textAnchor="middle"
                 >
@@ -808,8 +828,8 @@ function SurpriseChart({
               />
               <text
                 x={center}
-                y={py - 12}
-                fontSize={13}
+                y={py - 13}
+                fontSize={15}
                 fill={forecast}
                 textAnchor="middle"
               >
@@ -818,7 +838,7 @@ function SurpriseChart({
               <text
                 x={center}
                 y={H - 12}
-                fontSize={13}
+                fontSize={15}
                 fill={forecast}
                 textAnchor="middle"
               >
@@ -827,8 +847,8 @@ function SurpriseChart({
               {f.growth != null && (
                 <text
                   x={center}
-                  y={H + 2}
-                  fontSize={11}
+                  y={H + 3}
+                  fontSize={13}
                   fontWeight={500}
                   fill={f.growth >= 0 ? up : down}
                   textAnchor="middle"
@@ -845,18 +865,38 @@ function SurpriseChart({
 }
 
 /** A legend swatch with its label, used beneath the chart. `color` is either a
- *  theme palette path (e.g. "success.main") or a theme-aware resolver. */
+ *  theme palette path (e.g. "success.main") or a theme-aware resolver. The
+ *  `ring` variant draws a hollow circle rather than a filled chip, matching the
+ *  hollow markers the chart uses for estimate and forecast points. */
 function LegendItem({
   color,
   label,
+  ring = false,
 }: {
   color: string | ((theme: Theme) => string)
   label: string
+  ring?: boolean
 }) {
   return (
     <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-      <Box sx={{ width: 12, height: 12, borderRadius: 0.5, bgcolor: color }} />
-      <Typography variant="caption" color="text.secondary">
+      <Box
+        sx={
+          ring
+            ? {
+                width: 13,
+                height: 13,
+                borderRadius: '50%',
+                border: '2.5px solid',
+                borderColor: color,
+              }
+            : { width: 13, height: 13, borderRadius: 0.5, bgcolor: color }
+        }
+      />
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ fontSize: '0.85rem' }}
+      >
         {label}
       </Typography>
     </Stack>
@@ -1472,7 +1512,7 @@ export default function EarningsCard({
                 <LegendItem color="success.main" label="EPS" />
               ) : (
                 <>
-                  <LegendItem color={estimateColor} label="EPS estimate" />
+                  <LegendItem color={estimateColor} label="EPS estimate" ring />
                   <LegendItem color="success.main" label="Beat" />
                   <LegendItem color="error.main" label="Missed" />
                 </>
@@ -1481,7 +1521,7 @@ export default function EarningsCard({
                 <LegendItem color="secondary.main" label="Revenue" />
               )}
               {hasUpcoming && (
-                <LegendItem color="primary.main" label="Upcoming (est.)" />
+                <LegendItem color="primary.main" label="Upcoming (est.)" ring />
               )}
             </Stack>
             {hasGrowth && (
