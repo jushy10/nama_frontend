@@ -188,24 +188,6 @@ export default function CandleChart({
       Math.round((i * (n - 1)) / Math.max(dateN - 1, 1)),
     )
 
-    // Below ~2.5px a slot the bodies collapse into a 1px smear (a phone's 6M/1Y
-    // view), so fall back to a filled close-price area — the trend still reads
-    // and the tap crosshair/readout keep working. Candles return on their own
-    // once there's room again (a wider container or a shorter range).
-    const dense = slot < 2.5
-    const trendUp = n > 0 && candles[n - 1].close >= candles[0].close
-    let linePath = ''
-    let areaPath = ''
-    if (dense && n > 0) {
-      const pts = candles
-        .map((d, i) => `${x(i).toFixed(2)},${y(d.close).toFixed(2)}`)
-        .join('L')
-      linePath = `M${pts}`
-      areaPath = `M${x(0).toFixed(2)},${volTop.toFixed(2)}L${pts}L${x(
-        n - 1,
-      ).toFixed(2)},${volTop.toFixed(2)}Z`
-    }
-
     // EMA overlays: map each point onto the candle sharing its `time` and stitch
     // a polyline across the price axis. Points with no matching candle (outside
     // the visible window) are skipped, so a line starts at the first bar it can.
@@ -234,10 +216,6 @@ export default function CandleChart({
       min,
       max,
       padRight,
-      dense,
-      linePath,
-      areaPath,
-      trendUp,
       emaPaths,
     }
   }, [candles, W, H, intraday, emaLines])
@@ -261,10 +239,6 @@ export default function CandleChart({
     min,
     max,
     padRight,
-    dense,
-    linePath,
-    areaPath,
-    trendUp,
     emaPaths,
   } = geo
   const active = hover ?? candles.length - 1
@@ -451,47 +425,35 @@ export default function CandleChart({
           )
         })}
 
-        {/* price series: real candles when there's room, else a filled
-            close-price area once the slots collapse below ~2.5px (geo.dense) */}
-        {dense ? (
-          <>
-            <path d={areaPath} fill={trendUp ? up : down} opacity={0.12} />
-            <path
-              d={linePath}
-              fill="none"
-              stroke={trendUp ? up : down}
-              strokeWidth={1.5}
-              strokeLinejoin="round"
-            />
-          </>
-        ) : (
-          candles.map((d, i) => {
-            const color = d.close >= d.open ? up : down
-            const yo = y(d.open)
-            const yc = y(d.close)
-            const top = Math.min(yo, yc)
-            const h = Math.max(1, Math.abs(yc - yo))
-            return (
-              <g key={`c${i}`}>
-                <line
-                  x1={x(i)}
-                  x2={x(i)}
-                  y1={y(d.high)}
-                  y2={y(d.low)}
-                  stroke={color}
-                  strokeWidth={1}
-                />
-                <rect
-                  x={x(i) - bodyW / 2}
-                  y={top}
-                  width={bodyW}
-                  height={h}
-                  fill={color}
-                />
-              </g>
-            )
-          })
-        )}
+        {/* price series: one candlestick per bar — a wick (high→low) and a body
+            (open→close), each coloured by its own up/down move. On a dense range
+            the bars just render thin rather than collapsing into a trend line. */}
+        {candles.map((d, i) => {
+          const color = d.close >= d.open ? up : down
+          const yo = y(d.open)
+          const yc = y(d.close)
+          const top = Math.min(yo, yc)
+          const h = Math.max(1, Math.abs(yc - yo))
+          return (
+            <g key={`c${i}`}>
+              <line
+                x1={x(i)}
+                x2={x(i)}
+                y1={y(d.high)}
+                y2={y(d.low)}
+                stroke={color}
+                strokeWidth={1}
+              />
+              <rect
+                x={x(i) - bodyW / 2}
+                y={top}
+                width={bodyW}
+                height={h}
+                fill={color}
+              />
+            </g>
+          )
+        })}
 
         {/* EMA overlay lines, drawn over the price series but under the support
             tags and crosshair. Non-interactive so they never steal the pointer. */}

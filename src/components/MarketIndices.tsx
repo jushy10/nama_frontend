@@ -6,14 +6,21 @@ import {
   CardContent,
   CircularProgress,
   Container,
+  FormControlLabel,
   Stack,
+  Switch,
   Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import type { ChartRange } from '@/lib/api'
-import { errorMessage, useCandles } from '@/lib/queries'
+import {
+  errorMessage,
+  useCandles,
+  useEma,
+  useSupportLevels,
+} from '@/lib/queries'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
@@ -40,15 +47,28 @@ const CHART_HEIGHT_MOBILE = 360
  * Home-page band of major US index proxies with their move for the day, plus a
  * candlestick chart of whichever index is selected. Each tile is a toggle —
  * picking one swaps the chart under it — and the chart carries the same range
- * row as the stock page. The tile strip loads on mount and quietly re-polls
- * every minute; a failed symbol shows a dash rather than blanking the row.
+ * row and moving-average/support-level overlays as the stock page. The tile
+ * strip loads on mount and quietly re-polls every minute; a failed symbol shows
+ * a dash rather than blanking the row.
  */
 export default function MarketIndices() {
   const [selected, setSelected] = useState(INDICES[0].symbol)
   // 1D by default: this section is about the day's session, unlike the stock
   // page's longer default horizon.
   const [range, setRange] = useState<ChartRange>('1D')
+  // The same two chart overlays the stock page offers, defaulted on to match it.
+  const [showSupport, setShowSupport] = useState(true)
+  const [showEma, setShowEma] = useState(true)
   const candleQuery = useCandles(selected, range)
+  // Support levels ride the selected proxy, keyed by symbol only — a fixed 1Y
+  // scan that doesn't refetch as the range changes; the chart draws just the
+  // ones inside the visible price range (so on the 1D default they quietly drop
+  // off until a longer range brings them into view).
+  const supportQuery = useSupportLevels(selected)
+  // EMA overlay follows the chart's range (so the lines sit under the same bars)
+  // and is only fetched while the toggle is on. Best-effort: a failure just
+  // leaves the overlay off, never disturbs the price chart.
+  const emaQuery = useEma(selected, range, showEma)
   const active = INDICES.find((i) => i.symbol === selected) ?? INDICES[0]
 
   // Taller chart on the wide desktop band; the phone keeps the original height.
@@ -117,7 +137,45 @@ export default function MarketIndices() {
                   <RangeReturn candles={candleQuery.data.candles} />
                 )}
               </Stack>
-              <ChartRangeToggle value={range} onChange={setRange} />
+              <Stack
+                direction="row"
+                spacing={1.5}
+                sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+              >
+                <FormControlLabel
+                  control={
+                    <Switch
+                      size="small"
+                      checked={showEma}
+                      onChange={(e) => setShowEma(e.target.checked)}
+                    />
+                  }
+                  label="Moving averages"
+                  sx={{
+                    m: 0,
+                    color: 'text.secondary',
+                    '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                  }}
+                />
+                {(supportQuery.data?.levels.length ?? 0) > 0 && (
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        size="small"
+                        checked={showSupport}
+                        onChange={(e) => setShowSupport(e.target.checked)}
+                      />
+                    }
+                    label="Support levels"
+                    sx={{
+                      m: 0,
+                      color: 'text.secondary',
+                      '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                    }}
+                  />
+                )}
+                <ChartRangeToggle value={range} onChange={setRange} />
+              </Stack>
             </Stack>
 
             {candleQuery.isLoading && (
@@ -140,6 +198,10 @@ export default function MarketIndices() {
               <CandleChart
                 candles={candleQuery.data.candles}
                 timeframe={candleQuery.data.timeframe}
+                supportLevels={
+                  showSupport ? supportQuery.data?.levels : undefined
+                }
+                emaLines={showEma ? emaQuery.data?.lines : undefined}
                 height={chartHeight}
               />
             )}
