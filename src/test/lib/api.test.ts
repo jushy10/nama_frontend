@@ -179,7 +179,7 @@ describe('clampToRegularHours', () => {
 describe('defaultTimeframe', () => {
   it('maps each range to a granularity that keeps the bar count readable', () => {
     expect(defaultTimeframe('1D')).toBe('5Min')
-    expect(defaultTimeframe('5D')).toBe('15Min')
+    expect(defaultTimeframe('7D')).toBe('15Min')
     expect(defaultTimeframe('1M')).toBe('4Hour')
     expect(defaultTimeframe('3M')).toBe('1Day')
     expect(defaultTimeframe('6M')).toBe('1Day')
