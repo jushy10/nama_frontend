@@ -740,12 +740,49 @@ export interface PeHistoryPoint {
   pe: number
 }
 
+/** The backend's one-word valuation read: where the current multiple sits vs. its own past. */
+export type PeHistorySignal = 'cheap' | 'fair' | 'expensive'
+
+/**
+ * Where the current trailing P/E sits within the stock's own history — the
+ * valuation summary the backend derives from the `points` series. `median_pe`
+ * with the `p25_pe`/`p75_pe` interquartile band (and the `min_pe`/`max_pe`
+ * envelope) is the multiple's usual range; `current_percentile` (0–100) is where
+ * the latest reading falls in it and `signal` buckets it — `cheap` in the bottom
+ * quartile, `expensive` in the top, `fair` between. `discount_to_median_percent`
+ * is the gap to the median (negative = cheaper than usual). A *relative* read —
+ * "cheap for this stock", not cheap outright (a re-rated business can read cheap
+ * all the way down).
+ */
+export interface PeHistoryStats {
+  /** The latest sampled multiple (the most recent earnings release). */
+  current_pe: number
+  median_pe: number
+  p25_pe: number
+  p75_pe: number
+  min_pe: number
+  max_pe: number
+  /** 0–100: the share of history at or below the current multiple. */
+  current_percentile: number
+  /** Current vs. its median, percent — negative = cheaper than usual. */
+  discount_to_median_percent: number
+  signal: PeHistorySignal
+  /** Number of releases the distribution rests on. */
+  sample_size: number
+}
+
 /** A stock's trailing P/E over time — one point per reported quarter, oldest first. */
 export interface PeHistory {
   ticker: string
   /** Number of points (may be fewer than the reported quarters). */
   count: number
   points: PeHistoryPoint[]
+  /**
+   * Where the current multiple sits vs. its own history (percentile + signal +
+   * band). `null` for a series too short (< ~2 years) to rank, and may be absent
+   * on an empty series — so treat missing as "no ranked read".
+   */
+  stats?: PeHistoryStats | null
 }
 
 /**

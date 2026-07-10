@@ -13,7 +13,12 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import type { PeHistory, PeHistoryPoint } from '@/lib/api'
+import type {
+  PeHistory,
+  PeHistoryPoint,
+  PeHistorySignal,
+  PeHistoryStats,
+} from '@/lib/api'
 import InfoHint from '@/components/InfoHint'
 
 // A trailing-P/E history needs a few points to read as a trend rather than a dot
@@ -32,8 +37,25 @@ const STANCE = {
 } as const
 type Stance = keyof typeof STANCE
 
+// Map the backend's percentile-based signal onto the card's stance vocabulary —
+// cheap (bottom quartile of its own history) reads the same green "below its avg"
+// as a client-computed below-median stance, so the palette stays consistent
+// whichever path produced the verdict.
+const SIGNAL_STANCE: Record<PeHistorySignal, Stance> = {
+  cheap: 'below',
+  fair: 'in_line',
+  expensive: 'above',
+}
+
 /** A P/E to one decimal, e.g. 21.04 → "21.0". */
 const fmt = (n: number) => n.toFixed(1)
+
+/** An ordinal label for a percentile, e.g. 6 → "6th", 92 → "92nd". */
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd']
+  const v = n % 100
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
+}
 
 /** A short month/year label from an ISO `yyyy-mm-dd` (parsed as local midnight). */
 const fmtDate = (iso: string) =>
@@ -91,6 +113,40 @@ function summaryLine(
     `Its trailing P/E of ${fmt(latest)} is about ${pct}% below its ` +
     `${n}-quarter median of ${fmt(med)} — cheaper than its own recent norm; ` +
     `${range}.`
+  )
+}
+
+/**
+ * The stats-aware summary (when the backend ranked the series): leads with how the
+ * current multiple ranks against the stock's own recent history — the percentile
+ * complement, so "cheaper than 94% of the last N quarters" — then its gap to the
+ * median. Worded off `stats.signal` so it never disagrees with the verdict chip.
+ */
+function statsSummaryLine(stats: PeHistoryStats, n: number): string {
+  const pe = fmt(stats.current_pe)
+  const med = fmt(stats.median_pe)
+  const disc = Math.abs(Math.round(stats.discount_to_median_percent))
+  const pct = Math.round(stats.current_percentile)
+  const range = `over ${n} quarters it has ranged ${fmt(stats.min_pe)}–${fmt(
+    stats.max_pe,
+  )}`
+  if (stats.signal === 'cheap') {
+    return (
+      `Its trailing P/E of ${pe} is cheaper than ${100 - pct}% of the last ${n} ` +
+      `quarters — about ${disc}% below its median of ${med}. Low for its own ` +
+      `history, whether a bargain or a discount for slower growth; ${range}.`
+    )
+  }
+  if (stats.signal === 'expensive') {
+    return (
+      `Its trailing P/E of ${pe} is higher than ${pct}% of the last ${n} ` +
+      `quarters — about ${disc}% above its median of ${med}. The market is ` +
+      `paying up versus its own history; ${range}.`
+    )
+  }
+  return (
+    `Its trailing P/E of ${pe} is about where it usually trades ` +
+    `(median ${med}); ${range}.`
   )
 }
 
@@ -162,9 +218,11 @@ const PAD = { top: 12, right: 46, bottom: 24, left: 10 }
 function PeLineChart({
   points,
   med,
+  band,
 }: {
   points: PeHistoryPoint[]
   med: number
+  band?: { p25: number; p75: number }
 }) {
   const theme = useTheme()
   const grid = theme.palette.divider
@@ -263,7 +321,11 @@ function PeLineChart({
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
         role="img"
-        aria-label={`Trailing P/E over the last ${points.length} quarters`}
+        aria-label={
+          band
+            ? `Trailing P/E over the last ${points.length} quarters, with its usual 25th–75th percentile range shaded`
+            : `Trailing P/E over the last ${points.length} quarters`
+        }
         onPointerDown={onPoint}
         onPointerMove={onPoint}
         onPointerLeave={onLeave}
@@ -275,6 +337,20 @@ function PeLineChart({
           cursor: 'crosshair',
         }}
       >
+        {/* the multiple's usual range (25th–75th percentile) — the line dipping
+            below it reads cheap, poking above it rich; only when the backend
+            ranked the series (drawn first, so it sits behind the grid and line) */}
+        {band && (
+          <rect
+            x={PAD.left}
+            y={y(band.p75)}
+            width={W - PAD.right - PAD.left}
+            height={Math.max(0, y(band.p25) - y(band.p75))}
+            fill={lineColor}
+            opacity={0.1}
+          />
+        )}
+
         {/* horizontal gridlines + P/E axis labels (right) */}
         {yTicks.map((v, i) => (
           <g key={i}>
@@ -367,9 +443,11 @@ function PeLineChart({
  * the closing price at each past earnings release over its trailing-twelve-month
  * reported EPS. Where the Industry P/E card anchors the multiple against peers,
  * this anchors it against the stock's *own* history — is today's multiple rich or
- * cheap versus where it has traded? A verdict chip grades the latest reading
- * against the window median, a line plots the walk with that median marked, and a
- * plain-language line spells out the gap. Renders nothing below `MIN_POINTS` — a
+ * cheap versus where it has traded? When the backend ranked the series (≈2+ years),
+ * the verdict, the headline percentile, and the shaded interquartile band all come
+ * from its `stats` block (a percentile-based read); for shorter series it falls back
+ * to a client-side median stance. A line plots the walk with that median marked, and
+ * a plain-language line spells out the gap. Renders nothing below `MIN_POINTS` — a
  * dot or two isn't a history (an uncovered/blocked symbol comes back near-empty).
  */
 export default function PeHistoryCard({ history }: { history: PeHistory }) {
@@ -377,13 +455,18 @@ export default function PeHistoryCard({ history }: { history: PeHistory }) {
   if (points.length < MIN_POINTS) return null
 
   const pes = points.map((p) => p.pe)
-  const med = median(pes)
-  const latest = points[points.length - 1].pe
+  // Prefer the backend's ranked read (percentile + signal + IQR band over the whole
+  // series) when present; fall back to a client-side median stance for short series
+  // (3–7 quarters) the backend leaves unranked (`stats: null`).
+  const stats = history.stats ?? null
+  const med = stats ? stats.median_pe : median(pes)
+  const latest = stats ? stats.current_pe : points[points.length - 1].pe
   const lo = Math.min(...pes)
   const hi = Math.max(...pes)
-  const stance = stanceOf(latest, med)
+  const stance = stats ? SIGNAL_STANCE[stats.signal] : stanceOf(latest, med)
   const meta = stance ? STANCE[stance] : null
   const latestColor = meta ? meta.color : 'text.primary'
+  const band = stats ? { p25: stats.p25_pe, p75: stats.p75_pe } : undefined
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
@@ -436,6 +519,19 @@ export default function PeHistoryCard({ history }: { history: PeHistory }) {
               >
                 {meta.label}
               </Box>
+              {stats && (
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: 'block',
+                    mt: 0.75,
+                    color: 'text.secondary',
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {ordinal(Math.round(stats.current_percentile))} percentile
+                </Typography>
+              )}
             </Box>
           )}
         </Stack>
@@ -456,10 +552,12 @@ export default function PeHistoryCard({ history }: { history: PeHistory }) {
           />
         </Box>
 
-        <PeLineChart points={points} med={med} />
+        <PeLineChart points={points} med={med} band={band} />
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
-          {summaryLine(latest, med, lo, hi, points.length, stance)}
+          {stats
+            ? statsSummaryLine(stats, points.length)
+            : summaryLine(latest, med, lo, hi, points.length, stance)}
         </Typography>
       </CardContent>
     </Card>
