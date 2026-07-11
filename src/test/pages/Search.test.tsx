@@ -151,8 +151,16 @@ const analysis = {
   recommendation: 'hold',
   confidence: 'medium',
   thesis: 'A balanced read on the stock.',
-  strengths: ['Strong brand'],
-  risks: ['Rich valuation'],
+  sections: [
+    {
+      key: 'business_quality',
+      title: 'Business quality',
+      stance: 'positive',
+      label: 'Strong',
+      summary: 'A durable, profitable franchise.',
+      metrics: [{ label: 'Net margin', value: '25.00%' }],
+    },
+  ],
   disclaimer: 'Not financial advice.',
   model: 'claude-haiku-4-5',
   generated_at: '2026-07-08T00:00:00Z',

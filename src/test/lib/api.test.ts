@@ -608,8 +608,16 @@ describe('getStockAnalysis', () => {
       recommendation: 'buy',
       confidence: 'high',
       thesis: 'Solid profits at a fair price.',
-      strengths: ['High margins'],
-      risks: ['Rich valuation'],
+      sections: [
+        {
+          key: 'business_quality',
+          title: 'Business quality',
+          stance: 'positive',
+          label: 'Strong',
+          summary: 'Highly profitable.',
+          metrics: [{ label: 'Net margin', value: '25.00%' }],
+        },
+      ],
       disclaimer: 'Not financial advice.',
       model: 'claude-haiku-4-5',
       generated_at: '2026-07-08T00:00:00Z',
@@ -630,8 +638,12 @@ describe('getStockAnalysis', () => {
 
     expect(requestedUrl).toContain('/stocks/AAPL/analysis')
     expect(result.recommendation).toBe('buy')
-    expect(result.strengths).toEqual(['High margins'])
-    expect(result.risks).toEqual(['Rich valuation'])
+    expect(result.sections).toHaveLength(1)
+    expect(result.sections[0].key).toBe('business_quality')
+    expect(result.sections[0].metrics[0]).toEqual({
+      label: 'Net margin',
+      value: '25.00%',
+    })
   })
 
   it('throws an ApiError carrying the server detail on a non-2xx', async () => {

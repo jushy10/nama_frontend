@@ -43,7 +43,7 @@ import AssessmentIcon from '@mui/icons-material/Assessment'
 import GroupsIcon from '@mui/icons-material/Groups'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
-import AnalysisCard from '@/components/AnalysisCard'
+import ScorecardCard from '@/components/ScorecardCard'
 import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
@@ -338,7 +338,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               )}
             </Alert>
           )}
-          {analysisQuery.data && <AnalysisCard analysis={analysisQuery.data} />}
+          {analysisQuery.data && (
+            <ScorecardCard analysis={analysisQuery.data} />
+          )}
 
           {/* The price chart anchors the tab. */}
           <Card variant="outlined" sx={{ borderColor: 'divider' }}>
