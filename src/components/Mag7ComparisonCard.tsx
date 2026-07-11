@@ -1,15 +1,20 @@
 import { useMemo, useState } from 'react'
 import {
   Alert,
+  Box,
+  Button,
   Card,
   CardContent,
   CircularProgress,
+  Collapse,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
   useTheme,
 } from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import { type Candle, type ChartRange } from '@/lib/api'
 import { useManyCandles } from '@/lib/queries'
 import type { QuoteDef } from '@/components/QuoteGrid'
@@ -106,6 +111,12 @@ interface Props {
 export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
   const theme = useTheme()
   const [range, setRange] = useState<ChartRange>('1Y')
+  // The ρ/dashed-line note is power-user detail. Show it open on desktop, but
+  // collapse it by default on phones so it doesn't push the chart off-screen;
+  // either way a tap toggles it. `null` = follow the breakpoint default.
+  const upSm = useMediaQuery(theme.breakpoints.up('sm'))
+  const [helpOpen, setHelpOpen] = useState<boolean | null>(null)
+  const showHelp = helpOpen ?? upSm
 
   // Benchmarks ride last, so the first benchmark sits at index `items.length`.
   const symbols = useMemo(
@@ -194,41 +205,88 @@ export default function Mag7ComparisonCard({ items, benchmarks }: Props) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={1.5}
           sx={{
             justifyContent: 'space-between',
             alignItems: { sm: 'center' },
-            mb: 0.5,
+            mb: 1,
           }}
         >
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Performance vs. the indices
           </Typography>
+          {/* On phones the 8 ranges scroll horizontally on one row rather than
+              wrapping to a ragged block, and every button gets a taller tap
+              target. On sm+ they wrap normally. */}
           <ToggleButtonGroup
             size="small"
             exclusive
             value={range}
             onChange={(_, value: ChartRange | null) => value && setRange(value)}
             aria-label="Comparison range"
-            sx={{ flexWrap: 'wrap' }}
+            sx={{
+              width: { xs: '100%', sm: 'auto' },
+              flexWrap: { xs: 'nowrap', sm: 'wrap' },
+              overflowX: { xs: 'auto', sm: 'visible' },
+              scrollbarWidth: 'none',
+              '&::-webkit-scrollbar': { display: 'none' },
+            }}
           >
             {RANGE_OPTIONS.map((r) => (
-              <ToggleButton key={r} value={r} sx={{ px: 1.5, py: 0.25 }}>
+              <ToggleButton
+                key={r}
+                value={r}
+                sx={{ px: 1.75, py: { xs: 0.75, sm: 0.25 }, flexShrink: 0 }}
+              >
                 {r}
               </ToggleButton>
             ))}
           </ToggleButtonGroup>
         </Stack>
 
-        <Typography color="text.secondary" sx={{ fontSize: '0.85rem', mb: 2 }}>
-          Each line is rebased to 0% at the start of the range, so paths that
-          move together are correlated regardless of share price. The S&amp;P
-          500 (SPY) and Nasdaq-100 (QQQ) are dashed; ρ is each line&apos;s
-          daily-return correlation to SPY (1.0 = lockstep).
-        </Typography>
+        <Box sx={{ mb: 2 }}>
+          <Typography color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+            Each line is rebased to 0% at the start of the range, so paths that
+            move together are correlated regardless of share price.
+          </Typography>
+          <Button
+            onClick={() => setHelpOpen(!showHelp)}
+            aria-expanded={showHelp}
+            endIcon={
+              <ExpandMoreIcon
+                sx={{
+                  transform: showHelp ? 'rotate(180deg)' : 'none',
+                  transition: 'transform 150ms',
+                }}
+              />
+            }
+            sx={{
+              color: 'text.secondary',
+              fontSize: '0.8rem',
+              fontWeight: 500,
+              px: 0.75,
+              ml: -0.75,
+              mt: 0.25,
+              minWidth: 0,
+              '&:hover': { bgcolor: 'action.hover' },
+            }}
+          >
+            What are ρ and the dashed lines?
+          </Button>
+          <Collapse in={showHelp}>
+            <Typography
+              color="text.secondary"
+              sx={{ fontSize: '0.85rem', mt: 0.5 }}
+            >
+              The S&amp;P 500 (SPY) and Nasdaq-100 (QQQ) ride on top as dashed
+              reference lines. ρ is each line&apos;s daily-return correlation to
+              SPY — 1.0 means it moved in lockstep.
+            </Typography>
+          </Collapse>
+        </Box>
 
         {loading && (
           <Stack
