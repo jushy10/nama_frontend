@@ -87,8 +87,11 @@ export default function SectorCard({
         height: '100%',
         cursor: 'pointer',
         borderColor: 'divider',
-        transition: 'border-color 150ms',
+        WebkitTapHighlightColor: 'transparent',
+        transition: 'border-color 150ms, transform 150ms, box-shadow 150ms',
         '&:hover': { borderColor: 'rgba(47,99,180,0.4)' },
+        // Touch devices have no hover — give a press state so a tap registers.
+        '&:active': { transform: 'scale(0.985)' },
         '&:focus-visible': {
           outline: '2px solid',
           outlineColor: 'primary.main',
@@ -132,7 +135,16 @@ export default function SectorCard({
               <Typography
                 variant="subtitle1"
                 component="h3"
-                sx={{ fontWeight: 600, lineHeight: 1.2 }}
+                sx={{
+                  fontWeight: 600,
+                  lineHeight: 1.2,
+                  // Wrap long names (e.g. "Communication Services") to two lines
+                  // instead of colliding with the price column on narrow phones.
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }}
               >
                 {sector.sector}
               </Typography>
@@ -213,7 +225,8 @@ export default function SectorCard({
           </Typography>
         </Box>
 
-        {/* Click affordance for the holdings drill-down */}
+        {/* Click affordance for the holdings drill-down — a pill so it reads as
+            tappable on touch, where the card's hover state never fires. */}
         <Stack
           direction="row"
           sx={{
@@ -221,6 +234,12 @@ export default function SectorCard({
             alignItems: 'center',
             justifyContent: 'space-between',
             color: 'primary.light',
+            px: 1.25,
+            py: 0.75,
+            borderRadius: 1.5,
+            border: '1px solid',
+            borderColor: 'rgba(47,99,180,0.2)',
+            bgcolor: 'rgba(47,99,180,0.06)',
           }}
         >
           <Typography
