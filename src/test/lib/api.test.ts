@@ -18,6 +18,7 @@ import {
   optionsSentiment,
   optionsSignal,
   profitabilityVerdict,
+  cashFlowVerdict,
   rangeReturnPct,
   type Candle,
   type CandleSeries,
@@ -220,6 +221,26 @@ describe('profitabilityVerdict', () => {
 
   it('returns null when there is no margin to judge', () => {
     expect(profitabilityVerdict(null)).toBeNull()
+  })
+})
+
+describe('cashFlowVerdict', () => {
+  it('grades FCF yield: 6%+ rich, 3–6% generative, thin, or a burn', () => {
+    expect(cashFlowVerdict(8.1)).toBe('Cash Rich')
+    expect(cashFlowVerdict(6)).toBe('Cash Rich')
+    expect(cashFlowVerdict(5.9)).toBe('Cash Generative')
+    expect(cashFlowVerdict(3)).toBe('Cash Generative')
+    expect(cashFlowVerdict(2.9)).toBe('Thin Free Cash')
+    expect(cashFlowVerdict(0.1)).toBe('Thin Free Cash')
+  })
+
+  it('treats break-even and negative yields as Cash Burning', () => {
+    expect(cashFlowVerdict(0)).toBe('Cash Burning')
+    expect(cashFlowVerdict(-2.4)).toBe('Cash Burning')
+  })
+
+  it('returns null when there is no yield to judge', () => {
+    expect(cashFlowVerdict(null)).toBeNull()
   })
 })
 

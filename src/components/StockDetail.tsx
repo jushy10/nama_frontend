@@ -38,6 +38,7 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import AnalysisCard from '@/components/AnalysisCard'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
+import CashGenerationCard from '@/components/CashGenerationCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
@@ -62,11 +63,11 @@ const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
 
 // A small tab menu splits the detail into focused sections so it isn't one long
 // scroll: Overview (snapshot, performance, the AI take and price chart),
-// Valuation (profitability + the industry-P/E and P/E-history reads), Analysts
-// (the sell-side ratings), Earnings, and Options.
+// Fundamentals (profitability, cash generation, and the industry-P/E and
+// P/E-history reads), Analysts (the sell-side ratings), Earnings, and Options.
 type StockDetailTab =
   | 'overview'
-  | 'valuation'
+  | 'fundamentals'
   | 'analysts'
   | 'earnings'
   | 'options'
@@ -172,7 +173,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
       >
         <Tab label="Overview" value="overview" />
-        <Tab label="Valuation" value="valuation" />
+        <Tab label="Fundamentals" value="fundamentals" />
         <Tab label="Analysts" value="analysts" />
         <Tab label="Earnings" value="earnings" />
         <Tab label="Options" value="options" />
@@ -314,11 +315,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Valuation gathers the analytical reads that used to crowd the old
-          General tab: the profitability gauge and the peer P/E benchmark. All
-          ride the card's metrics block (the industry read its own best-effort
-          query), so switching in is instant. */}
-      {tab === 'valuation' && (
+      {/* Fundamentals gathers the analytical reads that used to crowd the old
+          General tab: the profitability gauge, the cash-generation read, and the
+          peer P/E benchmark. The first two ride the card's metrics block (the
+          industry read its own best-effort query), so switching in is instant. */}
+      {tab === 'fundamentals' && (
         <Stack spacing={3} role="tabpanel">
           {/* "Is it making money?" — the trailing net-margin read. */}
           {stock.metrics && (
@@ -328,6 +329,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               operatingMargin={stock.metrics.operating_margin}
             />
           )}
+
+          {/* "Does it throw off cash?" — free cash flow yield, how operating
+              cash converts to free cash after capex, and the cash multiples.
+              Self-hides when the whole cash-flow block is uncovered. */}
+          {stock.metrics && <CashGenerationCard metrics={stock.metrics} />}
 
           {/* "Is the price rich or cheap for its industry?" Best-effort:
               self-hides when fewer than MIN_INDUSTRY_PEERS back the benchmark
@@ -361,10 +367,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                     component="h2"
                     sx={{ fontWeight: 600 }}
                   >
-                    Valuation
+                    Fundamentals
                   </Typography>
                   <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    No valuation data for {stock.ticker}.
+                    No fundamental data for {stock.ticker}.
                   </Typography>
                 </CardContent>
               </Card>
