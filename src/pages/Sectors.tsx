@@ -19,12 +19,18 @@ import {
   type SectorWindow,
 } from '@/lib/api'
 import { errorMessage, useSectors } from '@/lib/queries'
+import { usePageMeta } from '@/lib/usePageMeta'
 import SectorCard from '@/components/SectorCard'
 import SectorStocksDialog from '@/components/SectorStocksDialog'
 
 type Window = SectorWindow
 
 export default function Sectors() {
+  usePageMeta(
+    'Stock Market Sectors — Performance & Valuation | Nama Insights',
+    'Explore the US stock market by sector: performance across time windows, valuation and the companies driving each sector.',
+  )
+
   const sectorsQuery = useSectors()
   const [timeframe, setTimeframe] = useState<Window>('1d')
   // The sector whose holdings drill-down is open (null = closed).

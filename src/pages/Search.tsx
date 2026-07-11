@@ -20,6 +20,7 @@ import {
   type SearchOption,
 } from '@/lib/universeSearch'
 import { trackEvent } from '@/lib/analytics'
+import { usePageMeta } from '@/lib/usePageMeta'
 import StockDetail from '@/components/StockDetail'
 import EtfDetail from '@/components/EtfDetail'
 
@@ -41,6 +42,11 @@ const ETF_SUGGESTIONS = 5
  * straight in.
  */
 export default function Search() {
+  usePageMeta(
+    'Search Stocks & ETFs | Nama Insights',
+    'Search any US-listed stock or ETF for live quotes, fundamentals, free-cash-flow metrics, earnings history and analyst coverage.',
+  )
+
   const [searchParams, setSearchParams] = useSearchParams()
   const urlSymbol = (searchParams.get('symbol') ?? '').trim().toUpperCase()
 

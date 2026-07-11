@@ -7,6 +7,7 @@ import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
 import SectorPulse from '@/components/SectorPulse'
 import Reveal from '@/components/Reveal'
 import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
+import { usePageMeta } from '@/lib/usePageMeta'
 
 /**
  * Home dashboard, read top to bottom as one story: a search-first hero that
@@ -25,6 +26,10 @@ import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
  * result, not a second fetch.)
  */
 function Home() {
+  usePageMeta(
+    'Nama Insights — Free Stock & ETF Research with a Cash-Flow Focus',
+    'Free research for US stocks and ETFs: live quotes, free-cash-flow metrics, earnings history, analyst coverage and AI analysis. No login, no paywall.',
+  )
   const marketFailed = useMarketSummary().isError
   const sectorFailed = useSectorAnalysis().isError
 

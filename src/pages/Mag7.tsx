@@ -1,6 +1,7 @@
 import { Box, Container, Stack, Typography } from '@mui/material'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import Mag7ComparisonCard from '@/components/Mag7ComparisonCard'
+import { usePageMeta } from '@/lib/usePageMeta'
 
 // The "Magnificent 7" mega-caps. These are tradeable tickers Alpaca quotes
 // directly, so no ETF proxy is needed — each tile is the stock itself.
@@ -21,6 +22,11 @@ const BENCHMARKS: QuoteDef[] = [{ label: 'Nasdaq 100', symbol: 'QQQ' }]
 
 /** Dedicated page for the Magnificent 7 mega-caps and their move for the day. */
 export default function Mag7() {
+  usePageMeta(
+    'Magnificent 7 Stocks — Live Prices & Performance | Nama Insights',
+    'Apple, Microsoft, Alphabet, Amazon, Nvidia, Meta and Tesla — live prices and the intraday move for the seven mega-caps driving the market.',
+  )
+
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
       <Box sx={{ mb: 4 }}>
