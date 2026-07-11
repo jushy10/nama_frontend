@@ -31,6 +31,7 @@ import {
   useIndustryValuation,
   usePeHistory,
   useAnalystInfo,
+  useInsiderTransactions,
   useQuarterlyEarnings,
   useRatingsAnalysis,
   useStockAnalysis,
@@ -41,6 +42,7 @@ import ShowChartIcon from '@mui/icons-material/ShowChart'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import AssessmentIcon from '@mui/icons-material/Assessment'
 import GroupsIcon from '@mui/icons-material/Groups'
+import SwapVertIcon from '@mui/icons-material/SwapVert'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import ScorecardCard from '@/components/ScorecardCard'
@@ -56,6 +58,7 @@ import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
+import InsiderTransactionsCard from '@/components/InsiderTransactionsCard'
 import RatingsReviewCard from '@/components/RatingsReviewCard'
 import EarningsCard from '@/components/EarningsCard'
 import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
@@ -79,6 +82,7 @@ type StockDetailTab =
   | 'overview'
   | 'fundamentals'
   | 'analysts'
+  | 'insiders'
   | 'earnings'
   | 'options'
 
@@ -93,6 +97,7 @@ const STOCK_TABS: {
   { value: 'overview', label: 'Overview', icon: <DashboardIcon /> },
   { value: 'fundamentals', label: 'Fundamentals', icon: <AssessmentIcon /> },
   { value: 'analysts', label: 'Analysts', icon: <GroupsIcon /> },
+  { value: 'insiders', label: 'Insiders', icon: <SwapVertIcon /> },
   { value: 'earnings', label: 'Earnings', icon: <BarChartIcon /> },
   { value: 'options', label: 'Options', icon: <CandlestickChartIcon /> },
 ]
@@ -160,6 +165,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const emaQuery = useEma(loadedSymbol, range, showEma)
   const fiveYearReturn = useFiveYearReturn(loadedSymbol)
   const analystQuery = useAnalystInfo(loadedSymbol)
+  // The insider feed is a live SEC read — gate it on the Insiders tab being open
+  // (like the AI reads) so a detail-page load doesn't fire it.
+  const insiderQuery = useInsiderTransactions(loadedSymbol, tab === 'insiders')
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
   // The AI take is the slowest read (a live model call), so it rides the loaded
@@ -588,6 +596,31 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               topFirms={analystQuery.data.top_firms}
               price={stock.price}
             />
+          )}
+        </Stack>
+      )}
+
+      {/* Insider buys and sells on their own tab: the conviction summary (net
+          open-market flow) over the filterable Form 4 feed — a live SEC read
+          gated on the tab, so it shows a spinner then fills in; a failure
+          degrades to a warning. */}
+      {tab === 'insiders' && (
+        <Stack spacing={3} role="tabpanel">
+          {insiderQuery.isLoading && (
+            <Stack sx={{ alignItems: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+          {insiderQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                insiderQuery.error,
+                'Could not load insider transactions.',
+              )}
+            </Alert>
+          )}
+          {insiderQuery.data && (
+            <InsiderTransactionsCard data={insiderQuery.data} />
           )}
         </Stack>
       )}
