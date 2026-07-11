@@ -4,6 +4,9 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
+  Chip,
+  CircularProgress,
   Container,
   IconButton,
   InputAdornment,
@@ -22,19 +25,28 @@ import {
   TextField,
   Tooltip,
   Typography,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
 import {
   humanizeClassification,
   stockLogoUrl,
+  type AiEtfScreenInterpretation,
   type EtfSearchResult,
   type EtfSearchSort,
   type SortOrder,
 } from '@/lib/api'
-import { errorMessage, useEtfCategories, useEtfSearch } from '@/lib/queries'
+import {
+  errorMessage,
+  useAiEtfScreen,
+  useEtfCategories,
+  useEtfSearch,
+} from '@/lib/queries'
 import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
@@ -119,6 +131,19 @@ const SORT_OPTIONS: { key: EtfSearchSort; label: string }[] = [
   { key: 'expense_ratio', label: 'Expense ratio' },
   { key: 'dividend_yield', label: 'Dividend yield' },
 ]
+
+// The sort keys the AI screen may name in its interpreted filters. The API types
+// `sort` as a raw string (it can only ever return a known slug, but the shape doesn't
+// prove it), so validate against these before it drives the typed control — an
+// off-vocabulary sort falls back to the page's default (net assets).
+const VALID_SORTS = new Set<string>(SORT_OPTIONS.map((o) => o.key))
+
+// A few plain-English prompts, shown under the AI box as one-tap starters.
+const AI_EXAMPLES = [
+  'Low-cost S&P 500 index funds',
+  'High-yield dividend ETFs',
+  'Technology sector funds by size',
+] as const
 
 // Total number of columns, for the empty/skeleton rows' colSpan: symbol,
 // category, exchange, + the metric columns.
@@ -276,6 +301,169 @@ function SkeletonRow({ sort }: { sort: EtfSearchSort }) {
   )
 }
 
+/** Mobile card for one screened fund: logo, ticker/name up top, the category·exchange line
+ *  beneath, then every metric in a tidy grid — the full row's worth of data, sized for a phone
+ *  (the table's per-column hiding and horizontal scroll don't apply here). The metric grid maps
+ *  the same `METRIC_COLUMNS` the table reads, so the two never drift. Clicking opens the fund's
+ *  detail page. */
+function EtfListCard({
+  etf,
+  onSelect,
+}: {
+  etf: EtfSearchResult
+  onSelect: (ticker: string) => void
+}) {
+  const categoryLabel = etf.category
+    ? humanizeClassification(etf.category)
+    : null
+  const classLine = [categoryLabel, etf.exchange].filter(Boolean).join(' · ')
+  return (
+    <Box
+      onClick={() => onSelect(etf.ticker)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect(etf.ticker)
+        }
+      }}
+      tabIndex={0}
+      role="link"
+      aria-label={`View ${etf.ticker} details`}
+      sx={{
+        px: 1.5,
+        py: 1.5,
+        cursor: 'pointer',
+        borderBottom: 1,
+        borderColor: 'divider',
+        transition: 'background-color 120ms ease',
+        '&:last-of-type': { borderBottom: 0 },
+        '&:hover, &:focus-visible': { bgcolor: 'action.hover' },
+        outline: 'none',
+      }}
+    >
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <EtfLogo symbol={etf.ticker} size={40} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Typography
+            sx={{ fontWeight: 700, fontSize: '0.95rem', lineHeight: 1.2 }}
+          >
+            {etf.ticker}
+          </Typography>
+          {etf.name && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {etf.name}
+            </Typography>
+          )}
+        </Box>
+      </Stack>
+
+      {classLine && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            mt: 0.75,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {classLine}
+        </Typography>
+      )}
+
+      <Box
+        sx={{
+          mt: 1.25,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          columnGap: 1,
+          rowGap: 1.25,
+        }}
+      >
+        {METRIC_COLUMNS.map((col) => {
+          const value = col.value(etf)
+          return (
+            <Box key={col.key} sx={{ minWidth: 0 }}>
+              <Typography
+                sx={{
+                  color: 'text.secondary',
+                  fontSize: '0.6rem',
+                  fontWeight: 600,
+                  letterSpacing: '0.04em',
+                  textTransform: 'uppercase',
+                  lineHeight: 1.4,
+                }}
+              >
+                {col.label}
+              </Typography>
+              <Typography
+                sx={{
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  fontVariantNumeric: 'tabular-nums',
+                  color: value == null ? 'text.secondary' : 'text.primary',
+                }}
+              >
+                {col.format(value)}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+    </Box>
+  )
+}
+
+/** Placeholder card shown per expected result while the first mobile page loads. */
+function SkeletonCard() {
+  return (
+    <Box
+      sx={{
+        px: 1.5,
+        py: 1.5,
+        borderBottom: 1,
+        borderColor: 'divider',
+        '&:last-of-type': { borderBottom: 0 },
+      }}
+    >
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Skeleton variant="rounded" width={40} height={40} />
+        <Box sx={{ flex: 1 }}>
+          <Skeleton width={64} />
+          <Skeleton width={120} />
+        </Box>
+      </Stack>
+      <Box
+        sx={{
+          mt: 1.25,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          columnGap: 1,
+          rowGap: 1.25,
+        }}
+      >
+        {METRIC_COLUMNS.map((col) => (
+          <Box key={col.key}>
+            <Skeleton width={40} />
+            <Skeleton width={52} />
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  )
+}
+
 /**
  * ETF Screener page: search and filter the screened top US ETF universe by
  * name/ticker and one or more fund categories, sorted by net assets (AUM),
@@ -292,6 +480,41 @@ export default function EtfScreener() {
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
   const navigate = useNavigate()
+  // The AI-screen box: its own text (separate from the name/ticker filter, which the
+  // AI populates) and the mutation that translates it into filters.
+  const [aiInput, setAiInput] = useState('')
+  const aiScreen = useAiEtfScreen()
+
+  const theme = useTheme()
+  // Below `sm` the metrics table gives way to a card list that shows every field (logo
+  // included) without a horizontal scroll. useMediaQuery has no matchMedia under jsdom, so
+  // this stays false in tests and the table renders.
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
+
+  // Apply the AI's interpreted filters to the manual controls — a fresh screen, so it replaces
+  // every axis (clearing ones the request didn't set) rather than layering on top. The result
+  // then flows through the ordinary useEtfSearch and the user can tweak any control. Each value
+  // is validated before it drives a typed control; an off-vocabulary sort falls back to the
+  // page's default.
+  const applyInterpretation = (interp: AiEtfScreenInterpretation) => {
+    setSearchInput(interp.query ?? '')
+    setCategories(interp.categories)
+    setSort(
+      interp.sort && VALID_SORTS.has(interp.sort)
+        ? (interp.sort as EtfSearchSort)
+        : 'net_assets',
+    )
+    setOrder(interp.direction === 'asc' ? 'asc' : 'desc')
+  }
+
+  const runAiScreen = (raw?: string) => {
+    const request = (raw ?? aiInput).trim()
+    if (!request || aiScreen.isPending) return
+    if (raw != null) setAiInput(raw) // reflect a one-tap example in the box
+    aiScreen.mutate(request, {
+      onSuccess: (data) => applyInterpretation(data.interpreted),
+    })
+  }
 
   // Any filter/sort change starts a new result set, so jump back to page 1 —
   // otherwise a narrow filter could leave you stranded past its last page.
@@ -393,11 +616,104 @@ export default function EtfScreener() {
         </Tooltip>
       </Stack>
 
-      {/* Filter card */}
+      {/* AI screen box — ask in plain English; the model fills in the filters below,
+          which you can then tweak by hand. */}
       <Paper
         variant="outlined"
         sx={{
           mt: 4,
+          p: { xs: 1.5, sm: 2 },
+          borderRadius: 3,
+          borderColor: 'primary.dark',
+          bgcolor: 'background.paper',
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', mb: 1.5 }}
+        >
+          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.light' }} />
+          <Typography sx={{ fontWeight: 700 }}>
+            Ask AI to Build a Screen
+          </Typography>
+        </Stack>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault()
+            runAiScreen()
+          }}
+          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}
+        >
+          <TextField
+            size="small"
+            value={aiInput}
+            onChange={(e) => setAiInput(e.target.value)}
+            placeholder="e.g. Low-cost S&P 500 index funds, or High-yield dividend ETFs"
+            disabled={aiScreen.isPending}
+            sx={{ flex: '1 1 320px', minWidth: { xs: '100%', sm: 320 } }}
+            slotProps={{
+              // aria-label on the native input (a label-less field) so it has an
+              // accessible name; the icon rides the input adornment.
+              htmlInput: { 'aria-label': 'Describe the ETFs you want' },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AutoAwesomeIcon fontSize="small" />
+                  </InputAdornment>
+                ),
+              },
+            }}
+          />
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={!aiInput.trim() || aiScreen.isPending}
+            startIcon={
+              aiScreen.isPending ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <AutoAwesomeIcon />
+              )
+            }
+            sx={{ whiteSpace: 'nowrap' }}
+          >
+            {aiScreen.isPending ? 'Screening…' : 'Screen'}
+          </Button>
+        </Box>
+        {/* One-tap example prompts. `useFlexGap` so the chips that wrap to a new line
+            stay aligned with the first (margin-based spacing doesn't reset on wrap). */}
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ mt: 1.5, flexWrap: 'wrap' }}
+        >
+          {AI_EXAMPLES.map((ex) => (
+            <Chip
+              key={ex}
+              label={ex}
+              size="small"
+              variant="outlined"
+              onClick={() => runAiScreen(ex)}
+              disabled={aiScreen.isPending}
+              sx={{ cursor: 'pointer' }}
+            />
+          ))}
+        </Stack>
+        {aiScreen.isError && (
+          <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>
+            {errorMessage(aiScreen.error)}
+          </Alert>
+        )}
+      </Paper>
+
+      {/* Filter card */}
+      <Paper
+        variant="outlined"
+        sx={{
+          mt: 2,
           p: { xs: 1.5, sm: 2 },
           borderRadius: 3,
           borderColor: 'divider',
@@ -502,129 +818,162 @@ export default function EtfScreener() {
 
       {!showError && (
         <>
-          <TableContainer
-            sx={{
-              mt: 1.5,
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 3,
-              bgcolor: 'background.paper',
-              overflow: 'auto',
-              // Cap the height on desktop; on phones (xs) drop the cap so the page
-              // scrolls naturally instead of trapping a short inner scroll region.
-              maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
-              // Dim while a new page/sort loads (previous rows stay put).
-              transition: 'opacity 150ms ease',
-              opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
-            }}
-          >
-            <Table
-              size="small"
-              stickyHeader
+          {isMobile && (
+            <Box
               sx={{
-                '& td, & th': {
-                  borderColor: 'divider',
-                  px: { xs: 1, sm: 2 },
-                  whiteSpace: 'nowrap',
-                },
-                '& tbody tr:hover': { bgcolor: 'action.hover' },
-                // Pin the first column (ticker/name) so a row keeps its identity
-                // while the metric columns scroll horizontally on a narrow screen.
-                // The header corner (z-3) sits above both the sticky header row
-                // (z-2) and the pinned body cells (z-1); the pinned body cell
-                // carries an opaque background — matched to the row-hover tint —
-                // so scrolled metrics never show through it.
-                '& thead th:first-of-type': {
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 3,
-                },
-                '& tbody td:first-of-type': {
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
-                  bgcolor: 'background.paper',
-                },
-                '& tbody tr:hover td:first-of-type': {
-                  bgcolor: 'action.hover',
-                },
+                mt: 1.5,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                overflow: 'hidden',
+                // Dim while a new page/sort loads (previous cards stay put).
+                transition: 'opacity 150ms ease',
+                opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
               }}
             >
-              <TableHead>
-                <TableRow
-                  sx={{
-                    '& th': {
-                      color: 'text.secondary',
-                      fontWeight: 600,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.04em',
-                      fontSize: { xs: '0.75rem', sm: '0.7rem' },
-                      backgroundColor: 'background.paper',
-                      borderBottom: 2,
-                      borderBottomColor: 'divider',
-                    },
-                  }}
-                >
-                  <TableCell>Symbol</TableCell>
-                  <TableCell sx={HIDE_SM}>Category</TableCell>
-                  <TableCell sx={HIDE_MD}>Exchange</TableCell>
-                  {METRIC_COLUMNS.map((col) => {
-                    const active = sort === col.key
-                    return (
-                      <TableCell
-                        key={col.key}
-                        align="right"
-                        sortDirection={active ? order : false}
-                        sx={metricColumnSx(col, active)}
-                      >
-                        <Tooltip
-                          title={col.tip}
-                          enterDelay={400}
-                          placement="top"
-                        >
-                          <TableSortLabel
-                            active={active}
-                            direction={active ? order : 'desc'}
-                            onClick={() => onSort(col.key)}
-                          >
-                            {col.label}
-                          </TableSortLabel>
-                        </Tooltip>
-                      </TableCell>
-                    )
-                  })}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {query.isLoading &&
-                  Array.from({ length: Math.min(rowsPerPage, 10) }).map(
-                    (_, i) => <SkeletonRow key={i} sort={sort} />,
-                  )}
-                {data && rows.length === 0 && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={COLSPAN}
-                      sx={{
-                        py: 5,
-                        textAlign: 'center',
-                        color: 'text.secondary',
-                      }}
-                    >
-                      No ETFs match these filters.
-                    </TableCell>
-                  </TableRow>
+              {query.isLoading &&
+                Array.from({ length: Math.min(rowsPerPage, 10) }).map(
+                  (_, i) => <SkeletonCard key={i} />,
                 )}
-                {rows.map((etf) => (
-                  <EtfRow
-                    key={etf.ticker}
-                    etf={etf}
-                    onSelect={openEtf}
-                    sort={sort}
-                  />
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+              {data && rows.length === 0 && (
+                <Box
+                  sx={{ py: 5, textAlign: 'center', color: 'text.secondary' }}
+                >
+                  No ETFs match these filters.
+                </Box>
+              )}
+              {rows.map((etf) => (
+                <EtfListCard key={etf.ticker} etf={etf} onSelect={openEtf} />
+              ))}
+            </Box>
+          )}
+
+          {!isMobile && (
+            <TableContainer
+              sx={{
+                mt: 1.5,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                overflow: 'auto',
+                // Cap the height on desktop; on phones (xs) drop the cap so the page
+                // scrolls naturally instead of trapping a short inner scroll region.
+                maxHeight: { xs: 'none', md: 'calc(100vh - 260px)' },
+                // Dim while a new page/sort loads (previous rows stay put).
+                transition: 'opacity 150ms ease',
+                opacity: query.isFetching && !query.isLoading ? 0.6 : 1,
+              }}
+            >
+              <Table
+                size="small"
+                stickyHeader
+                sx={{
+                  '& td, & th': {
+                    borderColor: 'divider',
+                    px: { xs: 1, sm: 2 },
+                    whiteSpace: 'nowrap',
+                  },
+                  '& tbody tr:hover': { bgcolor: 'action.hover' },
+                  // Pin the first column (ticker/name) so a row keeps its identity
+                  // while the metric columns scroll horizontally on a narrow screen.
+                  // The header corner (z-3) sits above both the sticky header row
+                  // (z-2) and the pinned body cells (z-1); the pinned body cell
+                  // carries an opaque background — matched to the row-hover tint —
+                  // so scrolled metrics never show through it.
+                  '& thead th:first-of-type': {
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 3,
+                  },
+                  '& tbody td:first-of-type': {
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    bgcolor: 'background.paper',
+                  },
+                  '& tbody tr:hover td:first-of-type': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow
+                    sx={{
+                      '& th': {
+                        color: 'text.secondary',
+                        fontWeight: 600,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        fontSize: { xs: '0.75rem', sm: '0.7rem' },
+                        backgroundColor: 'background.paper',
+                        borderBottom: 2,
+                        borderBottomColor: 'divider',
+                      },
+                    }}
+                  >
+                    <TableCell>Symbol</TableCell>
+                    <TableCell sx={HIDE_SM}>Category</TableCell>
+                    <TableCell sx={HIDE_MD}>Exchange</TableCell>
+                    {METRIC_COLUMNS.map((col) => {
+                      const active = sort === col.key
+                      return (
+                        <TableCell
+                          key={col.key}
+                          align="right"
+                          sortDirection={active ? order : false}
+                          sx={metricColumnSx(col, active)}
+                        >
+                          <Tooltip
+                            title={col.tip}
+                            enterDelay={400}
+                            placement="top"
+                          >
+                            <TableSortLabel
+                              active={active}
+                              direction={active ? order : 'desc'}
+                              onClick={() => onSort(col.key)}
+                            >
+                              {col.label}
+                            </TableSortLabel>
+                          </Tooltip>
+                        </TableCell>
+                      )
+                    })}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {query.isLoading &&
+                    Array.from({ length: Math.min(rowsPerPage, 10) }).map(
+                      (_, i) => <SkeletonRow key={i} sort={sort} />,
+                    )}
+                  {data && rows.length === 0 && (
+                    <TableRow>
+                      <TableCell
+                        colSpan={COLSPAN}
+                        sx={{
+                          py: 5,
+                          textAlign: 'center',
+                          color: 'text.secondary',
+                        }}
+                      >
+                        No ETFs match these filters.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                  {rows.map((etf) => (
+                    <EtfRow
+                      key={etf.ticker}
+                      etf={etf}
+                      onSelect={openEtf}
+                      sort={sort}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
 
           <TablePagination
             component="div"

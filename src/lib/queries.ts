@@ -17,6 +17,7 @@ import {
 } from '@tanstack/react-query'
 import {
   ApiError,
+  aiSearchEtfs,
   aiSearchStocks,
   getAnnualEarnings,
   getCandles,
@@ -45,6 +46,7 @@ import {
   getTickerType,
   searchEtfs,
   searchStocks,
+  type AiEtfScreenResponse,
   type AiScreenResponse,
   type AnalystInfo,
   type AnnualEarnings,
@@ -633,6 +635,25 @@ export function useEtfCategories(): UseQueryResult<EtfCategories> {
     queryKey: ['etf-categories'],
     queryFn: ({ signal }) => getEtfCategories(signal),
     staleTime: 60 * 60 * 1000,
+  })
+}
+
+/**
+ * The AI-driven ETF screen (`GET /stocks/etfs/ai-search`) as a mutation — the ETF sibling of
+ * {@link useAiStockScreen}. It's an imperative action (fired when the user submits a
+ * plain-English request), not a reactive query, so a `useMutation` fits: call `.mutate(query)`
+ * and read `.isPending` / `.error` for the button state. The result carries the interpreted
+ * filters, which the page applies to its manual controls (so the ordinary `useEtfSearch` then
+ * renders the results and the user can tweak the filters). A blank query is a 400 and a
+ * translation failure a 502 — both surface via `.error`.
+ */
+export function useAiEtfScreen(): UseMutationResult<
+  AiEtfScreenResponse,
+  Error,
+  string
+> {
+  return useMutation({
+    mutationFn: (query: string) => aiSearchEtfs(query),
   })
 }
 

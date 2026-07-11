@@ -1293,6 +1293,58 @@ export async function getEtfCategories(
 }
 
 /**
+ * The filters an AI ETF screen resolved a plain-English request into
+ * (`GET /stocks/etfs/ai-search`) — the ETF sibling of {@link AiScreenInterpretation},
+ * echoed back so the UI can show what was applied and let the user tweak it. Every field
+ * maps one-to-one onto a manual ETF-screener control: `categories` are stored category
+ * slugs, `sort`/`direction` the same sort keys. All optional/empty when the request didn't
+ * call for them (an all-unset interpretation is a neutral browse). Typed with the raw
+ * `string` unions the API can return; the caller validates them against the known control
+ * values before applying.
+ */
+export interface AiEtfScreenInterpretation {
+  query: string | null
+  categories: string[]
+  sort: string | null
+  direction: string
+  limit: number | null
+}
+
+/**
+ * The response to an AI ETF screen (`GET /stocks/etfs/ai-search`): the AI's reading of the
+ * request as a set of filters, for the UI to surface and apply to the manual controls
+ * (which then run the ordinary ETF search). The endpoint returns only this — it doesn't run
+ * the search itself, so there is no result page here.
+ */
+export interface AiEtfScreenResponse {
+  interpreted: AiEtfScreenInterpretation
+}
+
+/**
+ * Screen the top US ETF universe from a plain-English request (`GET /stocks/etfs/ai-search`).
+ * An AI translates `query` ("cheap S&P 500 index funds", "high-yield dividend ETFs") into the
+ * same filters `searchEtfs` accepts. Returns just the interpreted filters — apply them to the
+ * manual controls so the user sees and can edit what was applied, and the ordinary search then
+ * fetches the rows. A blank query is a 400; a translation failure (the model couldn't parse it)
+ * a 502.
+ */
+export async function aiSearchEtfs(
+  query: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<AiEtfScreenResponse> {
+  const qs = new URLSearchParams({ q: query })
+  const res = await fetch(`${API_BASE}/stocks/etfs/ai-search?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as AiEtfScreenResponse
+  if (!data?.interpreted) {
+    throw new ApiError(res.status, 'Malformed AI ETF screen response')
+  }
+  return data
+}
+
+/**
  * One line of a fund's portfolio: the held company's `ticker` and `name`, and
  * its `weight` as a percent of net assets (`7.89` = 7.89%). Any field is null
  * when the vendor omits it (an odd row can lack a `ticker`); link the ticker to
