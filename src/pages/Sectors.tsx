@@ -69,7 +69,11 @@ export default function Sectors() {
           <Typography
             variant="h4"
             component="h1"
-            sx={{ color: 'primary.light', fontWeight: 700 }}
+            sx={{
+              color: 'primary.light',
+              fontWeight: 700,
+              fontSize: { xs: '1.5rem', sm: '2.125rem' },
+            }}
           >
             Market Sectors
           </Typography>
