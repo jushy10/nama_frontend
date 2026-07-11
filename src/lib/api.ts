@@ -2241,6 +2241,85 @@ export async function getAnalystInfo(
   return data
 }
 
+/**
+ * One insider (Form 4) transaction — a single reported buy or sell of the
+ * company's stock by an officer, director, or 10% owner. `transaction_code` is
+ * the raw Form 4 code and `code_label` its human rendering; the open-market
+ * `P`/`S` conviction trades are flagged by `is_open_market_buy` /
+ * `is_open_market_sale` (their union `is_open_market`), apart from the
+ * grant/exercise/tax activity a Form 4 also reports. `value` is the trade's
+ * dollar size (shares × price), null when a leg is missing (e.g. a footnote-only
+ * price). `role` is the insider's title ("Chief Executive Officer", "Director").
+ * Dates are ISO `yyyy-mm-dd` (`transaction_date` null when the filing omits it).
+ */
+export interface InsiderTransaction {
+  filing_date: string
+  transaction_date: string | null
+  insider_name: string
+  role: string
+  security_title: string | null
+  transaction_code: string
+  code_label: string
+  acquired_disposed: string | null // "A" (acquired) / "D" (disposed)
+  is_open_market: boolean
+  is_open_market_buy: boolean
+  is_open_market_sale: boolean
+  shares: number | null
+  price_per_share: number | null
+  value: number | null
+  shares_owned_following: number | null
+}
+
+/**
+ * The net buy-vs-sell rollup of the open-market (P/S) trades — counts and summed
+ * dollar value of purchases vs. sales, and `net_value` (buy − sell; positive =
+ * net buying). Always reflects the full open-market set, independent of any
+ * client-side filter on the transaction list.
+ */
+export interface InsiderSummary {
+  open_market_buy_count: number
+  open_market_sell_count: number
+  open_market_buy_value: number
+  open_market_sell_value: number
+  net_value: number
+}
+
+/**
+ * A stock's recent insider transactions — the response of
+ * `GET /stocks/ticker/{ticker}/insider-transactions`. `transactions` is the
+ * newest-first Form 4 feed and `summary` the net buy-vs-sell rollup of its
+ * open-market trades. Best-effort: a stock with no recent Form 4 activity carries
+ * an empty `transactions` (and a zeroed `summary`), not an error.
+ */
+export interface InsiderTransactions {
+  symbol: string
+  count: number
+  summary: InsiderSummary
+  transactions: InsiderTransaction[]
+}
+
+/**
+ * Fetch a stock's recent insider (Form 4) buys and sells — the full feed plus the
+ * net buy-vs-sell summary, newest first.
+ */
+export async function getInsiderTransactions(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<InsiderTransactions> {
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(
+      symbol,
+    )}/insider-transactions`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as InsiderTransactions
+  if (!Array.isArray(data?.transactions) || data?.summary == null) {
+    throw new ApiError(res.status, 'Malformed insider-transactions response')
+  }
+  return data
+}
+
 /** The overall read of a stock's analyst coverage — the AI ratings verdict. */
 export type RatingsVerdict = 'bullish' | 'mixed' | 'cautious'
 

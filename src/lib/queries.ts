@@ -28,6 +28,7 @@ import {
   getEtfCategories,
   getEtfDetail,
   getIndustryValuation,
+  getInsiderTransactions,
   getPeHistory,
   getQuarterlyEarnings,
   getHeatMap,
@@ -64,6 +65,7 @@ import {
   type EtfSearchResponse,
   type EtfSearchSort,
   type IndustryValuation,
+  type InsiderTransactions,
   type PeHistory,
   type MarketCapTier,
   type HeatMap,
@@ -323,6 +325,26 @@ export function useAnalystInfo(
     queryKey: ['analyst-info', symbol],
     queryFn: ({ signal }) => getAnalystInfo(symbol as string, { signal }),
     enabled: !!symbol,
+  })
+}
+
+/**
+ * A stock's recent insider (Form 4) buys and sells — the newest-first feed plus
+ * the net buy-vs-sell summary. It's a live SEC read (the backend caches it for
+ * five minutes), so it's gated on the Insiders tab being open and held fresh for
+ * five minutes, so toggling away and back doesn't re-fetch. Idle until `symbol`
+ * is set *and* `enabled` is true.
+ */
+export function useInsiderTransactions(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<InsiderTransactions> {
+  return useQuery({
+    queryKey: ['insider-transactions', symbol],
+    queryFn: ({ signal }) =>
+      getInsiderTransactions(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
