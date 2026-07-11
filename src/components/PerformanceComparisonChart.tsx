@@ -12,7 +12,12 @@ import { Box, Stack, Typography, useTheme } from '@mui/material'
 // phone widths, with a sensible desktop fallback until we've measured (and in
 // jsdom, which has no ResizeObserver).
 const W_FALLBACK = 820
-const H = 360
+// Chart height by width band. On a phone the plot is nearly as wide as it is
+// tall, which crushes the overlapping lines into the lower third; a taller box
+// on narrow screens gives them vertical room to separate. Desktop stays 16:7-ish.
+const H_NARROW = 440
+const H_WIDE = 360
+const NARROW_MAX = 480
 const PAD = { top: 14, right: 52, bottom: 26, left: 10 }
 
 /** One point on a rebased line: a timestamp and a percent-from-start value. */
@@ -92,6 +97,7 @@ export default function PerformanceComparisonChart({
     return () => ro.disconnect()
   }, [])
   const W = cw
+  const H = W <= NARROW_MAX ? H_NARROW : H_WIDE
 
   const grid = theme.palette.divider
   const axis = theme.palette.text.secondary
@@ -155,7 +161,7 @@ export default function PerformanceComparisonChart({
     )
 
     return { x, y, slotOf, pctTicks, timeline, maps, dateIdx, plotW, lastSlot }
-  }, [series, W, intraday])
+  }, [series, W, H, intraday])
 
   if (series.length === 0 || geo.timeline.length === 0) {
     return (
@@ -187,24 +193,33 @@ export default function PerformanceComparisonChart({
 
   return (
     <Box ref={wrapRef}>
-      {/* Legend: a swatch + label + value-at-cursor + correlation per ticker.
-          Defaults to the latest point (total return over the range) and tracks
-          the hovered date. */}
+      {/* Legend: a swatch + label + value-at-cursor per ticker. Defaults to the
+          latest point (total return over the range) and tracks the hovered
+          date. The date sits on its own line above so the ticker chips wrap into
+          a clean grid rather than around a leading label. */}
+      <Box
+        sx={{
+          color: axis,
+          fontSize: '0.78rem',
+          fontWeight: 600,
+          fontVariantNumeric: 'tabular-nums',
+          mb: 0.75,
+        }}
+      >
+        {fmtDate(activeT, intraday)}
+      </Box>
       <Stack
         direction="row"
         useFlexGap
         sx={{
           flexWrap: 'wrap',
           columnGap: 1.5,
-          rowGap: 0.5,
+          rowGap: 0.75,
           fontSize: '0.8rem',
           fontWeight: 500,
           mb: 1,
         }}
       >
-        <Box component="span" sx={{ color: axis, mr: 0.5 }}>
-          {fmtDate(activeT, intraday)}
-        </Box>
         {series.map((s, si) => {
           const v = maps[si].get(activeT)
           const up = (v ?? s.totalPct) >= 0
