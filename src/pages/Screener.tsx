@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageMeta } from '@/lib/usePageMeta'
 import {
   Alert,
   Avatar,
@@ -650,6 +651,11 @@ function SkeletonCard() {
  * query; clicking a row opens that stock's live detail page.
  */
 export default function Screener() {
+  usePageMeta(
+    'Stock Screener — Filter US Stocks by Valuation, FCF Yield & Growth | Nama Insights',
+    'Screen US stocks by market cap, sector, valuation, free-cash-flow yield and growth — or describe what you want in plain English and let AI build the filters.',
+  )
+
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
   const [sectors, setSectors] = useState<string[]>([])

@@ -13,6 +13,7 @@ import {
 import type { StockIndex } from '@/lib/api'
 import { errorMessage, useHeatMap } from '@/lib/queries'
 import { dedupeShareClasses } from '@/lib/heatmap'
+import { usePageMeta } from '@/lib/usePageMeta'
 import HeatMapChart, { HeatMapLegend } from '@/components/HeatMap'
 
 const SCOPES: { value: StockIndex; label: string }[] = [
@@ -21,6 +22,11 @@ const SCOPES: { value: StockIndex; label: string }[] = [
 ]
 
 export default function HeatMapPage() {
+  usePageMeta(
+    'Stock Market Heat Map — S&P 500 & Nasdaq-100 | Nama Insights',
+    'A live market heat map of the S&P 500 and Nasdaq-100 — every stock sized by market cap and colored by its move for the day.',
+  )
+
   const [scope, setScope] = useState<StockIndex>('sp500')
   const query = useHeatMap(scope)
   // On touch there's no hover tooltip, and a tap opens a detail sheet rather than

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { usePageMeta } from '@/lib/usePageMeta'
 import {
   Alert,
   Avatar,
@@ -472,6 +473,11 @@ function SkeletonCard() {
  * that fund's live detail on `/search`.
  */
 export default function EtfScreener() {
+  usePageMeta(
+    'ETF Screener — Filter US ETFs by AUM & Expense Ratio | Nama Insights',
+    'Screen the top US ETFs by category, assets under management and expense ratio.',
+  )
+
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
   const [categories, setCategories] = useState<string[]>([])
