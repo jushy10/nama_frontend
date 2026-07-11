@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import HeatMap from '@/components/HeatMap'
 import type { HeatMap as HeatMapData } from '@/lib/api'
@@ -68,5 +68,43 @@ describe('HeatMap', () => {
     renderWithProviders(<HeatMap data={sample} />)
     expect(screen.getByText('technology')).toBeInTheDocument()
     expect(screen.getByText('financials')).toBeInTheDocument()
+  })
+})
+
+describe('HeatMap on mobile', () => {
+  // useMediaQuery reads matchMedia, which jsdom doesn't provide (so the component
+  // renders its desktop board everywhere else). Force it true here to exercise the
+  // mobile board and its tap-to-inspect sheet, then restore it for other suites.
+  const realMatchMedia = window.matchMedia
+  beforeEach(() => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia
+  })
+  afterEach(() => {
+    window.matchMedia = realMatchMedia
+  })
+
+  it('opens a tap-to-inspect sheet instead of navigating', async () => {
+    const { user } = renderWithProviders(<HeatMap data={sample} />)
+
+    const tile = screen.getByText('NVDA').closest('g')
+    expect(tile).not.toBeNull()
+    await user.click(tile as Element)
+
+    // The sheet surfaces the details a hover tooltip can't reach on touch, plus a
+    // clear button to actually open the stock.
+    expect(
+      await screen.findByRole('button', { name: /open nvda/i }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('NVIDIA')).toBeInTheDocument()
+    expect(screen.getByText('Semiconductors')).toBeInTheDocument()
   })
 })

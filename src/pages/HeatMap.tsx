@@ -8,6 +8,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Typography,
+  useMediaQuery,
 } from '@mui/material'
 import type { StockIndex } from '@/lib/api'
 import { errorMessage, useHeatMap } from '@/lib/queries'
@@ -22,6 +23,9 @@ const SCOPES: { value: StockIndex; label: string }[] = [
 export default function HeatMapPage() {
   const [scope, setScope] = useState<StockIndex>('sp500')
   const query = useHeatMap(scope)
+  // On touch there's no hover tooltip, and a tap opens a detail sheet rather than
+  // navigating — so the instruction differs from the desktop click-through.
+  const isMobile = useMediaQuery((theme) => theme.breakpoints.down('sm'))
 
   // Collapse multi-class shares (GOOGL/GOOG, …) to one tile per company so nothing
   // is double-counted — feeds both the treemap and the up/down tally below.
@@ -58,7 +62,8 @@ export default function HeatMapPage() {
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
           Every stock a tile — sized by market cap, coloured by today&apos;s
-          price move — grouped by sector and industry. Click a tile to open it.
+          price move — grouped by sector and industry.{' '}
+          {isMobile ? 'Tap a tile for details.' : 'Click a tile to open it.'}
         </Typography>
       </Box>
 
