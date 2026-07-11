@@ -2412,6 +2412,63 @@ export async function getEarningsAnalysis(
 }
 
 /**
+ * The overall read of a company's fundamentals: 'strong' when they clearly hold up
+ * (healthy margins and growth, a sound balance sheet, a fair price), 'weak' when they
+ * clearly don't (thin or falling margins, shrinking growth, heavy debt, or a price the
+ * business can't justify), 'mixed' when the picture is uneven or conflicting. Lowercase
+ * to match the API's JSON.
+ */
+export type FundamentalsVerdict = 'strong' | 'mixed' | 'weak'
+
+/**
+ * An AI-generated, plain-language read of a stock's fundamentals
+ * (`GET /stocks/{symbol}/fundamentals/analysis`) — the fundamentals-focused sibling of
+ * `EarningsAnalysis` and `RatingsAnalysis`. `verdict` is the overall read (strong / mixed /
+ * weak) of the company's profitability, growth, balance-sheet health and how its valuation
+ * stacks up, and `confidence` how firmly it's held; `summary` is the everyday-language
+ * headline and `findings` a few short, concrete takeaways. `disclaimer` is a fixed
+ * not-financial-advice reminder authored by the service — render it as a footnote — and
+ * `model`/`generated_at` record what produced the read. Reasoned only over the fundamentals
+ * the ticker card exposes plus the industry-P/E peer benchmark; descriptive, not advice, and
+ * regenerated at most every few minutes (the endpoint caches).
+ */
+export interface FundamentalsAnalysis {
+  symbol: string
+  verdict: FundamentalsVerdict
+  confidence: AnalysisConfidence
+  summary: string
+  findings: string[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Fetch the AI fundamentals analysis for a ticker
+ * (`GET /stocks/{symbol}/fundamentals/analysis`). The backend runs a language model over the
+ * stock's valuation, profitability, growth and health metrics (plus its industry-P/E peer
+ * benchmark), so this is a slow read — seconds, not milliseconds — which is why the
+ * Fundamentals tab fetches it on its own and shows the card once it lands. Throws an
+ * `ApiError` when the read is unavailable (a symbol with no fundamentals on file, or the
+ * backend isn't configured for AI analysis).
+ */
+export async function getFundamentalsAnalysis(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<FundamentalsAnalysis> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/fundamentals/analysis`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as FundamentalsAnalysis
+  if (typeof data?.summary !== 'string' || !Array.isArray(data?.findings)) {
+    throw new ApiError(res.status, 'Malformed fundamentals analysis response')
+  }
+  return data
+}
+
+/**
  * An AI-generated, plain-language read on a single fund
  * (`GET /stocks/etf/{ticker}/analysis`) — the ETF sibling of `StockAnalysis`,
  * the same shape but keyed on `ticker` with an `asset_type` marker. The backend

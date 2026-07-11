@@ -35,6 +35,7 @@ import {
   getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
+  getFundamentalsAnalysis,
   getRatingsAnalysis,
   getScreener,
   getSectorAnalysis,
@@ -54,6 +55,7 @@ import {
   type ChartRange,
   type Classifications,
   type EarningsAnalysis,
+  type FundamentalsAnalysis,
   type RatingsAnalysis,
   type EmaSeries,
   type EtfAnalysis,
@@ -383,6 +385,28 @@ export function useRatingsAnalysis(
   return useQuery({
     queryKey: ['ratings-analysis', symbol],
     queryFn: ({ signal }) => getRatingsAnalysis(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * The AI fundamentals analysis for a ticker
+ * (`GET /stocks/{symbol}/fundamentals/analysis`) — a plain-language read of the
+ * company's fundamentals (an overall verdict + a few findings) the Fundamentals
+ * tab shows in a card below the summary. Like `useRatingsAnalysis` it's a live
+ * (slow, paid) model call gated on the tab being open, held fresh for five minutes
+ * so toggling away and back doesn't re-fire it. Idle until `symbol` is set *and*
+ * `enabled` is true.
+ */
+export function useFundamentalsAnalysis(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<FundamentalsAnalysis> {
+  return useQuery({
+    queryKey: ['fundamentals-analysis', symbol],
+    queryFn: ({ signal }) =>
+      getFundamentalsAnalysis(symbol as string, { signal }),
     enabled: !!symbol && enabled,
     staleTime: 5 * 60 * 1000,
   })
