@@ -33,15 +33,27 @@ export interface TickerDividend {
  * EPS) — the figure quotes report today. The margins are trailing percentages.
  * `revenue_growth_yoy`/`eps_growth_yoy` are the trailing year-over-year growth
  * rates (percent) for the top and bottom line — the pace behind the multiple
- * above. Any field a vendor doesn't cover is null.
+ * above.
+ *
+ * The cash-flow block reads the same business through what it actually banks:
+ * `price_to_fcf` is the trailing price-to-free-cash-flow multiple (a cash-based
+ * cousin of `pe`); `fcf_yield` and `ocf_yield` are free and operating cash flow
+ * as a percent of market cap — the cash a shareholder's dollar earns, the gap
+ * between them the drag from capital spending; `fcf_growth_yoy` is the trailing
+ * year-over-year change in free cash flow (percent, signed). Any field a vendor
+ * doesn't cover is null.
  */
 export interface TickerMetrics {
   pe: number | null
+  price_to_fcf: number | null
+  fcf_yield: number | null
+  ocf_yield: number | null
   gross_margin: number | null
   operating_margin: number | null
   net_margin: number | null
   revenue_growth_yoy: number | null
   eps_growth_yoy: number | null
+  fcf_growth_yoy: number | null
 }
 
 /**
@@ -420,6 +432,52 @@ export function profitabilityVerdict(
   }
   /* c8 ignore next — any margin > 0 clears the 0 floor above */
   return 'Unprofitable'
+}
+
+/**
+ * A plain-language read on how much free cash a business throws off relative to
+ * its price, keyed off free-cash-flow yield (FCF ÷ market cap). Like a bond's
+ * yield, a higher figure means more cash returned per dollar paid; at or below
+ * zero the company burns cash rather than generating it.
+ */
+export type CashFlowVerdict =
+  | 'Cash Rich'
+  | 'Cash Generative'
+  | 'Thin Free Cash'
+  | 'Cash Burning'
+
+/**
+ * FCF-yield tiers, richest-first. Free-cash-flow yield (free cash flow ÷ market
+ * cap) is the cash a shareholder's dollar earns each year: above ~6% is a rich,
+ * bond-like cash return, 3–6% a healthy self-funding level, and a thin sub-3%
+ * yield means you're paying up for the cash (a pricey or capital-hungry name).
+ * Broad large-cap rules of thumb — NOT sector-aware (a fast grower reinvests
+ * everything by design), so it's a rough guide, not a verdict on the business.
+ */
+export const FCF_YIELD_TIERS: { verdict: CashFlowVerdict; floor: number }[] = [
+  { verdict: 'Cash Rich', floor: 6 },
+  { verdict: 'Cash Generative', floor: 3 },
+  { verdict: 'Thin Free Cash', floor: 0 },
+]
+
+/**
+ * Map a trailing free-cash-flow yield (a percent) to a cash-generation call.
+ * Returns null when there's no yield to judge. A flat-or-negative yield (≤ 0)
+ * is Cash Burning — no free cash after running and investing in the business;
+ * above zero the tiers grade how generous the cash return is. The 0% floor is
+ * strict, so exactly break-even reads as Cash Burning rather than a razor-thin
+ * yield.
+ */
+export function cashFlowVerdict(
+  fcfYield: number | null,
+): CashFlowVerdict | null {
+  if (fcfYield == null) return null
+  if (fcfYield <= 0) return 'Cash Burning'
+  for (const tier of FCF_YIELD_TIERS) {
+    if (fcfYield >= tier.floor) return tier.verdict
+  }
+  /* c8 ignore next — any yield > 0 clears the 0 floor above */
+  return 'Cash Burning'
 }
 
 /**
