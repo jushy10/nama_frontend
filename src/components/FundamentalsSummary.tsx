@@ -201,21 +201,24 @@ export default function FundamentalsSummary({
   // Nothing to summarise — let the tab fall through to its own empty state.
   if (quality == null && price == null) return null
 
-  const qualityChips: Chip[] = [
-    profit && { label: profit, color: PROFIT_COLOR[profit] },
-    cash && { label: cash, color: CASH_COLOR[cash] },
-  ].filter((c): c is Chip => c != null)
+  // The evidence chips behind each answer — only the verdicts that graded.
+  const qualityChips: Chip[] = []
+  if (profit) qualityChips.push({ label: profit, color: PROFIT_COLOR[profit] })
+  if (cash) qualityChips.push({ label: cash, color: CASH_COLOR[cash] })
 
-  const priceChips: Chip[] = [
-    industryStance && {
+  const priceChips: Chip[] = []
+  if (industryStance) {
+    priceChips.push({
       label: PEER_LABEL[industryStance],
       color: STANCE_COLOR[industryStance],
-    },
-    historyStance && {
+    })
+  }
+  if (historyStance) {
+    priceChips.push({
       label: HISTORY_LABEL[historyStance],
       color: STANCE_COLOR[historyStance],
-    },
-  ].filter((c): c is Chip => c != null)
+    })
+  }
 
   const q = quality ? QUALITY[quality] : null
   const p = price ? PRICE[price] : null

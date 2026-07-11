@@ -8,9 +8,15 @@ import {
 } from '@/lib/fundamentals'
 import type { PeHistoryPoint } from '@/lib/api'
 
-/** A P/E-history series from a list of multiples (dates are unused by the math). */
+/** A P/E-history series from a list of multiples (only `pe` drives the math;
+ *  `price`/`ttm_eps` are filled to satisfy the point shape). */
 const series = (pes: number[]): PeHistoryPoint[] =>
-  pes.map((pe, i) => ({ date: `20${20 + i}-01-01`, pe }))
+  pes.map((pe, i) => ({
+    date: `20${20 + i}-01-01`,
+    price: pe * 10,
+    ttm_eps: 10,
+    pe,
+  }))
 
 describe('median', () => {
   it('takes the middle of an odd-length list, order-independent', () => {
