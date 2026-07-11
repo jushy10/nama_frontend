@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import AnalysisCard from '@/components/AnalysisCard'
-import type { StockAnalysis } from '@/lib/api'
+import type { AnalysisBase } from '@/lib/api'
 
-function analysis(overrides: Partial<StockAnalysis> = {}): StockAnalysis {
+function analysis(overrides: Partial<AnalysisBase> = {}): AnalysisBase {
   return {
-    symbol: 'AAPL',
     recommendation: 'buy',
     confidence: 'high',
     thesis:

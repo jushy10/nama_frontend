@@ -2303,15 +2303,14 @@ export type AnalysisRecommendation = 'buy' | 'hold' | 'sell'
 export type AnalysisConfidence = 'low' | 'medium' | 'high'
 
 /**
- * The fields every AI analysis carries, whatever the asset it reads.
+ * The fields the **bullet-style** AI analysis carries (currently the ETF read).
  * `recommendation` is the headline buy/hold/sell call and `confidence` how
  * firmly it's held; `thesis` is a few everyday-language sentences of reasoning,
  * with `strengths` (the bull case) and `risks` (the bear case) as short bullet
  * points. `disclaimer` is a fixed not-financial-advice reminder authored by the
  * service — render it as a footnote — and `model`/`generated_at` record what
- * produced the read and when. The presentational card renders only these; the
- * per-asset identity (a stock's `symbol`, a fund's `ticker`) rides on the
- * concrete types that extend this.
+ * produced the read and when. The stock read has moved to the sectioned
+ * `StockAnalysis` scorecard below; `EtfAnalysis` still extends this.
  */
 export interface AnalysisBase {
   recommendation: AnalysisRecommendation
@@ -2325,13 +2324,55 @@ export interface AnalysisBase {
 }
 
 /**
- * An AI-generated, plain-language read on a single stock
- * (`GET /stocks/{symbol}/analysis`). Reasoned only over the figures the other
- * stock endpoints expose; descriptive, not advice, and regenerated at most every
- * few minutes (the endpoint caches).
+ * How one scorecard section reads *for the stock* — the favourability signal the
+ * card colours on (green for positive, amber for neutral, red for negative).
  */
-export interface StockAnalysis extends AnalysisBase {
+export type AnalysisStance = 'positive' | 'neutral' | 'negative'
+
+/**
+ * One supporting figure under a scorecard section — a `label` and a pre-formatted
+ * display `value` (e.g. `{ label: 'Net margin', value: '25.00%' }`). Attached by
+ * the service from real data, never authored by the model.
+ */
+export interface AnalysisSectionMetric {
+  label: string
+  value: string
+}
+
+/**
+ * One graded facet of the stock scorecard. `key` is a stable id the UI keys off
+ * (`business_quality` / `valuation` / `earnings` / `analyst_view`) and `title` its
+ * display name; `stance` is the favourability signal, `label` a short human tag
+ * ("Exceptional", "Expensive"), `summary` a plain-language read, and `metrics` the
+ * supporting chips.
+ */
+export interface AnalysisSection {
+  key: string
+  title: string
+  stance: AnalysisStance
+  label: string
+  summary: string
+  metrics: AnalysisSectionMetric[]
+}
+
+/**
+ * An AI-generated, **sectioned** buy/hold/sell scorecard for a single stock
+ * (`GET /stocks/{symbol}/analysis`): an overall verdict (`recommendation` /
+ * `confidence` / `thesis`) over a handful of graded `sections` — business quality,
+ * valuation, earnings, and the analyst view — each with its own stance, label,
+ * plain-language summary, and supporting figures. Reasoned only over the figures
+ * the other stock endpoints expose; descriptive, not advice, and regenerated at
+ * most every few minutes (the endpoint caches).
+ */
+export interface StockAnalysis {
   symbol: string
+  recommendation: AnalysisRecommendation
+  confidence: AnalysisConfidence
+  thesis: string
+  sections: AnalysisSection[]
+  disclaimer: string
+  model: string
+  generated_at: string
 }
 
 /**
@@ -2352,7 +2393,7 @@ export async function getStockAnalysis(
   )
   if (!res.ok) throw await toApiError(res)
   const data = (await res.json()) as StockAnalysis
-  if (!Array.isArray(data?.strengths) || !Array.isArray(data?.risks)) {
+  if (!Array.isArray(data?.sections)) {
     throw new ApiError(res.status, 'Malformed analysis response')
   }
   return data
