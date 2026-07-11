@@ -13,14 +13,13 @@ import {
   Typography,
 } from '@mui/material'
 import {
-  industryPeStance,
   MIN_INDUSTRY_PEERS,
   quarterlyToEarningsHistory,
   quarterlyUpcoming,
   type ChartRange,
   type TickerCardInclude,
 } from '@/lib/api'
-import { MIN_PE_HISTORY_POINTS, peHistoryStance } from '@/lib/fundamentals'
+import { MIN_PE_HISTORY_POINTS } from '@/lib/fundamentals'
 import {
   errorMessage,
   useAnnualEarnings,
@@ -49,7 +48,6 @@ import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CashGenerationCard from '@/components/CashGenerationCard'
-import FundamentalsSummary from '@/components/FundamentalsSummary'
 import FundamentalsAnalysisCard from '@/components/FundamentalsAnalysisCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
@@ -221,20 +219,16 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   }
   if (!stock) return null
 
-  // The two valuation reads that feed the Fundamentals summary and gate its
-  // Valuation group. The industry read only counts once it rests on enough peers
-  // to stand for the industry (the same MIN_INDUSTRY_PEERS gate the card uses);
-  // the history read self-gates below MIN_PE_HISTORY_POINTS. Either being usable
-  // is what draws the "Valuation" group under the summary.
+  // The two valuation reads that gate the Fundamentals tab's "Valuation" group.
+  // The industry read only counts once it rests on enough peers to stand for the
+  // industry (the same MIN_INDUSTRY_PEERS gate the card uses); the history read
+  // self-gates below MIN_PE_HISTORY_POINTS. Either being usable is what draws the
+  // "Valuation" group.
   const iv = industryValuationQuery.data
   const industryUsable =
     !!iv && iv.median_pe != null && iv.count >= MIN_INDUSTRY_PEERS
-  const industryStance = industryUsable
-    ? industryPeStance(stock.metrics?.pe ?? null, iv.median_pe)
-    : null
   const historyPoints = peHistoryQuery.data?.points
   const historyUsable = (historyPoints?.length ?? 0) >= MIN_PE_HISTORY_POINTS
-  const historyStance = historyPoints ? peHistoryStance(historyPoints) : null
 
   return (
     <Stack spacing={{ xs: 2, sm: 3 }}>
@@ -453,28 +447,17 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Fundamentals opens on the "Good business, fair price?" summary, then
-          sorts its cards into the two questions that summary answers: Business
-          quality (profitability + cash generation, riding the card's metrics
-          block, so instant) and Valuation (the peer and own-history P/E reads,
-          each a best-effort query that fills in as it lands). */}
+      {/* Fundamentals sorts its cards into two questions: Business quality
+          (profitability + cash generation, riding the card's metrics block, so
+          instant) and Valuation (the peer and own-history P/E reads, each a
+          best-effort query that fills in as it lands). */}
       {tab === 'fundamentals' && (
         <Stack spacing={3} role="tabpanel">
-          {/* The thesis: the two questions, each answered by folding the cards'
-              own verdicts into one word. Self-hides only when neither can be
-              graded (the same case the empty state below covers). */}
-          <FundamentalsSummary
-            netMargin={stock.metrics?.net_margin ?? null}
-            fcfYield={stock.metrics?.fcf_yield ?? null}
-            industryStance={industryStance}
-            historyStance={historyStance}
-          />
-
-          {/* The AI fundamentals take sits under the thesis summary — a
-              plain-language read of how solid the business is and whether the
-              shares look reasonably priced. Its own slow model call, gated on the
-              tab, so it shows a loading card then fills in; a failure degrades to a
-              warning rather than sinking the cards below. */}
+          {/* The AI fundamentals take leads the tab — a plain-language read of
+              how solid the business is and whether the shares look reasonably
+              priced. Its own slow model call, gated on the tab, so it shows a
+              loading card then fills in; a failure degrades to a warning rather
+              than sinking the cards below. */}
           {fundamentalsAnalysisQuery.isLoading && (
             <AnalysisLoadingCard title="Fundamentals Analysis" />
           )}
