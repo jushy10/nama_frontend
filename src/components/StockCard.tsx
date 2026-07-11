@@ -1,22 +1,7 @@
-import {
-  Avatar,
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Stack,
-  Typography,
-} from '@mui/material'
+import { Box, Card, CardContent, Divider, Typography } from '@mui/material'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
-import {
-  humanizeClassification,
-  stockLogoUrl,
-  PERF_WINDOWS,
-  type StockPerformance,
-  type TickerCard,
-} from '@/lib/api'
-import { heroWash } from '@/components/heroWash'
+import QueryStatsIcon from '@mui/icons-material/QueryStats'
+import { PERF_WINDOWS, type StockPerformance, type TickerCard } from '@/lib/api'
 import SectionHeading from '@/components/SectionHeading'
 
 const fmt = (n: number | null) =>
@@ -49,17 +34,6 @@ const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
 /** Signed percent for directional figures — a trailing return reads its sign. */
 const fmtPct = (n: number | null) =>
   n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
-
-/** The "Sector · Industry" summary line, skipping whichever side is absent. */
-const classificationLine = (
-  sector: string | null,
-  industry: string | null,
-): string | null => {
-  const parts = [sector, industry]
-    .filter(Boolean)
-    .map((s) => humanizeClassification(s!))
-  return parts.length ? parts.join(' · ') : null
-}
 
 /**
  * One labelled figure in the key-stats grid. Tiles stretch to fill the card's
@@ -149,11 +123,12 @@ function PerfPill({ label, value }: { label: string; value: number | null }) {
 }
 
 /**
- * The identity + snapshot hero: what the stock is, where it trades, its live
- * quote and key stats, and — when the snapshot carries them — the trailing
- * returns. The performance strip rides the same card so the whole read lands as
- * one hero rather than two stacked panels; `perf` is the snapshot's own
- * `performance` block and `fiveYearReturn` arrives a beat later off 5Y candles.
+ * The Overview snapshot card — the figures that frame the live quote (size,
+ * valuation, dividend) plus the trailing-return strip. The identity and price
+ * now lead the page from the persistent `StockHeader`, so this card carries the
+ * numbers alone: key stats up top, then performance when the snapshot ships a
+ * `performance` block. `perf` is the snapshot's own block and `fiveYearReturn`
+ * arrives a beat later off 5Y candles.
  */
 export default function StockCard({
   stock,
@@ -164,10 +139,6 @@ export default function StockCard({
   perf?: StockPerformance | null
   fiveYearReturn?: number | null
 }) {
-  const up = (stock.change ?? 0) >= 0
-  const changeColor = up ? 'success.main' : 'error.main'
-  const sign = up ? '+' : ''
-  const classification = classificationLine(stock.sector, stock.industry)
   const metrics = stock.metrics
   // 1W…1Y ride the snapshot's performance block; 5Y is derived upstream and
   // passed in, so it shows a dash until it lands.
@@ -179,177 +150,14 @@ export default function StockCard({
     : []
 
   return (
-    <Card
-      variant="outlined"
-      sx={{
-        position: 'relative',
-        overflow: 'hidden',
-        borderColor: 'divider',
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        // The home-page blue→gold wash, so the identity card reads as this
-        // page's hero rather than one more flat panel.
-        backgroundImage: (theme) => heroWash(theme),
-      }}
-    >
-      <CardContent
-        sx={{
-          p: { xs: 2, sm: 3 },
-          flexGrow: 1,
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={{ xs: 2, sm: 2.5 }}
-          sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
-        >
-          <Stack
-            direction="row"
-            spacing={2}
-            sx={{ alignItems: 'flex-start', minWidth: 0 }}
-          >
-            <Avatar
-              variant="rounded"
-              src={stockLogoUrl(stock.ticker)}
-              alt={`${stock.ticker} logo`}
-              slotProps={{
-                img: { loading: 'lazy', style: { objectFit: 'contain' } },
-              }}
-              sx={{
-                width: 76,
-                height: 76,
-                flexShrink: 0,
-                bgcolor: '#fff',
-                color: '#111',
-                fontWeight: 700,
-                fontSize: '1.75rem',
-                p: 1.25,
-                borderRadius: '18px',
-                border: '1px solid',
-                borderColor: 'divider',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
-              }}
-            >
-              {stock.ticker.charAt(0)}
-            </Avatar>
-            <Box sx={{ minWidth: 0 }}>
-              <Stack
-                direction="row"
-                spacing={1}
-                sx={{ alignItems: 'center', flexWrap: 'wrap' }}
-              >
-                <Typography
-                  component="h2"
-                  sx={{ fontWeight: 700, lineHeight: 1.05, fontSize: '2rem' }}
-                >
-                  {stock.ticker}
-                </Typography>
-                {stock.exchange && (
-                  <Chip
-                    label={stock.exchange}
-                    size="small"
-                    variant="outlined"
-                    sx={{
-                      height: 22,
-                      fontSize: '0.72rem',
-                      fontWeight: 600,
-                      color: 'text.secondary',
-                      borderColor: 'divider',
-                    }}
-                  />
-                )}
-              </Stack>
-              {stock.name && (
-                <Typography
-                  sx={{
-                    mt: 0.5,
-                    color: 'text.primary',
-                    fontSize: '1.15rem',
-                    fontWeight: 500,
-                    lineHeight: 1.3,
-                    display: '-webkit-box',
-                    WebkitBoxOrient: 'vertical',
-                    WebkitLineClamp: 2,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {stock.name}
-                </Typography>
-              )}
-              {classification && (
-                <Typography
-                  sx={{
-                    display: 'block',
-                    mt: 0.75,
-                    color: 'text.secondary',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.06em',
-                    fontSize: '0.8rem',
-                    fontWeight: 500,
-                  }}
-                >
-                  {classification}
-                </Typography>
-              )}
-            </Box>
-          </Stack>
-          <Box sx={{ textAlign: { xs: 'left', sm: 'right' }, flexShrink: 0 }}>
-            <Typography
-              sx={{
-                fontWeight: 700,
-                fontSize: '2.25rem',
-                fontVariantNumeric: 'tabular-nums',
-                lineHeight: 1.05,
-                letterSpacing: '-0.01em',
-              }}
-            >
-              ${fmt(stock.price)}
-            </Typography>
-            {/* the day's move as a tinted pill, so direction reads at a glance */}
-            <Box
-              sx={{
-                mt: 1,
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 0.5,
-                px: 1.5,
-                py: 0.6,
-                borderRadius: 999,
-                color: changeColor,
-                bgcolor: up
-                  ? 'rgba(52,211,153,0.14)'
-                  : 'rgba(248,113,113,0.14)',
-              }}
-            >
-              <Box
-                component="span"
-                aria-hidden
-                sx={{ fontSize: '0.65rem', lineHeight: 1 }}
-              >
-                {up ? '▲' : '▼'}
-              </Box>
-              <Typography
-                component="span"
-                sx={{
-                  fontWeight: 600,
-                  fontSize: '0.95rem',
-                  fontVariantNumeric: 'tabular-nums',
-                  lineHeight: 1,
-                }}
-              >
-                {sign}
-                {fmt(stock.change)} ({sign}
-                {fmt(stock.change_percent)}%)
-              </Typography>
-            </Box>
-          </Box>
-        </Stack>
-
-        <Divider sx={{ mt: 2.5, mb: 2.5 }} />
-
+    <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <SectionHeading
+          component="h2"
+          icon={<QueryStatsIcon fontSize="small" />}
+          title="Key statistics"
+          subtitle="Size, valuation, and the dividend"
+        />
         {/* Key stats: a 2×2 grid of the figures that frame the quote — size,
             valuation, and the dividend. Rows stretch (gridAutoRows 1fr) so the
             tiles stay even. P/E rides the card's `metrics` block and shows a
@@ -358,8 +166,12 @@ export default function StockCard({
           component="dl"
           sx={{
             m: 0,
+            mt: 2,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+            gridTemplateColumns: {
+              xs: 'repeat(2, minmax(0, 1fr))',
+              sm: 'repeat(4, minmax(0, 1fr))',
+            },
             gridAutoRows: '1fr',
             gap: 1,
           }}
@@ -376,10 +188,9 @@ export default function StockCard({
           />
         </Box>
 
-        {/* The trailing-return strip, folded into the hero so how it's performed
-            reads as part of the same snapshot rather than a second panel below.
-            Pills are green/red by sign; only shown when the snapshot carries a
-            performance block. */}
+        {/* The trailing-return strip, folded into the snapshot so how it's
+            performed reads as part of the same card. Pills are green/red by
+            sign; only shown when the snapshot carries a performance block. */}
         {perf && (
           <>
             <Divider sx={{ mt: 2.5, mb: 2.5 }} />

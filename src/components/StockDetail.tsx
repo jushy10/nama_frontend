@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import {
   Alert,
   Box,
@@ -35,7 +35,13 @@ import {
   useTickerCard,
 } from '@/lib/queries'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import AssessmentIcon from '@mui/icons-material/Assessment'
+import GroupsIcon from '@mui/icons-material/Groups'
+import BarChartIcon from '@mui/icons-material/BarChart'
+import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import AnalysisCard from '@/components/AnalysisCard'
+import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CashGenerationCard from '@/components/CashGenerationCard'
@@ -71,6 +77,27 @@ type StockDetailTab =
   | 'analysts'
   | 'earnings'
   | 'options'
+
+// The tab strip's sections, each with a small leading glyph so the row scans as
+// icons + labels rather than five look-alike words — Overview, Fundamentals,
+// Analysts, Earnings, Options.
+const STOCK_TABS: {
+  value: StockDetailTab
+  label: string
+  icon: ReactElement
+}[] = [
+  { value: 'overview', label: 'Overview', icon: <DashboardIcon /> },
+  { value: 'fundamentals', label: 'Fundamentals', icon: <AssessmentIcon /> },
+  { value: 'analysts', label: 'Analysts', icon: <GroupsIcon /> },
+  { value: 'earnings', label: 'Earnings', icon: <BarChartIcon /> },
+  { value: 'options', label: 'Options', icon: <CandlestickChartIcon /> },
+]
+
+// The active-tab pill reuses the top nav's house treatment (src/App.tsx) — a
+// navy→blue fill with a soft glow — so the detail's section switcher reads as
+// the same control family rather than a stray restyle.
+const ACTIVE_PILL = 'linear-gradient(135deg, #07378e 0%, #4f83e6 100%)'
+const ACTIVE_GLOW = '0 6px 16px -5px rgba(47,99,180,0.55)'
 
 /**
  * The stock detail view — the snapshot card plus the performance/profitability/
@@ -154,30 +181,85 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   if (!stock) return null
 
   return (
-    <>
-      {/* A small tab menu keeps the detail from being one long scroll: Overview
-          holds the essentials (snapshot, performance, the AI take and the price
-          chart), Valuation gathers the analytical reads, Analysts the sell-side
-          ratings, and Earnings and Options each get their own tab. Most queries
-          fire up top regardless of the active tab, so switching is instant and
-          never refetches; the one exception is the earnings analysis, a slow
-          paid model call gated on the Earnings tab being open. Scrollable so the
-          five labels never crowd a phone. */}
-      <Tabs
-        value={tab}
-        onChange={(_, value: StockDetailTab) => setTab(value)}
-        aria-label="Stock detail sections"
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+    <Stack spacing={{ xs: 2, sm: 3 }}>
+      {/* The identity + live quote lead the page and stay put across every tab
+          via the persistent header, so the ticker, name and price never scroll
+          out of mind while you read Fundamentals, Analysts or Options. */}
+      <StockHeader stock={stock} />
+
+      {/* A pill tab strip splits the detail into focused sections so it isn't
+          one long scroll: Overview holds the essentials (snapshot, the AI take
+          and the price chart), Fundamentals the analytical reads, Analysts the
+          sell-side ratings, and Earnings and Options each get their own tab.
+          Most queries fire up top regardless of the active tab, so switching is
+          instant and never refetches; the one exception is the earnings
+          analysis, a slow paid model call gated on the Earnings tab being open.
+          The strip sticks just under the app bar and scrolls sideways on a
+          phone, so the sections stay one tap away however far you've scrolled. */}
+      <Box
+        sx={{
+          position: 'sticky',
+          top: { xs: 56, sm: 64 },
+          zIndex: 3,
+          py: 1,
+          mx: { xs: -2, sm: -3 },
+          px: { xs: 2, sm: 3 },
+          bgcolor: (theme) =>
+            theme.palette.mode === 'dark'
+              ? 'rgba(10,10,15,0.82)'
+              : 'rgba(247,248,250,0.82)',
+          backdropFilter: 'blur(12px)',
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
       >
-        <Tab label="Overview" value="overview" />
-        <Tab label="Fundamentals" value="fundamentals" />
-        <Tab label="Analysts" value="analysts" />
-        <Tab label="Earnings" value="earnings" />
-        <Tab label="Options" value="options" />
-      </Tabs>
+        <Tabs
+          value={tab}
+          onChange={(_, value: StockDetailTab) => setTab(value)}
+          aria-label="Stock detail sections"
+          variant="scrollable"
+          scrollButtons={false}
+          sx={{
+            minHeight: 0,
+            '& .MuiTabs-indicator': { display: 'none' },
+            '& .MuiTabs-flexContainer': { gap: 0.5 },
+            '& .MuiTabs-scroller': { py: 0.25 },
+            '& .MuiSvgIcon-root': { fontSize: '1.1rem' },
+            '& .MuiTab-root': {
+              minHeight: 0,
+              minWidth: 0,
+              gap: 0.5,
+              px: 1.25,
+              py: 0.9,
+              borderRadius: 999,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: { xs: '0.8rem', sm: '0.875rem' },
+              color: 'text.secondary',
+              transition:
+                'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
+              '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+            },
+            '& .Mui-selected': {
+              color: '#fff !important',
+              background: ACTIVE_PILL,
+              boxShadow: ACTIVE_GLOW,
+              '&:hover': { background: ACTIVE_PILL },
+            },
+          }}
+        >
+          {STOCK_TABS.map((t) => (
+            <Tab
+              key={t.value}
+              value={t.value}
+              label={t.label}
+              icon={t.icon}
+              iconPosition="start"
+              disableRipple
+            />
+          ))}
+        </Tabs>
+      </Box>
 
       {tab === 'overview' && (
         <Stack spacing={3} role="tabpanel">
@@ -503,6 +585,6 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           )}
         </Box>
       )}
-    </>
+    </Stack>
   )
 }
