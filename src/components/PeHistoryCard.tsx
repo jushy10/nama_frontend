@@ -13,24 +13,23 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
-import type { PeHistory, PeHistoryPoint } from '@/lib/api'
+import type { IndustryPeStance, PeHistory, PeHistoryPoint } from '@/lib/api'
+import {
+  median,
+  MIN_PE_HISTORY_POINTS,
+  peHistoryStance,
+} from '@/lib/fundamentals'
 import InfoHint from '@/components/InfoHint'
-
-// A trailing-P/E history needs a few points to read as a trend rather than a dot
-// or two; below this the card self-hides (an uncovered or upstream-blocked symbol
-// comes back with an empty/near-empty series from the best-effort endpoint).
-const MIN_POINTS = 3
 
 // The same valuation palette the Industry P/E card uses — cheaper-than-usual
 // reads green, in its usual band amber, pricier-than-usual red — so "green = cheap"
 // stays consistent down the Valuation tab. The difference: this compares the stock
 // against *its own* history, not its peers.
-const STANCE = {
+const STANCE: Record<IndustryPeStance, { color: string; label: string }> = {
   below: { color: 'success.main', label: 'Below Its Avg' },
   in_line: { color: '#fbbf24', label: 'In Its Range' },
   above: { color: 'error.main', label: 'Above Its Avg' },
-} as const
-type Stance = keyof typeof STANCE
+}
 
 /** A P/E to one decimal, e.g. 21.04 → "21.0". */
 const fmt = (n: number) => n.toFixed(1)
@@ -42,26 +41,6 @@ const fmtDate = (iso: string) =>
     year: '2-digit',
   })
 
-/** The median of a numeric list (mean of the two middles on an even count). */
-function median(xs: number[]): number {
-  const s = [...xs].sort((a, b) => a - b)
-  const mid = Math.floor(s.length / 2)
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2
-}
-
-/**
- * Grade the latest P/E against the window median with the same ±10% dead-band the
- * industry read uses, so a small gap doesn't read as a signal. Null when either
- * figure is non-positive (no gradeable comparison without two positive multiples).
- */
-function stanceOf(latest: number, med: number): Stance | null {
-  if (latest <= 0 || med <= 0) return null
-  const ratio = latest / med
-  if (ratio <= 0.9) return 'below'
-  if (ratio >= 1.1) return 'above'
-  return 'in_line'
-}
-
 /** The one-line story the latest multiple and the window tell together, worded off
  *  the graded stance so the chip and the sentence never disagree at the band edge. */
 function summaryLine(
@@ -70,7 +49,7 @@ function summaryLine(
   lo: number,
   hi: number,
   n: number,
-  stance: Stance | null,
+  stance: IndustryPeStance | null,
 ): string {
   const range = `over the last ${n} quarters it has ranged ${fmt(lo)}–${fmt(hi)}`
   if (stance === null || stance === 'in_line') {
@@ -374,14 +353,14 @@ function PeLineChart({
  */
 export default function PeHistoryCard({ history }: { history: PeHistory }) {
   const points = history.points
-  if (points.length < MIN_POINTS) return null
+  if (points.length < MIN_PE_HISTORY_POINTS) return null
 
   const pes = points.map((p) => p.pe)
   const med = median(pes)
   const latest = points[points.length - 1].pe
   const lo = Math.min(...pes)
   const hi = Math.max(...pes)
-  const stance = stanceOf(latest, med)
+  const stance = peHistoryStance(points)
   const meta = stance ? STANCE[stance] : null
   const latestColor = meta ? meta.color : 'text.primary'
 

@@ -13,11 +13,14 @@ import {
   Typography,
 } from '@mui/material'
 import {
+  industryPeStance,
+  MIN_INDUSTRY_PEERS,
   quarterlyToEarningsHistory,
   quarterlyUpcoming,
   type ChartRange,
   type TickerCardInclude,
 } from '@/lib/api'
+import { MIN_PE_HISTORY_POINTS, peHistoryStance } from '@/lib/fundamentals'
 import {
   errorMessage,
   useAnnualEarnings,
@@ -45,6 +48,7 @@ import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CashGenerationCard from '@/components/CashGenerationCard'
+import FundamentalsSummary from '@/components/FundamentalsSummary'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
@@ -98,6 +102,32 @@ const STOCK_TABS: {
 // the same control family rather than a stray restyle.
 const ACTIVE_PILL = 'linear-gradient(135deg, #07378e 0%, #4f83e6 100%)'
 const ACTIVE_GLOW = '0 6px 16px -5px rgba(47,99,180,0.55)'
+
+/**
+ * A quiet section label with a trailing hairline — the divider that sorts the
+ * Fundamentals cards into "Business quality" and "Valuation" without competing
+ * with the cards' own h6 titles. Sits above each group, hugging its cards.
+ */
+function GroupLabel({ label }: { label: string }) {
+  return (
+    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+      <Typography
+        component="h3"
+        sx={{
+          textTransform: 'uppercase',
+          letterSpacing: '0.08em',
+          fontSize: '0.72rem',
+          fontWeight: 700,
+          color: 'text.secondary',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {label}
+      </Typography>
+      <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider' }} />
+    </Stack>
+  )
+}
 
 /**
  * The stock detail view — the snapshot card plus the performance/profitability/
@@ -179,6 +209,21 @@ export default function StockDetail({ symbol }: { symbol: string }) {
     )
   }
   if (!stock) return null
+
+  // The two valuation reads that feed the Fundamentals summary and gate its
+  // Valuation group. The industry read only counts once it rests on enough peers
+  // to stand for the industry (the same MIN_INDUSTRY_PEERS gate the card uses);
+  // the history read self-gates below MIN_PE_HISTORY_POINTS. Either being usable
+  // is what draws the "Valuation" group under the summary.
+  const iv = industryValuationQuery.data
+  const industryUsable =
+    !!iv && iv.median_pe != null && iv.count >= MIN_INDUSTRY_PEERS
+  const industryStance = industryUsable
+    ? industryPeStance(stock.metrics?.pe ?? null, iv.median_pe)
+    : null
+  const historyPoints = peHistoryQuery.data?.points
+  const historyUsable = (historyPoints?.length ?? 0) >= MIN_PE_HISTORY_POINTS
+  const historyStance = historyPoints ? peHistoryStance(historyPoints) : null
 
   return (
     <Stack spacing={{ xs: 2, sm: 3 }}>
@@ -397,66 +442,86 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Fundamentals gathers the analytical reads that used to crowd the old
-          General tab: the profitability gauge, the cash-generation read, and the
-          peer P/E benchmark. The first two ride the card's metrics block (the
-          industry read its own best-effort query), so switching in is instant. */}
+      {/* Fundamentals opens on the "Good business, fair price?" summary, then
+          sorts its cards into the two questions that summary answers: Business
+          quality (profitability + cash generation, riding the card's metrics
+          block, so instant) and Valuation (the peer and own-history P/E reads,
+          each a best-effort query that fills in as it lands). */}
       {tab === 'fundamentals' && (
         <Stack spacing={3} role="tabpanel">
-          {/* "Is it making money?" — the trailing net-margin read. */}
+          {/* The thesis: the two questions, each answered by folding the cards'
+              own verdicts into one word. Self-hides only when neither can be
+              graded (the same case the empty state below covers). */}
+          <FundamentalsSummary
+            netMargin={stock.metrics?.net_margin ?? null}
+            fcfYield={stock.metrics?.fcf_yield ?? null}
+            industryStance={industryStance}
+            historyStance={historyStance}
+          />
+
+          {/* "Is it a good business?" — how much profit it keeps and how much
+              free cash it throws off. */}
           {stock.metrics && (
-            <ProfitabilityCard
-              netMargin={stock.metrics.net_margin}
-              grossMargin={stock.metrics.gross_margin}
-              operatingMargin={stock.metrics.operating_margin}
-            />
+            <Box>
+              <GroupLabel label="Business quality" />
+              <Stack spacing={3} sx={{ mt: 2 }}>
+                {/* "Is it making money?" — the trailing net-margin read. */}
+                <ProfitabilityCard
+                  netMargin={stock.metrics.net_margin}
+                  grossMargin={stock.metrics.gross_margin}
+                  operatingMargin={stock.metrics.operating_margin}
+                />
+                {/* "Does it throw off cash?" — free cash flow yield, how
+                    operating cash converts after capex, and the cash multiples.
+                    Self-hides when the whole cash-flow block is uncovered. */}
+                <CashGenerationCard metrics={stock.metrics} />
+              </Stack>
+            </Box>
           )}
 
-          {/* "Does it throw off cash?" — free cash flow yield, how operating
-              cash converts to free cash after capex, and the cash multiples.
-              Self-hides when the whole cash-flow block is uncovered. */}
-          {stock.metrics && <CashGenerationCard metrics={stock.metrics} />}
-
-          {/* "Is the price rich or cheap for its industry?" Best-effort:
-              self-hides when fewer than MIN_INDUSTRY_PEERS back the benchmark
-              (the card returns null), so a sole-peer "median" never renders as
-              a verdict. */}
-          {industryValuationQuery.data && (
-            <IndustryPeCard
-              stockPe={stock.metrics?.pe ?? null}
-              valuation={industryValuationQuery.data}
-            />
-          )}
-
-          {/* "Is the price rich or cheap versus its own history?" The trailing
-              P/E at each past earnings release, anchored on the stock's own
-              median rather than its peers'. Best-effort: self-hides when the
-              series is too short (an uncovered/blocked symbol comes back near
-              empty), so no loading/error UI. */}
-          {peHistoryQuery.data && (
-            <PeHistoryCard history={peHistoryQuery.data} />
+          {/* "Is the price fair?" — the trailing multiple against peers and
+              against the stock's own past. Renders only when at least one read
+              rests on enough data to stand (so no orphan label over a card that
+              self-hid). */}
+          {(industryUsable || historyUsable) && (
+            <Box>
+              <GroupLabel label="Valuation" />
+              <Stack spacing={3} sx={{ mt: 2 }}>
+                {/* Rich or cheap for its industry — self-hides below
+                    MIN_INDUSTRY_PEERS, already gated by industryUsable. */}
+                {industryUsable && (
+                  <IndustryPeCard
+                    stockPe={stock.metrics?.pe ?? null}
+                    valuation={iv}
+                  />
+                )}
+                {/* Rich or cheap versus its own history — the trailing P/E at
+                    each past earnings release, anchored on its own median. */}
+                {historyUsable && (
+                  <PeHistoryCard history={peHistoryQuery.data!} />
+                )}
+              </Stack>
+            </Box>
           )}
 
           {/* Nothing to value — a rare unclassified/uncovered name. A plain
               empty state beats a blank panel. */}
-          {!stock.metrics &&
-            !industryValuationQuery.data &&
-            !peHistoryQuery.data?.points.length && (
-              <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-                <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                  <Typography
-                    variant="h6"
-                    component="h2"
-                    sx={{ fontWeight: 600 }}
-                  >
-                    Fundamentals
-                  </Typography>
-                  <Typography color="text.secondary" sx={{ mt: 1 }}>
-                    No fundamental data for {stock.ticker}.
-                  </Typography>
-                </CardContent>
-              </Card>
-            )}
+          {!stock.metrics && !industryUsable && !historyUsable && (
+            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+              <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                <Typography
+                  variant="h6"
+                  component="h2"
+                  sx={{ fontWeight: 600 }}
+                >
+                  Fundamentals
+                </Typography>
+                <Typography color="text.secondary" sx={{ mt: 1 }}>
+                  No fundamental data for {stock.ticker}.
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
         </Stack>
       )}
 
