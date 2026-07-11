@@ -28,6 +28,7 @@ import {
   useEarningsAnalysis,
   useEma,
   useFiveYearReturn,
+  useFundamentalsAnalysis,
   useIndustryValuation,
   usePeHistory,
   useAnalystInfo,
@@ -49,6 +50,7 @@ import StockCard from '@/components/StockCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CashGenerationCard from '@/components/CashGenerationCard'
 import FundamentalsSummary from '@/components/FundamentalsSummary'
+import FundamentalsAnalysisCard from '@/components/FundamentalsAnalysisCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
@@ -183,6 +185,15 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const ratingsAnalysisQuery = useRatingsAnalysis(
     loadedSymbol,
     tab === 'analysts',
+  )
+  // The Fundamentals-tab AI read — a plain-language take on the company's
+  // fundamentals (profitability, growth, health, and how its valuation stacks up),
+  // gated on the tab being open (the same slow/paid model-call discipline as the
+  // earnings and ratings analyses, held fresh across tab switches). Best-effort: an
+  // error or an uncovered symbol just omits the card.
+  const fundamentalsAnalysisQuery = useFundamentalsAnalysis(
+    loadedSymbol,
+    tab === 'fundamentals',
   )
   // The industry P/E benchmark rides the loaded card's own industry slug (idle
   // until it resolves; never fires for an unclassified stock). Best-effort — it
@@ -458,6 +469,28 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             industryStance={industryStance}
             historyStance={historyStance}
           />
+
+          {/* The AI fundamentals take sits under the thesis summary — a
+              plain-language read of how solid the business is and whether the
+              shares look reasonably priced. Its own slow model call, gated on the
+              tab, so it shows a loading card then fills in; a failure degrades to a
+              warning rather than sinking the cards below. */}
+          {fundamentalsAnalysisQuery.isLoading && (
+            <AnalysisLoadingCard title="Fundamentals Analysis" />
+          )}
+          {fundamentalsAnalysisQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                fundamentalsAnalysisQuery.error,
+                'Could not load the fundamentals analysis.',
+              )}
+            </Alert>
+          )}
+          {fundamentalsAnalysisQuery.data && (
+            <FundamentalsAnalysisCard
+              analysis={fundamentalsAnalysisQuery.data}
+            />
+          )}
 
           {/* "Is it a good business?" — how much profit it keeps and how much
               free cash it throws off. */}
