@@ -70,6 +70,49 @@ function stubApi(searchPayload: unknown = SEARCH_PAGE) {
 const lastSearchUrl = (calls: string[]) =>
   [...calls].reverse().find((u) => u.includes('/stocks/etfs?')) ?? ''
 
+type Interp = {
+  query: string | null
+  categories: string[]
+  sort: string | null
+  direction: string
+  limit: number | null
+}
+
+const NEUTRAL_INTERP: Interp = {
+  query: null,
+  categories: [],
+  sort: null,
+  direction: 'desc',
+  limit: null,
+}
+
+/**
+ * Like `stubApi`, but also answers /stocks/etfs/ai-search with an AiEtfScreenResponse
+ * carrying the given interpreted filters. Everything else routes as in `stubApi`
+ * (the ai-search path is checked first — it's a prefix-extension of the search path).
+ */
+function stubApiWithAi(interpreted: Interp) {
+  const calls: string[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string | URL) => {
+      const u = String(url)
+      calls.push(u)
+      const body = u.includes('/stocks/etfs/ai-search')
+        ? { interpreted } // the endpoint returns only the interpreted filters
+        : u.includes('/stocks/etfs/categories')
+          ? CATEGORIES
+          : SEARCH_PAGE
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(body),
+      })
+    }),
+  )
+  return calls
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 describe('EtfScreener', () => {
@@ -240,5 +283,97 @@ describe('EtfScreener', () => {
     renderWithProviders(<EtfScreener />)
 
     expect(await screen.findByText('Upstream is down.')).toBeInTheDocument()
+  })
+
+  it('applies the AI-interpreted filters to the manual search', async () => {
+    const calls = stubApiWithAi({
+      ...NEUTRAL_INTERP,
+      categories: ['large_blend'],
+      sort: 'expense_ratio',
+      direction: 'asc',
+    })
+    const { user } = renderWithProviders(<EtfScreener />)
+    await screen.findByText('VTI')
+
+    await user.type(
+      screen.getByRole('textbox', { name: /describe the etfs/i }),
+      'cheap index funds',
+    )
+    await user.click(screen.getByRole('button', { name: /^screen$/i }))
+
+    // The request went to the AI endpoint, and its interpreted filters then flow
+    // into the ordinary /stocks/etfs search.
+    await waitFor(() =>
+      expect(calls.some((u) => u.includes('/stocks/etfs/ai-search'))).toBe(
+        true,
+      ),
+    )
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/[?&]category=large_blend(&|$)/)
+      expect(url).toMatch(/[?&]sort=expense_ratio(&|$)/)
+      expect(url).toMatch(/[?&]order=asc(&|$)/)
+    })
+    // The applied category surfaces as a removable chip (the interpretation is
+    // visible and editable, not a black box) — so "Large Blend" now shows twice:
+    // once in VTI's Category cell, once as the active-filter chip.
+    expect(screen.getAllByText('Large Blend').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('runs an example prompt in one tap', async () => {
+    const calls = stubApiWithAi({ ...NEUTRAL_INTERP, sort: 'dividend_yield' })
+    const { user } = renderWithProviders(<EtfScreener />)
+    await screen.findByText('VTI')
+
+    await user.click(
+      screen.getByRole('button', { name: 'High-yield dividend ETFs' }),
+    )
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/[?&]sort=dividend_yield(&|$)/),
+    )
+  })
+
+  it('surfaces an AI translation failure without breaking the list', async () => {
+    const calls: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        const u = String(url)
+        calls.push(u)
+        if (u.includes('/stocks/etfs/ai-search')) {
+          return Promise.resolve({
+            ok: false,
+            status: 502,
+            json: () =>
+              Promise.resolve({
+                detail: 'AI ETF screening is temporarily unavailable.',
+              }),
+          })
+        }
+        const body = u.includes('/stocks/etfs/categories')
+          ? CATEGORIES
+          : SEARCH_PAGE
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+    const { user } = renderWithProviders(<EtfScreener />)
+    await screen.findByText('VTI')
+
+    await user.type(
+      screen.getByRole('textbox', { name: /describe the etfs/i }),
+      'something',
+    )
+    await user.click(screen.getByRole('button', { name: /^screen$/i }))
+
+    // The error shows in the AI box; the list stays intact.
+    expect(
+      await screen.findByText(/AI ETF screening is temporarily unavailable/i),
+    ).toBeInTheDocument()
+    expect(screen.getByText('VTI')).toBeInTheDocument()
   })
 })
