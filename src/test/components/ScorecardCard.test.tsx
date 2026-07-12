@@ -63,7 +63,7 @@ function analysis(overrides: Partial<StockAnalysis> = {}): StockAnalysis {
 describe('ScorecardCard', () => {
   it('shows the overall verdict, confidence, and thesis', () => {
     renderWithProviders(<ScorecardCard analysis={analysis()} />)
-    expect(screen.getByText('AI Analysis')).toBeInTheDocument()
+    expect(screen.getByText('AI Overview Analysis')).toBeInTheDocument()
     expect(screen.getByText('Buy')).toBeInTheDocument()
     expect(screen.getByText('High confidence')).toBeInTheDocument()
     expect(screen.getByText(/price already assumes a lot/i)).toBeInTheDocument()

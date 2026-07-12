@@ -231,7 +231,7 @@ describe('Search (unified)', () => {
       expect.anything(),
     )
     // The AI analysis card loads on its own and appears once the read lands.
-    expect(await screen.findByText('AI Analysis')).toBeInTheDocument()
+    expect(await screen.findByText('AI Overview Analysis')).toBeInTheDocument()
     // No ETF badge / holdings for a stock.
     expect(screen.queryByText('Top Holdings')).not.toBeInTheDocument()
   })
@@ -275,7 +275,7 @@ describe('Search (unified)', () => {
     )
     // Stock-only cards don't show for a fund.
     expect(screen.queryByText('Analyst Ratings')).not.toBeInTheDocument()
-    expect(screen.queryByText('AI Analysis')).not.toBeInTheDocument()
+    expect(screen.queryByText('AI Overview Analysis')).not.toBeInTheDocument()
   })
 
   it('suggests matches by company name or ticker as you type, stocks and ETFs', async () => {
