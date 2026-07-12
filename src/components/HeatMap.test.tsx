@@ -3,6 +3,15 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import HeatMap from '@/components/HeatMap'
 import type { HeatMap as HeatMapData } from '@/lib/api'
 
+const perf = (oneYear: number) => ({
+  '1w': 1,
+  '1m': 8,
+  '3m': 15,
+  '6m': 40,
+  ytd: 30,
+  '1y': oneYear,
+})
+
 const sample: HeatMapData = {
   scope: 'sp500',
   count: 3,
@@ -20,12 +29,14 @@ const sample: HeatMapData = {
               name: 'NVIDIA',
               market_cap: 3e12,
               change_percent: -0.99,
+              performance: perf(155.5),
             },
             {
               ticker: 'AVGO',
               name: 'Broadcom',
               market_cap: 1e12,
               change_percent: 3.27,
+              performance: perf(60),
             },
           ],
         },
@@ -44,6 +55,7 @@ const sample: HeatMapData = {
               name: 'JPMorgan',
               market_cap: 2e12,
               change_percent: 1.7,
+              performance: perf(20),
             },
           ],
         },
@@ -68,6 +80,41 @@ describe('HeatMap', () => {
     renderWithProviders(<HeatMap data={sample} />)
     expect(screen.getByText('technology')).toBeInTheDocument()
     expect(screen.getByText('financials')).toBeInTheDocument()
+  })
+
+  it('labels each tile with the day move by default', () => {
+    renderWithProviders(<HeatMap data={sample} />)
+    // Big tiles in a big viewBox -> the percent stacks under every ticker.
+    expect(screen.getByText('-0.99%')).toBeInTheDocument() // NVDA day move
+    expect(screen.getByText('+1.70%')).toBeInTheDocument() // JPM day move
+  })
+
+  it('recolours and relabels tiles by the selected timeframe window', () => {
+    renderWithProviders(<HeatMap data={sample} window="1y" />)
+    // The 1Y window reads each tile's trailing performance, not the day move.
+    expect(screen.getByText('+155.50%')).toBeInTheDocument() // NVDA 1y
+    expect(screen.getByText('+20.00%')).toBeInTheDocument() // JPM 1y
+    // ...and the day-move figure is no longer shown.
+    expect(screen.queryByText('-0.99%')).not.toBeInTheDocument()
+  })
+
+  it('leaves a window with no performance data uncoloured (neutral, em-dash)', () => {
+    // A board whose tiles carry no `performance` (e.g. before the backend ships it):
+    // every non-day window has no value, so tiles read as an em-dash.
+    const noPerf: HeatMapData = {
+      ...sample,
+      sectors: sample.sectors.map((s) => ({
+        ...s,
+        industries: s.industries.map((i) => ({
+          ...i,
+          stocks: i.stocks.map((st) => ({ ...st, performance: null })),
+        })),
+      })),
+    }
+    renderWithProviders(<HeatMap data={noPerf} window="1m" />)
+    expect(screen.getByText('NVDA')).toBeInTheDocument()
+    // No 1M value anywhere -> the tile prints the placeholder dash instead of a percent.
+    expect(screen.getAllByText('—').length).toBeGreaterThanOrEqual(1)
   })
 })
 

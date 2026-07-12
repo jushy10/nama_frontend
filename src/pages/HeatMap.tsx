@@ -10,7 +10,12 @@ import {
   Typography,
   useMediaQuery,
 } from '@mui/material'
-import type { StockIndex } from '@/lib/api'
+import {
+  heatMapReturn,
+  SECTOR_WINDOWS,
+  type SectorWindow,
+  type StockIndex,
+} from '@/lib/api'
 import { errorMessage, useHeatMap } from '@/lib/queries'
 import { dedupeShareClasses } from '@/lib/heatmap'
 import { usePageMeta } from '@/lib/usePageMeta'
@@ -28,6 +33,9 @@ export default function HeatMapPage() {
   )
 
   const [scope, setScope] = useState<StockIndex>('sp500')
+  // The timeframe the board colours by. `1d` is the live day move; the rest read the
+  // trailing performance windows the backend attaches to each tile.
+  const [timeframe, setTimeframe] = useState<SectorWindow>('1d')
   const query = useHeatMap(scope)
   // On touch there's no hover tooltip, and a tap opens a detail sheet rather than
   // navigating — so the instruction differs from the desktop click-through.
@@ -40,21 +48,22 @@ export default function HeatMapPage() {
     [query.data],
   )
 
-  // Up/down tally across every tile, for the summary line.
+  // Up/down tally across every tile for the selected timeframe, for the summary line.
   const tally = useMemo(() => {
     let up = 0
     let down = 0
     for (const sector of board?.sectors ?? []) {
       for (const industry of sector.industries) {
         for (const s of industry.stocks) {
-          if (s.change_percent == null) continue
-          if (s.change_percent >= 0) up += 1
+          const value = heatMapReturn(s, timeframe)
+          if (value == null) continue
+          if (value >= 0) up += 1
           else down += 1
         }
       }
     }
     return { up, down }
-  }, [board])
+  }, [board, timeframe])
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
@@ -67,8 +76,8 @@ export default function HeatMapPage() {
           Market Heat Map
         </Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Every stock a tile — sized by market cap, coloured by today&apos;s
-          price move — grouped by sector and industry.{' '}
+          Every stock a tile — sized by market cap, coloured by its move over
+          the timeframe you pick — grouped by sector and industry.{' '}
           {isMobile ? 'Tap a tile for details.' : 'Click a tile to open it.'}
         </Typography>
       </Box>
@@ -118,10 +127,47 @@ export default function HeatMapPage() {
               </Box>{' '}
               · {board?.count ?? 0} stocks
             </Typography>
-            <HeatMapLegend />
+            <HeatMapLegend window={timeframe} />
           </Stack>
         )}
       </Stack>
+
+      {/* Timeframe selector — recolours the whole board (and the up/down tally + legend)
+          to each stock's return over the chosen window. */}
+      <Box sx={{ mt: 3 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'text.secondary',
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+          }}
+        >
+          Timeframe
+        </Typography>
+        <Box sx={{ mt: 0.5 }}>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={timeframe}
+            onChange={(_, v: SectorWindow | null) => v && setTimeframe(v)}
+            aria-label="Heat map timeframe"
+            // rowGap so wrapped pills read as a second row rather than fusing to the row
+            // above; taller hit area on phones.
+            sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
+          >
+            {SECTOR_WINDOWS.map((w) => (
+              <ToggleButton
+                key={w.key}
+                value={w.key}
+                sx={{ px: 2, py: { xs: 0.75 } }}
+              >
+                {w.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
+      </Box>
 
       <Box sx={{ mt: 3 }}>
         {query.isLoading && (
@@ -150,7 +196,7 @@ export default function HeatMapPage() {
                 bgcolor: 'background.paper',
               }}
             >
-              <HeatMapChart data={board} />
+              <HeatMapChart data={board} window={timeframe} />
             </Box>
           ))}
       </Box>

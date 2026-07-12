@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { dedupeShareClasses } from '@/lib/heatmap'
-import type { HeatMap } from '@/lib/api'
+import { heatMapReturn, type HeatMap, type HeatMapStock } from '@/lib/api'
 
 describe('dedupeShareClasses', () => {
   it("collapses a company's share classes to its largest-cap tile", () => {
@@ -91,5 +91,47 @@ describe('dedupeShareClasses', () => {
       'AAA',
       'BBB',
     ])
+  })
+})
+
+describe('heatMapReturn', () => {
+  const stock: HeatMapStock = {
+    ticker: 'NVDA',
+    name: 'NVIDIA',
+    market_cap: 3e12,
+    change_percent: -0.99,
+    performance: {
+      '1w': 2.1,
+      '1m': 8.4,
+      '3m': null,
+      '6m': 40,
+      ytd: 33.3,
+      '1y': 155.5,
+    },
+  }
+
+  it('reads the live day move for the 1D window', () => {
+    expect(heatMapReturn(stock, '1d')).toBe(-0.99)
+  })
+
+  it('reads the trailing performance block for the other windows', () => {
+    expect(heatMapReturn(stock, '1m')).toBe(8.4)
+    expect(heatMapReturn(stock, 'ytd')).toBe(33.3)
+    expect(heatMapReturn(stock, '1y')).toBe(155.5)
+  })
+
+  it('is null when the window has no value or the block is absent', () => {
+    // A window the backend couldn't compute (not enough history).
+    expect(heatMapReturn(stock, '3m')).toBeNull()
+    // A board that predates the performance field (or a tile with no history) —
+    // every non-day window falls back to null rather than throwing.
+    const bare: HeatMapStock = {
+      ticker: 'XYZ',
+      name: null,
+      market_cap: 1e9,
+      change_percent: 1.2,
+    }
+    expect(heatMapReturn(bare, '1d')).toBe(1.2)
+    expect(heatMapReturn(bare, '1y')).toBeNull()
   })
 })
