@@ -825,13 +825,17 @@ export async function getMarketSummary(
 /** Index universe the screener can narrow to. */
 export type StockIndex = 'sp500' | 'nasdaq100'
 
-/** One stock tile in the heat map: sized by `market_cap`, coloured by
- *  `change_percent` (null = no live quote today → an uncoloured tile). */
+/** One stock tile in the heat map: sized by `market_cap`, coloured by its return over
+ *  the selected timeframe. `change_percent` is the day's move (null = no live quote today
+ *  → an uncoloured tile); `performance` carries the trailing windows (1W…1Y, YTD) the
+ *  timeframe selector colours by, and is absent/null when the backend fetched no history
+ *  (or hasn't shipped the field yet — the board falls back to the day move). */
 export interface HeatMapStock {
   ticker: string
   name: string | null
   market_cap: number
   change_percent: number | null
+  performance?: StockPerformance | null
 }
 
 /** An industry group within a sector — its stocks and their combined cap.
@@ -872,6 +876,23 @@ export async function getHeatMap(
   })
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as HeatMap
+}
+
+/**
+ * A heat-map tile's return over one timeframe window — the value that sizes the tile's
+ * colour and prints under its ticker. `1D` reads the live day move (`change_percent`);
+ * every other window reads the trailing `performance` block. Null when that window has no
+ * data (no live quote for `1D`, or no history / a backend that predates the `performance`
+ * field for the rest) — the tile then renders neutral. The window ladder is shared with
+ * the sector board (`SECTOR_WINDOWS`), so both controls read the same keys.
+ */
+export function heatMapReturn(
+  stock: HeatMapStock,
+  key: SectorWindow,
+): number | null {
+  return key === '1d'
+    ? stock.change_percent
+    : (stock.performance?.[key] ?? null)
 }
 
 /** One name in the screener's gainers/losers lists. */

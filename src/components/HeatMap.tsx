@@ -10,7 +10,13 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material'
-import type { HeatMap as HeatMapData, HeatMapStock } from '@/lib/api'
+import {
+  heatMapReturn,
+  SECTOR_WINDOWS,
+  type HeatMap as HeatMapData,
+  type HeatMapStock,
+  type SectorWindow,
+} from '@/lib/api'
 import { squarify, type Rect } from '@/lib/treemap'
 
 // The treemap is laid out in a fixed viewBox and scaled to the container via the
@@ -26,12 +32,26 @@ const SECTOR_GAP = 2 // blank gutter between sector blocks (viewBox units)
 const TILE_GAP = 0.5 // hairline between stock tiles
 const HEADER = 18 // sector-label strip height
 
-// The day-move colour scale, clamped at ±3% like Finviz: 0% is a neutral gray,
-// deepening to green above and red below. A tile with no live quote today reads
-// as neutral (sized, uncoloured).
+// The move colour scale: 0% is a neutral gray, deepening to green above and red below,
+// clamped at ±`clamp`% (see WINDOW_CLAMP). A tile with no value for the window reads as
+// neutral (sized, uncoloured).
 const NEUTRAL = '#3d434e'
 const POS = '#2ba15a'
 const NEG = '#d8443c'
+
+// The colour scale saturates at a different band per timeframe, Finviz-style. A day's
+// move rarely clears a few percent, but a quarter's or a year's routinely runs into the
+// tens — so a fixed ±3% clamp would paint every longer-window tile a saturated green or
+// red and wash out the contrast. Each window widens the band to keep tiles readable.
+const WINDOW_CLAMP: Record<SectorWindow, number> = {
+  '1d': 3,
+  '1w': 6,
+  '1m': 12,
+  '3m': 20,
+  '6m': 30,
+  ytd: 30,
+  '1y': 50,
+}
 
 interface SectorHeader {
   name: string
@@ -65,10 +85,11 @@ function mixHex(a: string, b: string, t: number): string {
   return `#${ch.map((v) => v.toString(16).padStart(2, '0')).join('')}`
 }
 
-/** Tile colour for a day-move percent (null → neutral). */
-function tileColor(changePercent: number | null): string {
-  if (changePercent == null) return NEUTRAL
-  const t = Math.max(-1, Math.min(1, changePercent / 3))
+/** Tile colour for a move percent over a window whose scale saturates at ±`clamp`%
+ *  (null → neutral). */
+function tileColor(value: number | null, clamp: number): string {
+  if (value == null) return NEUTRAL
+  const t = Math.max(-1, Math.min(1, value / clamp))
   return t >= 0 ? mixHex(NEUTRAL, POS, t) : mixHex(NEUTRAL, NEG, -t)
 }
 
@@ -93,9 +114,11 @@ function fmtCap(n: number): string {
   return `$${n.toFixed(0)}`
 }
 
-// Text fitting, in viewBox units. Tickers are drawn as large as will fit a tile,
-// with the day-move percent stacked beneath when there's still room for both. A
-// tile too small for even the smallest legible ticker is left blank.
+// Text fitting, in viewBox units. Reading a move off every tile is the whole point of
+// the board, so the percent is stacked under the ticker by default — wherever a legible
+// ticker fits with its percent beneath (and the percent fits the tile's width), both are
+// drawn. Only a tile too short to stack falls back to a ticker alone; one too small for
+// even the smallest legible ticker is left blank (a tap surfaces its detail on mobile).
 const PCT_RATIO = 0.62 // percent font size relative to the ticker's
 const LABEL_PAD = 1.5 // inset kept clear of the tile edge, per side
 
@@ -104,13 +127,19 @@ const LABEL_PAD = 1.5 // inset kept clear of the tile edge, per side
 // stay legible, mega-caps are let grow bigger to fill their extra room, and the
 // smallest tiles are left blank instead of printing sub-pixel noise — a tap surfaces
 // their detail instead (see the tile sheet below).
+//
+// `minStack` is a deliberately lower floor than `minTicker`: showing the move on every
+// tile that carries a stock is the point of the board, so a tile that can hold a legible
+// *solo* ticker should stack its percent too even if the pair ends up a touch smaller
+// than a lone ticker would be. Only tiles too small even for the stacked pair fall back to
+// a solo ticker (still identifying the stock), and only tiles below `minTicker` go blank.
 interface FitConfig {
-  minTicker: number // below this a ticker is unreadable — draw nothing
-  minPct: number // below this the percent line is dropped
+  minTicker: number // below this a ticker is unreadable — draw nothing (or a solo ticker)
+  minStack: number // stacked ticker+percent floor — lower, so the move shows on more tiles
   maxTicker: number // cap so the biggest tiles don't get billboard text
 }
-const DESKTOP_FIT: FitConfig = { minTicker: 3.5, minPct: 2.7, maxTicker: 22 }
-const MOBILE_FIT: FitConfig = { minTicker: 9, minPct: 6.5, maxTicker: 46 }
+const DESKTOP_FIT: FitConfig = { minTicker: 3.5, minStack: 2.4, maxTicker: 22 }
+const MOBILE_FIT: FitConfig = { minTicker: 9, minStack: 6.5, maxTicker: 46 }
 
 // Advance widths (as a fraction of font size) for the bold glyphs a ticker or
 // percent can contain — measured from the app's `system-ui` bold face (Segoe UI on
@@ -179,12 +208,13 @@ interface TileLabel {
 }
 
 /**
- * The largest ticker (and optional percent) font that fits a `w`×`h` tile.
+ * The largest ticker + percent font that fits a `w`×`h` tile.
  *
- * Sizing is bounded by the tile width (the ticker must fit on one line, measured by
- * its real glyph widths) and its height (one line for the ticker alone, or ~two when
- * the percent stacks below). Returns `showTicker: false` when the tile can't hold a
- * legible ticker at all.
+ * The stacked ticker + percent is the preferred layout — wherever the pair fits at the
+ * (low) `minStack` size and the percent also fits the tile's width, both are drawn, so the
+ * move reads off the tile. A tile too small for even that stacked pair falls back to a
+ * ticker alone if a *legible* (`minTicker`) one fits — a wide-but-very-short sliver still
+ * names its stock; anything smaller returns `showTicker: false` and is left blank.
  */
 function fitLabel(
   w: number,
@@ -195,35 +225,57 @@ function fitLabel(
 ): TileLabel {
   const innerW = w - LABEL_PAD * 2
   const innerH = h - LABEL_PAD * 2
-  const widthCapped = innerW / textEm(ticker)
+  const tickerWidthCap = innerW / textEm(ticker)
 
-  // Stacked ticker + percent: split the height ~two lines, and only if the
-  // percent string also fits the width at its smaller font.
-  const stackFs = Math.min(widthCapped, innerH / 1.95, cfg.maxTicker)
-  const stackPctFs = stackFs * PCT_RATIO
-  const pctFitsWidth = textEm(pct) * stackPctFs <= innerW
-  const showPct =
-    stackFs >= cfg.minTicker && stackPctFs >= cfg.minPct && pctFitsWidth
+  // Preferred: stacked ticker + percent. The percent line is drawn smaller (PCT_RATIO) but
+  // its string is usually *wider* than the ticker's (e.g. "+12.34%" vs "TXN"), so the pair
+  // must be sized to whichever line needs more width — bounding by the ticker alone and
+  // then rejecting when the percent overflows is what used to strand the move off wide,
+  // short-tickered tiles. So cap the font by the ticker's width, the percent's width, and
+  // ~two lines of the tile's height (1.72 ≈ the pair's combined line height); if the result
+  // clears the low `minStack` floor, both fit by construction. Preferring this slightly
+  // smaller pair over a bigger solo ticker is the whole "show the move on every tile" point.
+  const pctWidthCap = innerW / (textEm(pct) * PCT_RATIO)
+  const stackFs = Math.min(
+    tickerWidthCap,
+    pctWidthCap,
+    innerH / 1.72,
+    cfg.maxTicker,
+  )
+  if (stackFs >= cfg.minStack) {
+    return {
+      showTicker: true,
+      showPct: true,
+      tickerFs: stackFs,
+      pctFs: stackFs * PCT_RATIO,
+    }
+  }
 
-  // Ticker alone: it may use nearly the full height.
-  const soloFs = Math.min(widthCapped, innerH * 0.92, cfg.maxTicker)
-  const showTicker = showPct || soloFs >= cfg.minTicker
-
+  // Fallback: too small for the stacked pair — draw the ticker alone, using nearly the full
+  // height, if even that is legible; otherwise leave the tile blank.
+  const soloFs = Math.min(tickerWidthCap, innerH * 0.92, cfg.maxTicker)
   return {
-    showTicker,
-    showPct,
-    tickerFs: showPct ? stackFs : soloFs,
-    pctFs: stackPctFs,
+    showTicker: soloFs >= cfg.minTicker,
+    showPct: false,
+    tickerFs: soloFs,
+    pctFs: 0,
   }
 }
 
 /**
  * The heat-map treemap: sectors are the outer blocks (sized by their combined
  * market cap), each holding its stocks as inner tiles (sized by market cap,
- * coloured by the day's move). A two-level squarified layout — stocks are flattened
- * from their industry groups in order, so same-industry names stay adjacent.
+ * coloured by their move over the selected `window`). A two-level squarified layout —
+ * stocks are flattened from their industry groups in order, so same-industry names stay
+ * adjacent. `window` defaults to the day move (`1d`).
  */
-export default function HeatMap({ data }: { data: HeatMapData }) {
+export default function HeatMap({
+  data,
+  window = '1d',
+}: {
+  data: HeatMapData
+  window?: SectorWindow
+}) {
   const theme = useTheme()
   const navigate = useNavigate()
   // Below `sm`, swap the wide board for a tall portrait one and open a tap-to-inspect
@@ -235,6 +287,10 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
 
   const H = isMobile ? MOBILE_H : DESKTOP_H
   const fit = isMobile ? MOBILE_FIT : DESKTOP_FIT
+  // The colour clamp and the label for the selected timeframe — both used per tile below.
+  const clamp = WINDOW_CLAMP[window]
+  const windowLabel =
+    SECTOR_WINDOWS.find((w) => w.key === window)?.label ?? '1D'
 
   const { tiles, headers, borders } = useMemo(() => {
     // Outer sector blocks: desktop packs them 2-D (squarified); mobile stacks them as
@@ -336,7 +392,8 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
         <rect x={0} y={0} width={W} height={H} fill={paper} />
 
         {tiles.map((t) => {
-          const pct = fmtPct(t.stock.change_percent)
+          const value = heatMapReturn(t.stock, window)
+          const pct = fmtPct(value)
           const { showTicker, showPct, tickerFs, pctFs } = fitLabel(
             t.w,
             t.h,
@@ -355,14 +412,14 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
               <title>
                 {t.stock.ticker}
                 {t.stock.name ? ` · ${t.stock.name}` : ''} ·{' '}
-                {fmtCap(t.stock.market_cap)} · {pct}
+                {fmtCap(t.stock.market_cap)} · {windowLabel} {pct}
               </title>
               <rect
                 x={t.x}
                 y={t.y}
                 width={t.w}
                 height={t.h}
-                fill={tileColor(t.stock.change_percent)}
+                fill={tileColor(value, clamp)}
               />
               {showTicker && (
                 <text
@@ -434,6 +491,7 @@ export default function HeatMap({ data }: { data: HeatMapData }) {
       {isMobile && (
         <TileSheet
           detail={detail}
+          window={window}
           onClose={() => setDetail(null)}
           onOpen={() => {
             if (detail) {
@@ -491,14 +549,20 @@ function SheetMetric({
  */
 function TileSheet({
   detail,
+  window,
   onClose,
   onOpen,
 }: {
   detail: TileDetail | null
+  window: SectorWindow
   onClose: () => void
   onOpen: () => void
 }) {
-  const cp = detail?.stock.change_percent ?? null
+  // The move over the selected timeframe (the sheet's hero figure + colour).
+  const cp = detail ? heatMapReturn(detail.stock, window) : null
+  const clamp = WINDOW_CLAMP[window]
+  const windowLabel =
+    SECTOR_WINDOWS.find((w) => w.key === window)?.label ?? '1D'
   return (
     <Drawer
       anchor="bottom"
@@ -540,7 +604,7 @@ function TileSheet({
                   height: 48,
                   px: 1,
                   borderRadius: 1.5,
-                  bgcolor: tileColor(cp),
+                  bgcolor: tileColor(cp, clamp),
                   color: '#fff',
                   display: 'flex',
                   alignItems: 'center',
@@ -574,7 +638,7 @@ function TileSheet({
                 value={fmtCap(detail.stock.market_cap)}
               />
               <SheetMetric
-                label="Day change"
+                label={`${windowLabel} change`}
                 value={fmtPct(cp)}
                 valueColor={
                   cp == null
@@ -611,9 +675,16 @@ function TileSheet({
   )
 }
 
-/** The red→gray→green scale, as a small swatch legend for the page. */
-export function HeatMapLegend() {
-  const stops = [-3, -2, -1, 0, 1, 2, 3]
+/** The red→gray→green scale, as a small swatch legend for the page. The stops and the
+ *  caption track the selected timeframe, since each window saturates at a wider band
+ *  (see WINDOW_CLAMP) — so a 1Y legend reads ±50% where the day reads ±3%. */
+export function HeatMapLegend({ window = '1d' }: { window?: SectorWindow }) {
+  const clamp = WINDOW_CLAMP[window]
+  const windowLabel =
+    SECTOR_WINDOWS.find((w) => w.key === window)?.label ?? '1D'
+  // Seven swatches spanning −clamp…+clamp; the colour uses the exact stop, the label a
+  // rounded percent (uneven for clamps that don't divide by 3, but always legible).
+  const stops = [-3, -2, -1, 0, 1, 2, 3].map((i) => (i * clamp) / 3)
   return (
     <Box
       sx={{
@@ -624,14 +695,14 @@ export function HeatMapLegend() {
         fontSize: 12,
       }}
     >
-      {stops.map((s) => (
+      {stops.map((s, i) => (
         <Box
-          key={s}
+          key={i}
           sx={{
             width: 34,
             height: 18,
             borderRadius: 0.5,
-            bgcolor: tileColor(s),
+            bgcolor: tileColor(s, clamp),
             color: '#fff',
             display: 'flex',
             alignItems: 'center',
@@ -640,11 +711,11 @@ export function HeatMapLegend() {
             fontWeight: 600,
           }}
         >
-          {s > 0 ? `+${s}` : s}
+          {s > 0 ? `+${Math.round(s)}` : Math.round(s)}
         </Box>
       ))}
       <Box component="span" sx={{ ml: 0.5 }}>
-        % day change
+        % {windowLabel} change
       </Box>
     </Box>
   )
