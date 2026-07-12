@@ -7,15 +7,27 @@ import type { TickerMetrics } from '@/lib/api'
 // fields the card doesn't read stay null. Override per test.
 const metrics = (overrides: Partial<TickerMetrics> = {}): TickerMetrics => ({
   pe: null,
+  pb: null,
+  ps: null,
+  peg: null,
+  eps: null,
+  forward_pe: null,
+  forward_ps: null,
   price_to_fcf: null,
   fcf_yield: null,
   ocf_yield: null,
   gross_margin: null,
   operating_margin: null,
   net_margin: null,
+  roe: null,
+  current_ratio: null,
+  debt_to_equity: null,
+  beta: null,
   revenue_growth_yoy: null,
   eps_growth_yoy: null,
   fcf_growth_yoy: null,
+  forward_revenue_growth_yoy: null,
+  forward_eps_growth_yoy: null,
   ...overrides,
 })
 

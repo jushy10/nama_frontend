@@ -28,12 +28,25 @@ export interface TickerDividend {
 }
 
 /**
- * A ticker card's valuation and profitability metrics. `pe` is the trailing
- * price-to-earnings multiple (price over the last twelve months of reported
- * EPS) — the figure quotes report today. The margins are trailing percentages.
- * `revenue_growth_yoy`/`eps_growth_yoy` are the trailing year-over-year growth
- * rates (percent) for the top and bottom line — the pace behind the multiple
- * above.
+ * A ticker card's full valuation, profitability, health and growth ladder — every
+ * fundamental the app materializes on the stock, served off one DB read (only the
+ * price-anchored multiples are computed live on the quote).
+ *
+ * Valuation: `pe`/`pb`/`ps` are the trailing price-to-earnings/book/sales multiples
+ * (price over the last twelve months of reported EPS, book value per share, and
+ * sales per share); `peg` is `pe` over trailing EPS growth (a "multiple justified by
+ * growth?" read); `eps` is the trailing EPS the `pe` divides by; `forward_pe`/
+ * `forward_ps` are the same multiples on next year's analyst-consensus EPS/revenue —
+ * what the price implies about what's *expected*, not what's reported.
+ *
+ * Profitability & health: the margins are trailing percentages; `roe` is return on
+ * equity (percent); `current_ratio` (current assets over liabilities) and
+ * `debt_to_equity` (a ratio) read liquidity and leverage; `beta` is volatility
+ * versus the market (1 = moves with it).
+ *
+ * Growth: `revenue_growth_yoy`/`eps_growth_yoy` are the trailing year-over-year
+ * rates for the top and bottom line, and `forward_revenue_growth_yoy`/
+ * `forward_eps_growth_yoy` the analyst-expected next-year (FY1→FY2) rates.
  *
  * The cash-flow block reads the same business through what it actually banks:
  * `price_to_fcf` is the trailing price-to-free-cash-flow multiple (a cash-based
@@ -45,15 +58,27 @@ export interface TickerDividend {
  */
 export interface TickerMetrics {
   pe: number | null
+  pb: number | null
+  ps: number | null
+  peg: number | null
+  eps: number | null
+  forward_pe: number | null
+  forward_ps: number | null
   price_to_fcf: number | null
   fcf_yield: number | null
   ocf_yield: number | null
   gross_margin: number | null
   operating_margin: number | null
   net_margin: number | null
+  roe: number | null
+  current_ratio: number | null
+  debt_to_equity: number | null
+  beta: number | null
   revenue_growth_yoy: number | null
   eps_growth_yoy: number | null
   fcf_growth_yoy: number | null
+  forward_revenue_growth_yoy: number | null
+  forward_eps_growth_yoy: number | null
 }
 
 /**
@@ -478,6 +503,75 @@ export function cashFlowVerdict(
   }
   /* c8 ignore next — any yield > 0 clears the 0 floor above */
   return 'Cash Burning'
+}
+
+/**
+ * How much a company leans on borrowed money, from its debt-to-equity ratio (total
+ * debt ÷ shareholders' equity): `Low Debt` (a conservative balance sheet, debt at or
+ * below equity), `Moderate Debt` (more debt than equity but within a normal range),
+ * and `High Leverage` (debt runs well above equity, lifting both returns and risk).
+ */
+export type LeverageVerdict = 'Low Debt' | 'Moderate Debt' | 'High Leverage'
+
+/**
+ * Debt/equity tiers, safest-first, by ceiling. At or below 1.0 debt doesn't exceed
+ * equity (conservative); up to 2.0 is a moderate, common load; above that the balance
+ * sheet leans heavily on debt. Broad rules of thumb — NOT sector-aware (banks and
+ * utilities carry far more debt by design), so it's a rough guide, not a verdict.
+ */
+export const LEVERAGE_TIERS: { verdict: LeverageVerdict; ceiling: number }[] = [
+  { verdict: 'Low Debt', ceiling: 1 },
+  { verdict: 'Moderate Debt', ceiling: 2 },
+]
+
+/**
+ * The leverage verdict for a debt/equity ratio, or null when unknown or negative
+ * (a negative ratio comes from negative equity — buybacks or accumulated losses —
+ * which isn't a clean high/low read, so no verdict is given).
+ */
+export function leverageVerdict(
+  debtToEquity: number | null,
+): LeverageVerdict | null {
+  if (debtToEquity == null || debtToEquity < 0) return null
+  for (const tier of LEVERAGE_TIERS) {
+    if (debtToEquity <= tier.ceiling) return tier.verdict
+  }
+  return 'High Leverage'
+}
+
+/**
+ * Whether the price looks reasonable for the growth behind it, from the PEG ratio
+ * (P/E ÷ earnings growth): `Cheap for Growth` (PEG at or below 1 — the classic
+ * "growth you're not paying up for"), `Fairly Priced` (1–2, roughly in balance), and
+ * `Priced for Growth` (above 2 — a rich multiple the growth has to justify).
+ */
+export type ValuationVerdict =
+  | 'Cheap for Growth'
+  | 'Fairly Priced'
+  | 'Priced for Growth'
+
+/**
+ * PEG tiers, cheapest-first, by ceiling. Under 1.0 the multiple is low relative to
+ * the growth it rests on; 1–2 is a fair balance; above 2 the price runs ahead of the
+ * growth. A rough, non-sector-aware guide (and only as good as trailing EPS growth —
+ * meaningless when earnings shrank, which is why PEG is null there).
+ */
+export const PEG_TIERS: { verdict: ValuationVerdict; ceiling: number }[] = [
+  { verdict: 'Cheap for Growth', ceiling: 1 },
+  { verdict: 'Fairly Priced', ceiling: 2 },
+]
+
+/**
+ * The valuation-for-growth verdict for a PEG ratio, or null when unknown or
+ * non-positive (a non-positive PEG means a trailing loss or shrinking earnings, where
+ * the ratio has no meaning).
+ */
+export function valuationVerdict(peg: number | null): ValuationVerdict | null {
+  if (peg == null || peg <= 0) return null
+  for (const tier of PEG_TIERS) {
+    if (peg <= tier.ceiling) return tier.verdict
+  }
+  return 'Priced for Growth'
 }
 
 /**
