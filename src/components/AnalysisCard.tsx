@@ -14,14 +14,20 @@ import type {
 // cards (AnalystCard, OptionsCard) use for a neutral read.
 const HOLD_COLOR = '#fbbf24' // amber-400
 
-// Verdict-chip styling keyed by the buy/hold/sell call — the same green/amber/red
+// Verdict-chip styling keyed by the five-point call — the same green/amber/red
 // language the other verdict cards use, so the AI read sits consistently beside
-// them. Buy and Sell render as solid pills so the conviction reads at a glance;
-// Hold stays outlined amber (the custom amber has no theme contrast pairing).
+// them. The conviction calls render as solid pills so the read lands at a glance, the
+// 'strong' ends a deeper shade than plain buy/sell; Hold stays outlined amber (the
+// custom amber has no theme contrast pairing).
 const VERDICT: Record<
   AnalysisRecommendation,
   { label: string; color: string; filled?: { bg: string; fg: string } }
 > = {
+  strong_buy: {
+    label: 'Strong Buy',
+    color: 'success.dark',
+    filled: { bg: 'success.dark', fg: 'success.contrastText' },
+  },
   buy: {
     label: 'Buy',
     color: 'success.main',
@@ -32,6 +38,11 @@ const VERDICT: Record<
     label: 'Sell',
     color: 'error.main',
     filled: { bg: 'error.main', fg: 'error.contrastText' },
+  },
+  strong_sell: {
+    label: 'Strong Sell',
+    color: 'error.dark',
+    filled: { bg: 'error.dark', fg: 'error.contrastText' },
   },
 }
 
