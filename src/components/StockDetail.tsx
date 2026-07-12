@@ -48,6 +48,8 @@ import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import ScorecardCard from '@/components/ScorecardCard'
 import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
+import ValuationCard from '@/components/ValuationCard'
+import FinancialHealthCard from '@/components/FinancialHealthCard'
 import ProfitabilityCard from '@/components/ProfitabilityCard'
 import CashGenerationCard from '@/components/CashGenerationCard'
 import FundamentalsAnalysisCard from '@/components/FundamentalsAnalysisCard'
@@ -237,6 +239,18 @@ export default function StockDetail({ symbol }: { symbol: string }) {
     !!iv && iv.median_pe != null && iv.count >= MIN_INDUSTRY_PEERS
   const historyPoints = peHistoryQuery.data?.points
   const historyUsable = (historyPoints?.length ?? 0) >= MIN_PE_HISTORY_POINTS
+  // The Valuation card leads the group with the multiples themselves (P/E and its
+  // forward re-rate, PEG, P/S, P/B, EPS); the peer and own-history reads below put
+  // that P/E in context. Drawn whenever the card carries any valuation figure.
+  const m = stock.metrics
+  const valuationUsable =
+    !!m &&
+    (m.pe != null ||
+      m.forward_pe != null ||
+      m.ps != null ||
+      m.pb != null ||
+      m.peg != null ||
+      m.eps != null)
 
   return (
     <Stack spacing={{ xs: 2, sm: 3 }}>
@@ -485,8 +499,8 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             />
           )}
 
-          {/* "Is it a good business?" — how much profit it keeps and how much
-              free cash it throws off. */}
+          {/* "Is it a good business?" — how much profit it keeps, how much free
+              cash it throws off, and how sound its balance sheet is. */}
           {stock.metrics && (
             <Box>
               <GroupLabel label="Business quality" />
@@ -501,18 +515,24 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                     operating cash converts after capex, and the cash multiples.
                     Self-hides when the whole cash-flow block is uncovered. */}
                 <CashGenerationCard metrics={stock.metrics} />
+                {/* "Is the balance sheet sound?" — leverage, liquidity and how
+                    much it swings with the market. Self-hides when none is covered. */}
+                <FinancialHealthCard metrics={stock.metrics} />
               </Stack>
             </Box>
           )}
 
-          {/* "Is the price fair?" — the trailing multiple against peers and
-              against the stock's own past. Renders only when at least one read
-              rests on enough data to stand (so no orphan label over a card that
-              self-hid). */}
-          {(industryUsable || historyUsable) && (
+          {/* "Is the price fair?" — the multiples themselves, then the trailing P/E
+              against peers and against the stock's own past. Renders when the card
+              carries valuation figures or at least one context read stands (so no
+              orphan label over cards that self-hid). */}
+          {(valuationUsable || industryUsable || historyUsable) && (
             <Box>
               <GroupLabel label="Valuation" />
               <Stack spacing={3} sx={{ mt: 2 }}>
+                {/* The multiples themselves — P/E and its forward re-rate, PEG,
+                    P/S, P/B, EPS. Self-hides when no valuation figure is covered. */}
+                {stock.metrics && <ValuationCard metrics={stock.metrics} />}
                 {/* Rich or cheap for its industry — self-hides below
                     MIN_INDUSTRY_PEERS, already gated by industryUsable. */}
                 {industryUsable && (
