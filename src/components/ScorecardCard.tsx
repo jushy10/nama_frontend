@@ -116,10 +116,12 @@ function VerdictPill({
           aria-label={`${CONFIDENCE_LABEL[confidence]} — ${CONFIDENCE_HELP}`}
           sx={{
             color: 'text.secondary',
-            display: 'inline-flex',
+            display: 'flex',
+            justifyContent: 'flex-end',
             alignItems: 'center',
             gap: 0.25,
-            mt: 0.5,
+            mt: 0.75,
+            fontSize: '0.8125rem',
             cursor: 'help',
           }}
         >
@@ -145,21 +147,24 @@ function Section({ section }: { section: AnalysisSection }) {
         spacing={1.5}
         sx={{ justifyContent: 'space-between', alignItems: 'center' }}
       >
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        <Typography
+          variant="subtitle2"
+          sx={{ fontWeight: 600, fontSize: '1rem' }}
+        >
           {section.title}
         </Typography>
         {section.label && (
           <Box
             sx={{
               flexShrink: 0,
-              px: 1,
-              py: 0.25,
+              px: 1.25,
+              py: 0.5,
               borderRadius: 1.5,
               border: '1px solid',
               borderColor: color,
               color,
               bgcolor: 'action.hover',
-              fontSize: '0.75rem',
+              fontSize: '0.875rem',
               fontWeight: 700,
               whiteSpace: 'nowrap',
             }}
@@ -170,7 +175,11 @@ function Section({ section }: { section: AnalysisSection }) {
       </Stack>
 
       {section.summary && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 0.75, fontSize: '0.9375rem', lineHeight: 1.55 }}
+        >
           {section.summary}
         </Typography>
       )}
@@ -223,7 +232,7 @@ export default function ScorecardCard({
                 sx={{ color: 'primary.main' }}
               />
               <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-                AI Analysis
+                AI Overview Analysis
               </Typography>
             </Stack>
             <Typography variant="caption" color="text.secondary">
@@ -238,7 +247,10 @@ export default function ScorecardCard({
         </Stack>
 
         {analysis.thesis && (
-          <Typography variant="body1" sx={{ mt: 2.5 }}>
+          <Typography
+            variant="body1"
+            sx={{ mt: 2.5, fontSize: '1.0625rem', lineHeight: 1.6 }}
+          >
             {analysis.thesis}
           </Typography>
         )}
