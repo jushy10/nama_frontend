@@ -2392,12 +2392,17 @@ export async function getRatingsAnalysis(
 }
 
 /**
- * The AI analysis's headline call — a plain buy / hold / sell verdict. Lowercase
- * to match the API's JSON, and deliberately distinct from the five-step sell-side
- * `Recommendation` (Strong Buy … Strong Sell) so the AI read and the analyst
- * consensus never get crossed.
+ * The AI analysis's headline call — a five-point strong-buy … strong-sell verdict
+ * (Hold the neutral middle), the same shape as the sell-side consensus scale but
+ * authored by the model over the stock's own figures. Lowercase (snake_case for the
+ * 'strong' calls) to match the API's JSON.
  */
-export type AnalysisRecommendation = 'buy' | 'hold' | 'sell'
+export type AnalysisRecommendation =
+  | 'strong_buy'
+  | 'buy'
+  | 'hold'
+  | 'sell'
+  | 'strong_sell'
 
 /** How firmly the AI analysis holds its call, given how much clear data it had. */
 export type AnalysisConfidence = 'low' | 'medium' | 'high'

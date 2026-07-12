@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { renderWithProviders, screen } from '@/test/test-utils'
 import ScorecardCard from '@/components/ScorecardCard'
-import type { AnalysisSection, StockAnalysis } from '@/lib/api'
+import type {
+  AnalysisRecommendation,
+  AnalysisSection,
+  StockAnalysis,
+} from '@/lib/api'
 
 function section(overrides: Partial<AnalysisSection> = {}): AnalysisSection {
   return {
@@ -93,22 +97,21 @@ describe('ScorecardCard', () => {
     expect(screen.getByText(/not financial advice/i)).toBeInTheDocument()
   })
 
-  it('renders a hold and a sell verdict', () => {
-    const { rerender } = renderWithProviders(
-      <ScorecardCard
-        analysis={analysis({ recommendation: 'hold', confidence: 'medium' })}
-      />,
-    )
-    expect(screen.getByText('Hold')).toBeInTheDocument()
-    expect(screen.getByText('Medium confidence')).toBeInTheDocument()
-
-    rerender(
-      <ScorecardCard
-        analysis={analysis({ recommendation: 'sell', confidence: 'low' })}
-      />,
-    )
-    expect(screen.getByText('Sell')).toBeInTheDocument()
-    expect(screen.getByText('Low confidence')).toBeInTheDocument()
+  it('renders every point on the five-point verdict scale', () => {
+    const cases: Array<[AnalysisRecommendation, string]> = [
+      ['strong_buy', 'Strong Buy'],
+      ['buy', 'Buy'],
+      ['hold', 'Hold'],
+      ['sell', 'Sell'],
+      ['strong_sell', 'Strong Sell'],
+    ]
+    for (const [recommendation, label] of cases) {
+      const { unmount } = renderWithProviders(
+        <ScorecardCard analysis={analysis({ recommendation })} />,
+      )
+      expect(screen.getByText(label)).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('omits the chip row for a section with no metrics', () => {
