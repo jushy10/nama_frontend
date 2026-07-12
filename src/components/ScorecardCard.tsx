@@ -5,9 +5,18 @@ import {
   Chip,
   Divider,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+
+// Confidence on the scorecard is a read of *data coverage* — how much of the
+// analysis was backed by real figures — not the model's conviction. The label alone
+// ("Medium confidence") doesn't convey that, so an info tooltip spells it out.
+const CONFIDENCE_HELP =
+  'How much data this read could draw on — higher when more of the figures ' +
+  '(fundamentals, earnings, and analyst coverage) were available for this stock.'
 import type {
   AnalysisConfidence,
   AnalysisRecommendation,
@@ -100,12 +109,24 @@ function VerdictPill({
       >
         {verdict.label}
       </Box>
-      <Typography
-        variant="caption"
-        sx={{ color: 'text.secondary', display: 'block', mt: 0.5 }}
-      >
-        {CONFIDENCE_LABEL[confidence]}
-      </Typography>
+      <Tooltip title={CONFIDENCE_HELP} enterTouchDelay={0}>
+        <Typography
+          component="span"
+          variant="caption"
+          aria-label={`${CONFIDENCE_LABEL[confidence]} — ${CONFIDENCE_HELP}`}
+          sx={{
+            color: 'text.secondary',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.25,
+            mt: 0.5,
+            cursor: 'help',
+          }}
+        >
+          {CONFIDENCE_LABEL[confidence]}
+          <InfoOutlinedIcon sx={{ fontSize: 13 }} aria-hidden="true" />
+        </Typography>
+      </Tooltip>
     </Box>
   )
 }

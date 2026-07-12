@@ -69,6 +69,15 @@ describe('ScorecardCard', () => {
     expect(screen.getByText(/price already assumes a lot/i)).toBeInTheDocument()
   })
 
+  it('explains that confidence reflects data coverage', () => {
+    renderWithProviders(<ScorecardCard analysis={analysis()} />)
+    // The confidence caption carries an accessible explanation that it's about how
+    // much data the read drew on (data coverage), not the model's conviction.
+    expect(
+      screen.getByLabelText(/how much data this read could draw on/i),
+    ).toBeInTheDocument()
+  })
+
   it('renders each section title, label, and summary', () => {
     renderWithProviders(<ScorecardCard analysis={analysis()} />)
     for (const title of [
