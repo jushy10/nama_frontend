@@ -10,6 +10,7 @@ import {
 import SearchIcon from '@mui/icons-material/Search'
 import {
   renderUniverseOption,
+  resolveSubmittedTicker,
   SEARCH_DEBOUNCE_MS,
   useDebounced,
   useUniverseSearchOptions,
@@ -46,9 +47,12 @@ export default function HomeSearchBar() {
     if (ticker) navigate(`/search?symbol=${encodeURIComponent(ticker)}`)
   }
 
+  // Resolve the typed text to the best matching ticker on submit, so a company
+  // name like "nvidia" routes to NVDA instead of a dead `?symbol=NVIDIA` lookup;
+  // an exact symbol with no suggestions still passes through.
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    go(input)
+    go(resolveSubmittedTicker(input, options))
   }
 
   return (

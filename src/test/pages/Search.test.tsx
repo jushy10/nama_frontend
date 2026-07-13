@@ -350,6 +350,70 @@ describe('Search (unified)', () => {
     ).toBeInTheDocument()
   })
 
+  it('submitting a company name routes to the best matching ticker', async () => {
+    const stockHit = {
+      ticker: 'NVDA',
+      name: 'NVIDIA Corporation',
+      sector: 'technology',
+      industry: 'semiconductors',
+      market_cap: 3_210_000_000_000,
+      pe_ratio: 46.5,
+      revenue_growth_yoy: 69.2,
+      eps_growth_yoy: 80.5,
+      in_sp500: true,
+      in_nasdaq100: true,
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        const u = String(url)
+        const body = u.includes('/stocks/ticker?')
+          ? { total: 1, limit: 7, offset: 0, count: 1, results: [stockHit] }
+          : u.includes('/stocks/etfs?')
+            ? { total: 0, limit: 5, offset: 0, count: 0, results: [] }
+            : u.includes('/stocks/type/')
+              ? { ticker: 'NVDA', asset_type: 'equity' }
+              : u.includes('/candles')
+                ? candles
+                : u.includes('/analyst-info')
+                  ? analystInfo
+                  : u.includes('/earnings/quarterly')
+                    ? emptyQuarterly
+                    : u.includes('/earnings/annual')
+                      ? emptyAnnual
+                      : u.includes('/analysis')
+                        ? analysis
+                        : stockCard
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+    const { user } = renderWithProviders(<Search />)
+
+    // Type a name (not a ticker) and wait for the suggestion to load, then hit
+    // the Search button rather than picking a row.
+    await user.type(screen.getByLabelText(/name or ticker/i), 'nvidia')
+    await screen.findByText('NVIDIA Corporation')
+    await user.click(screen.getByRole('button', { name: /search/i }))
+
+    // It resolved the name to the best match's ticker — not a dead
+    // `/stocks/type/NVIDIA` lookup.
+    expect(
+      await screen.findByRole('heading', { name: 'NVDA' }),
+    ).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/type/NVDA'),
+      expect.anything(),
+    )
+    expect(fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining('/stocks/type/NVIDIA'),
+      expect.anything(),
+    )
+  })
+
   it('shows an error when the ticker is not found', async () => {
     vi.stubGlobal(
       'fetch',

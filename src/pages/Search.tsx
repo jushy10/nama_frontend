@@ -14,6 +14,7 @@ import {
 import { errorMessage, useTickerType } from '@/lib/queries'
 import {
   renderUniverseOption,
+  resolveSubmittedTicker,
   SEARCH_DEBOUNCE_MS,
   useDebounced,
   useUniverseSearchOptions,
@@ -95,12 +96,13 @@ export default function Search() {
     if (ticker) setSearchParams({ symbol: ticker })
   }
 
-  // Submitting the form (the button, or Enter with nothing highlighted) searches
-  // the typed text as a raw ticker — so an exact symbol outside the screened
-  // universe still resolves.
+  // Submitting the form (the button, or Enter with nothing highlighted) resolves
+  // the typed text to the best matching ticker — so a company name like "nvidia"
+  // lands on NVDA rather than a dead lookup — falling back to the raw symbol so
+  // an exact ticker outside the screened universe still resolves.
   function onSubmit(e: FormEvent) {
     e.preventDefault()
-    go(input)
+    go(resolveSubmittedTicker(input, options))
   }
 
   const loading = typeQuery.isLoading
