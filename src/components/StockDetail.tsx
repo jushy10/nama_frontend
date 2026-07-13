@@ -303,19 +303,21 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           sx={{
             minHeight: 0,
             '& .MuiTabs-indicator': { display: 'none' },
-            '& .MuiTabs-flexContainer': { gap: 0.5 },
+            '& .MuiTabs-flexContainer': { gap: { xs: 0.75, sm: 1 } },
             '& .MuiTabs-scroller': { py: 0.25 },
-            '& .MuiSvgIcon-root': { fontSize: '1.1rem' },
+            '& .MuiSvgIcon-root': { fontSize: '1.35rem' },
             '& .MuiTab-root': {
-              minHeight: 0,
+              // A comfortable 44px tap target — thumb-friendly on a phone and a
+              // clearly larger click zone on desktop, both without a redesign.
+              minHeight: 44,
               minWidth: 0,
-              gap: 0.5,
-              px: 1.25,
-              py: 0.9,
+              gap: 0.75,
+              px: { xs: 1.75, sm: 2.25 },
+              py: 1,
               borderRadius: 999,
               textTransform: 'none',
               fontWeight: 600,
-              fontSize: { xs: '0.8rem', sm: '0.875rem' },
+              fontSize: { xs: '0.9rem', sm: '1rem' },
               color: 'text.secondary',
               transition:
                 'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
