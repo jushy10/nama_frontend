@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { renderWithProviders, screen } from '@/test/test-utils'
+import { useLocation } from 'react-router-dom'
+import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import Search from '@/pages/Search'
+
+/** Renders the live browser query string so a test can assert the shareable URL
+ *  (e.g. the active stock-detail tab) the page keeps in the address bar. */
+function LocationProbe() {
+  const { search } = useLocation()
+  return <div data-testid="loc">{search}</div>
+}
 
 // The ticker card classifies the symbol (asset_type) and, for a stock, carries
 // the whole snapshot — the one request the Search page keys off.
@@ -412,6 +420,42 @@ describe('Search (unified)', () => {
       expect.stringContaining('/stocks/type/NVIDIA'),
       expect.anything(),
     )
+  })
+
+  it('writes the active detail tab into the URL when switched', async () => {
+    stubFetch(stockCard)
+    const { user } = renderWithProviders(
+      <>
+        <Search />
+        <LocationProbe />
+      </>,
+      { initialEntries: ['/search?symbol=NVDA'] },
+    )
+    await screen.findByRole('heading', { name: 'NVDA' })
+
+    // Overview is the default, so it stays out of the URL (clean deep link).
+    expect(screen.getByTestId('loc').textContent).not.toMatch(/tab=/)
+
+    await user.click(screen.getByRole('tab', { name: /fundamentals/i }))
+    await waitFor(() =>
+      expect(screen.getByTestId('loc').textContent).toMatch(/tab=fundamentals/),
+    )
+    // The symbol rides along untouched — the tab write is a partial update.
+    expect(screen.getByTestId('loc').textContent).toMatch(/symbol=NVDA/)
+  })
+
+  it('opens straight to a deep-linked detail tab', async () => {
+    stubFetch(stockCard)
+    renderWithProviders(<Search />, {
+      initialEntries: ['/search?symbol=NVDA&tab=analysts'],
+    })
+
+    // The Analysts tab is selected on arrival, and its gated AI ratings read fires —
+    // the verdict chip ("Mixed") is the persistent proof the tab's content loaded.
+    expect(
+      await screen.findByRole('tab', { name: /analysts/i }),
+    ).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByText('Mixed')).toBeInTheDocument()
   })
 
   it('shows an error when the ticker is not found', async () => {

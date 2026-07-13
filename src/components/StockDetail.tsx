@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react'
+import { readEnum, useUrlState, writeEnum } from '@/lib/urlState'
 import {
   Alert,
   Box,
@@ -106,6 +107,11 @@ const STOCK_TABS: {
   { value: 'options', label: 'Options', icon: <CandlestickChartIcon /> },
 ]
 
+// The tab values, for validating the `?tab=` URL param — an unknown or stale slug
+// falls back to Overview. `overview` is the default and is omitted from the URL, so
+// a fresh stock link stays clean (`/search?symbol=NVDA`).
+const STOCK_TAB_VALUES = STOCK_TABS.map((t) => t.value)
+
 // The active-tab pill reuses the top nav's house treatment (src/App.tsx) — a
 // navy→blue fill with a soft glow — so the detail's section switcher reads as
 // the same control family rather than a stray restyle.
@@ -149,7 +155,20 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<ChartRange>('6M')
   const [showSupport, setShowSupport] = useState(true)
   const [showEma, setShowEma] = useState(true)
-  const [tab, setTab] = useState<StockDetailTab>('overview')
+  // The active section lives in the URL (`?tab=`), so a deep link opens straight to
+  // Fundamentals/Analysts/…, the view is shareable, and Back/Forward walks the tabs
+  // you visited. Overview is the default and stays out of the URL. A `replace` write
+  // keeps each switch from stacking history, so Back returns you to where you came
+  // from rather than trudging back through every tab.
+  const { searchParams, update } = useUrlState()
+  const tab = readEnum<StockDetailTab>(
+    searchParams,
+    'tab',
+    STOCK_TAB_VALUES,
+    'overview',
+  )
+  const setTab = (next: StockDetailTab) =>
+    update((params) => writeEnum(params, 'tab', next, 'overview'))
   const cardQuery = useTickerCard(symbol, SNAPSHOT_BLOCKS)
   const stock = cardQuery.data
   // The chart, 5Y pill, ratings, and earnings ride the *loaded* ticker, so they
