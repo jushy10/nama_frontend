@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageMeta } from '@/lib/usePageMeta'
 import {
@@ -55,6 +55,19 @@ import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
 import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
+import {
+  readBool,
+  readEnum,
+  readInt,
+  readList,
+  readString,
+  useUrlState,
+  writeBool,
+  writeEnum,
+  writeInt,
+  writeList,
+  writeString,
+} from '@/lib/urlState'
 
 // Wait this long after the last keystroke before searching, so typing a ticker
 // doesn't fire a request per letter.
@@ -199,6 +212,17 @@ const capShort = (tier: MarketCapTier) =>
 // an off-vocabulary value is simply dropped rather than forced into a union.
 const VALID_SORTS = new Set<string>(SORT_OPTIONS.map((o) => o.key))
 const VALID_TIERS = new Set<string>(MARKET_CAP_TIERS.map((t) => t.value))
+
+// The vocabulary each filter lives under in the URL, so a hand-edited or stale
+// param can never drive a typed control. `?sort=` allows every sort key plus the
+// `none` sentinel — an explicit no-sort, distinct from the absent-param default of
+// market cap. The cap slugs validate the `?caps=` list; `ORDER_VALUES` the direction.
+const SORT_PARAM_VALUES: (StockSearchSort | typeof NO_SORT)[] = [
+  ...SORT_OPTIONS.map((o) => o.key),
+  NO_SORT,
+]
+const ORDER_VALUES: SortOrder[] = ['asc', 'desc']
+const CAP_VALUES = MARKET_CAP_TIERS.map((t) => t.value)
 
 // A few plain-English prompts, shown under the AI box as one-tap starters.
 const AI_EXAMPLES = [
@@ -656,19 +680,48 @@ export default function Screener() {
     'Screen US stocks by market cap, sector, valuation, free-cash-flow yield and growth — or describe what you want in plain English and let AI build the filters.',
   )
 
-  const [searchInput, setSearchInput] = useState('')
+  // The committed filters live in the URL (`/screener?sectors=…&sort=…&order=…`),
+  // so a filtered view is shareable, bookmarkable, and restored on refresh and
+  // Back/Forward. Each control reads its value straight from the query string and
+  // writes back through `update`; defaults are omitted so a pristine screen keeps a
+  // clean `/screener`.
+  const { searchParams, update } = useUrlState()
+  const urlQuery = readString(searchParams, 'q')
+  const sectors = readList(searchParams, 'sectors')
+  const industries = readList(searchParams, 'industries')
+  const marketCaps = readList(
+    searchParams,
+    'caps',
+    CAP_VALUES,
+  ) as MarketCapTier[]
+  const sp500 = readBool(searchParams, 'sp500')
+  const nasdaq100 = readBool(searchParams, 'nasdaq100')
+  // An absent `?sort=` means the market-cap default; the explicit `none` sentinel
+  // maps to a null sort (the backend's own order). Any other key re-sorts.
+  const sortParam = readEnum(
+    searchParams,
+    'sort',
+    SORT_PARAM_VALUES,
+    'market_cap',
+  )
+  const sort: StockSearchSort | null = sortParam === NO_SORT ? null : sortParam
+  const order = readEnum<SortOrder>(searchParams, 'order', ORDER_VALUES, 'desc')
+  // `page` rides the URL 1-based (human-friendly) but stays 0-based in code; `rows`
+  // is validated against the offered page sizes.
+  const page = Math.max(0, readInt(searchParams, 'page', 1) - 1)
+  const rowsRaw = readInt(searchParams, 'rows', ROWS_PER_PAGE[0])
+  const rowsPerPage = ROWS_PER_PAGE.includes(rowsRaw)
+    ? rowsRaw
+    : ROWS_PER_PAGE[0]
+
+  // The search box keeps a local value for responsiveness; its debounced form is
+  // what commits to the URL (and so drives the query). Seed it from the URL so a
+  // deep link shows its term in the field.
+  const [searchInput, setSearchInput] = useState(() =>
+    readString(searchParams, 'q'),
+  )
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
-  const [sectors, setSectors] = useState<string[]>([])
-  const [industries, setIndustries] = useState<string[]>([])
-  const [sp500, setSp500] = useState(false)
-  const [nasdaq100, setNasdaq100] = useState(false)
-  const [marketCaps, setMarketCaps] = useState<MarketCapTier[]>([])
-  // Default to market cap so the largest names lead on landing; "None" (null)
-  // drops to the backend's own order, any other key re-sorts.
-  const [sort, setSort] = useState<StockSearchSort | null>('market_cap')
-  const [order, setOrder] = useState<SortOrder>('desc')
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
+
   // The AI-screen box: its own text (separate from the name/ticker filter, which the
   // AI populates) and the mutation that translates it into filters.
   const [aiInput, setAiInput] = useState('')
@@ -681,28 +734,93 @@ export default function Screener() {
   // matchMedia under jsdom, so this stays false in tests and the table renders.
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
-  // Apply the AI's interpreted filters to the manual controls — a fresh screen, so it
-  // replaces every axis (clearing ones the request didn't set) rather than layering on
-  // top of whatever was there. The result then flows through the ordinary useStockSearch
-  // and the user can tweak any control. Each value is validated before it drives a typed
-  // control; an off-vocabulary sort/tier falls back to the page's default.
+  // A filter (or sort) change starts a new result set, so every write drops back to
+  // page 1 — otherwise a narrow filter could strand you past its last page. Page-only
+  // moves go through `update` directly and keep their page.
+  const setFilter = (mutate: (params: URLSearchParams) => void) =>
+    update((params) => {
+      mutate(params)
+      params.delete('page')
+    })
+
+  const setSectors = (next: string[]) =>
+    setFilter((p) => writeList(p, 'sectors', next))
+  const setIndustries = (next: string[]) =>
+    setFilter((p) => writeList(p, 'industries', next))
+  const setMarketCaps = (next: MarketCapTier[]) =>
+    setFilter((p) => writeList(p, 'caps', next))
+  const setSp500 = (next: boolean) =>
+    setFilter((p) => writeBool(p, 'sp500', next))
+  const setNasdaq100 = (next: boolean) =>
+    setFilter((p) => writeBool(p, 'nasdaq100', next))
+  const setSort = (next: StockSearchSort | null) =>
+    setFilter((p) => writeEnum(p, 'sort', next ?? NO_SORT, 'market_cap'))
+  const setOrder = (next: SortOrder) =>
+    setFilter((p) => writeEnum(p, 'order', next, 'desc'))
+  const setPage = (next: number) =>
+    update((p) => writeInt(p, 'page', next + 1, 1))
+  const setRowsPerPage = (next: number) =>
+    setFilter((p) => writeInt(p, 'rows', next, ROWS_PER_PAGE[0]))
+
+  // Mirror the committed (debounced) search into the URL, resetting to page 1 on a
+  // new term. This must fire only on a real edit — not when the URL changes underneath
+  // us (an AI screen, a cleared chip, Back/Forward), which would re-add a term the user
+  // just dropped. So it keys off the debounced value alone, reading the current URL term
+  // and the writer through refs: React Router rebuilds `setSearchParams` (and thus
+  // `update`) on every navigation, so depending on it here would re-run this on any URL
+  // change. External changes flow the other way, in the effect below.
+  const urlQueryRef = useRef(urlQuery)
+  const updateRef = useRef(update)
+  useEffect(() => {
+    urlQueryRef.current = urlQuery
+    updateRef.current = update
+  })
+  useEffect(() => {
+    const q = debouncedSearch.trim()
+    if (q !== urlQueryRef.current) {
+      updateRef.current((p) => {
+        writeString(p, 'q', q)
+        p.delete('page')
+      })
+    }
+  }, [debouncedSearch])
+
+  // Reflect an externally-driven query (AI screen, cleared chip, Back/Forward) back
+  // into the box — but never mid-type: if the box already debounces to the URL's term,
+  // leave its raw text (and the cursor) alone.
+  useEffect(() => {
+    setSearchInput((cur) => (cur.trim() === urlQuery ? cur : urlQuery))
+  }, [urlQuery])
+
+  // Apply the AI's interpreted filters — a fresh screen, so it replaces every axis
+  // (clearing ones the request didn't set) in a single URL write rather than layering
+  // on top. The result flows through the ordinary useStockSearch and the user can tweak
+  // any control. Each value is validated before it drives a typed control; an
+  // off-vocabulary sort/tier falls back to the page's default.
   const applyInterpretation = (interp: AiScreenInterpretation) => {
-    setSearchInput(interp.query ?? '')
-    setSectors(interp.sectors)
-    setIndustries(interp.industries)
-    setMarketCaps(
-      interp.market_cap_tiers.filter((t): t is MarketCapTier =>
-        VALID_TIERS.has(t),
-      ),
-    )
-    setSp500(interp.in_sp500 === true)
-    setNasdaq100(interp.in_nasdaq100 === true)
-    setSort(
-      interp.sort && VALID_SORTS.has(interp.sort)
-        ? (interp.sort as StockSearchSort)
-        : 'market_cap',
-    )
-    setOrder(interp.direction === 'asc' ? 'asc' : 'desc')
+    const q = (interp.query ?? '').trim()
+    setSearchInput(q)
+    setFilter((p) => {
+      writeString(p, 'q', q)
+      writeList(p, 'sectors', interp.sectors)
+      writeList(p, 'industries', interp.industries)
+      writeList(
+        p,
+        'caps',
+        interp.market_cap_tiers.filter((t) => VALID_TIERS.has(t)),
+      )
+      writeBool(p, 'sp500', interp.in_sp500 === true)
+      writeBool(p, 'nasdaq100', interp.in_nasdaq100 === true)
+      writeEnum(
+        p,
+        'sort',
+        interp.sort && VALID_SORTS.has(interp.sort)
+          ? (interp.sort as StockSearchSort)
+          : 'market_cap',
+        'market_cap',
+      )
+      writeEnum(p, 'order', interp.direction === 'asc' ? 'asc' : 'desc', 'desc')
+    })
   }
 
   const runAiScreen = (raw?: string) => {
@@ -714,23 +832,8 @@ export default function Screener() {
     })
   }
 
-  // Any filter/sort change starts a new result set, so jump back to page 1 —
-  // otherwise a narrow filter could leave you stranded past its last page.
-  useEffect(() => {
-    setPage(0)
-  }, [
-    debouncedSearch,
-    sectors,
-    industries,
-    sp500,
-    nasdaq100,
-    marketCaps,
-    sort,
-    order,
-  ])
-
   const query = useStockSearch({
-    q: debouncedSearch.trim() || null,
+    q: urlQuery || null,
     sectors,
     industries,
     inSp500: sp500,
@@ -764,7 +867,7 @@ export default function Screener() {
   // Only the very first load (nothing on screen yet) surfaces an error.
   const showError = query.isError && !data
   const hasFilters =
-    !!searchInput ||
+    !!urlQuery ||
     sectors.length > 0 ||
     industries.length > 0 ||
     sp500 ||
@@ -772,26 +875,39 @@ export default function Screener() {
     marketCaps.length > 0
 
   // Clicking a sorted column flips its direction; a new column starts descending
-  // (biggest / fastest-growing first, the useful default for each metric).
+  // (biggest / fastest-growing first, the useful default for each metric) — sort and
+  // direction land in one URL write.
   const onSort = (col: StockSearchSort) => {
     if (sort === col) {
-      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
+      setOrder(order === 'asc' ? 'desc' : 'asc')
     } else {
-      setSort(col)
-      setOrder('desc')
+      setFilter((p) => {
+        writeEnum(p, 'sort', col, 'market_cap')
+        writeEnum(p, 'order', 'desc', 'desc')
+      })
     }
   }
 
   const openStock = (ticker: string) =>
     navigate(`/search?symbol=${encodeURIComponent(ticker)}`)
 
+  // Drop every filter axis (search, sectors, industries, index toggles, caps) in one
+  // URL write, leaving the sort/order as they were — the same reset the chip row's
+  // "Clear all" has always done.
   const clearFilters = () => {
     setSearchInput('')
-    setSectors([])
-    setIndustries([])
-    setSp500(false)
-    setNasdaq100(false)
-    setMarketCaps([])
+    setFilter((p) => {
+      for (const key of [
+        'q',
+        'sectors',
+        'industries',
+        'caps',
+        'sp500',
+        'nasdaq100',
+      ]) {
+        p.delete(key)
+      }
+    })
   }
 
   const membership = [
@@ -803,29 +919,32 @@ export default function Screener() {
   // compact multi-select fields only show as a count, plus the search term and
   // index toggles, so the row is a complete, honest summary of what's applied.
   const activeChips: ActiveChip[] = [
-    ...(debouncedSearch.trim()
+    ...(urlQuery
       ? [
           {
             key: 'q',
-            label: `“${debouncedSearch.trim()}”`,
-            onDelete: () => setSearchInput(''),
+            label: `“${urlQuery}”`,
+            onDelete: () => {
+              setSearchInput('')
+              setFilter((p) => writeString(p, 'q', ''))
+            },
           },
         ]
       : []),
     ...sectors.map((s) => ({
       key: `sector:${s}`,
       label: humanizeClassification(s),
-      onDelete: () => setSectors((xs) => xs.filter((x) => x !== s)),
+      onDelete: () => setSectors(sectors.filter((x) => x !== s)),
     })),
     ...industries.map((i) => ({
       key: `industry:${i}`,
       label: humanizeClassification(i),
-      onDelete: () => setIndustries((xs) => xs.filter((x) => x !== i)),
+      onDelete: () => setIndustries(industries.filter((x) => x !== i)),
     })),
     ...marketCaps.map((t) => ({
       key: `cap:${t}`,
       label: capShort(t),
-      onDelete: () => setMarketCaps((xs) => xs.filter((x) => x !== t)),
+      onDelete: () => setMarketCaps(marketCaps.filter((x) => x !== t)),
     })),
     ...(sp500
       ? [{ key: 'sp500', label: 'S&P 500', onDelete: () => setSp500(false) }]
@@ -1030,10 +1149,14 @@ export default function Screener() {
           <ToggleButtonGroup
             size="small"
             value={membership}
-            onChange={(_, values: string[]) => {
-              setSp500(values.includes('sp500'))
-              setNasdaq100(values.includes('nasdaq100'))
-            }}
+            onChange={(_, values: string[]) =>
+              // Both toggles land in one URL write (two separate `update` calls in a
+              // tick wouldn't compose — each reads the same base params).
+              setFilter((p) => {
+                writeBool(p, 'sp500', values.includes('sp500'))
+                writeBool(p, 'nasdaq100', values.includes('nasdaq100'))
+              })
+            }
             aria-label="Index membership"
             // Full width on phones so it lines up with the stacked fields above;
             // its natural width from `md` up where it sits inline.
@@ -1087,9 +1210,7 @@ export default function Screener() {
             <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
               <span>
                 <IconButton
-                  onClick={() =>
-                    setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
-                  }
+                  onClick={() => setOrder(order === 'asc' ? 'desc' : 'asc')}
                   disabled={sort == null}
                   aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
                   sx={{ color: 'text.secondary' }}
@@ -1304,10 +1425,7 @@ export default function Screener() {
             onPageChange={(_, next) => setPage(next)}
             rowsPerPage={rowsPerPage}
             rowsPerPageOptions={ROWS_PER_PAGE}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(Number(e.target.value))
-              setPage(0)
-            }}
+            onRowsPerPageChange={(e) => setRowsPerPage(Number(e.target.value))}
             sx={{
               mt: 1,
               '& .MuiTablePagination-toolbar': { px: { xs: 0, sm: 2 } },

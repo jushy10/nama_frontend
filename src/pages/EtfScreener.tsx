@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageMeta } from '@/lib/usePageMeta'
 import {
@@ -52,6 +52,17 @@ import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
 import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
+import {
+  readEnum,
+  readInt,
+  readList,
+  readString,
+  useUrlState,
+  writeEnum,
+  writeInt,
+  writeList,
+  writeString,
+} from '@/lib/urlState'
 
 // Wait this long after the last keystroke before searching, so typing a ticker
 // doesn't fire a request per letter.
@@ -138,6 +149,12 @@ const SORT_OPTIONS: { key: EtfSearchSort; label: string }[] = [
 // prove it), so validate against these before it drives the typed control — an
 // off-vocabulary sort falls back to the page's default (net assets).
 const VALID_SORTS = new Set<string>(SORT_OPTIONS.map((o) => o.key))
+
+// The vocabulary the sort and direction live under in the URL, so a hand-edited or
+// stale param can never drive a typed control — anything off-list falls back to the
+// default (net assets, descending).
+const SORT_VALUES: EtfSearchSort[] = SORT_OPTIONS.map((o) => o.key)
+const ORDER_VALUES: SortOrder[] = ['asc', 'desc']
 
 // A few plain-English prompts, shown under the AI box as one-tap starters.
 const AI_EXAMPLES = [
@@ -478,13 +495,35 @@ export default function EtfScreener() {
     'Screen the top US ETFs by category, assets under management and expense ratio.',
   )
 
-  const [searchInput, setSearchInput] = useState('')
+  // The committed filters live in the URL (`/etf-screener?categories=…&sort=…`), so a
+  // filtered view is shareable, bookmarkable, and restored on refresh and
+  // Back/Forward. Each control reads from the query string and writes back through
+  // `update`; defaults are omitted so a pristine screen keeps a clean `/etf-screener`.
+  const { searchParams, update } = useUrlState()
+  const urlQuery = readString(searchParams, 'q')
+  const categories = readList(searchParams, 'categories')
+  const sort = readEnum<EtfSearchSort>(
+    searchParams,
+    'sort',
+    SORT_VALUES,
+    'net_assets',
+  )
+  const order = readEnum<SortOrder>(searchParams, 'order', ORDER_VALUES, 'desc')
+  // `page` rides the URL 1-based (human-friendly) but stays 0-based in code; `rows`
+  // is validated against the offered page sizes.
+  const page = Math.max(0, readInt(searchParams, 'page', 1) - 1)
+  const rowsRaw = readInt(searchParams, 'rows', ROWS_PER_PAGE[0])
+  const rowsPerPage = ROWS_PER_PAGE.includes(rowsRaw)
+    ? rowsRaw
+    : ROWS_PER_PAGE[0]
+
+  // The search box keeps a local value for responsiveness; its debounced form is
+  // what commits to the URL (and so drives the query). Seed it from the URL so a
+  // deep link shows its term in the field.
+  const [searchInput, setSearchInput] = useState(() =>
+    readString(searchParams, 'q'),
+  )
   const debouncedSearch = useDebounced(searchInput, SEARCH_DEBOUNCE_MS)
-  const [categories, setCategories] = useState<string[]>([])
-  const [sort, setSort] = useState<EtfSearchSort>('net_assets')
-  const [order, setOrder] = useState<SortOrder>('desc')
-  const [page, setPage] = useState(0)
-  const [rowsPerPage, setRowsPerPage] = useState(ROWS_PER_PAGE[0])
   const navigate = useNavigate()
   // The AI-screen box: its own text (separate from the name/ticker filter, which the
   // AI populates) and the mutation that translates it into filters.
@@ -497,20 +536,76 @@ export default function EtfScreener() {
   // this stays false in tests and the table renders.
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
-  // Apply the AI's interpreted filters to the manual controls — a fresh screen, so it replaces
-  // every axis (clearing ones the request didn't set) rather than layering on top. The result
-  // then flows through the ordinary useEtfSearch and the user can tweak any control. Each value
-  // is validated before it drives a typed control; an off-vocabulary sort falls back to the
-  // page's default.
+  // A filter (or sort) change starts a new result set, so every write drops back to
+  // page 1 — otherwise a narrow filter could strand you past its last page. Page-only
+  // moves go through `update` directly and keep their page.
+  const setFilter = (mutate: (params: URLSearchParams) => void) =>
+    update((params) => {
+      mutate(params)
+      params.delete('page')
+    })
+
+  const setCategories = (next: string[]) =>
+    setFilter((p) => writeList(p, 'categories', next))
+  const setSort = (next: EtfSearchSort) =>
+    setFilter((p) => writeEnum(p, 'sort', next, 'net_assets'))
+  const setOrder = (next: SortOrder) =>
+    setFilter((p) => writeEnum(p, 'order', next, 'desc'))
+  const setPage = (next: number) =>
+    update((p) => writeInt(p, 'page', next + 1, 1))
+  const setRowsPerPage = (next: number) =>
+    setFilter((p) => writeInt(p, 'rows', next, ROWS_PER_PAGE[0]))
+
+  // Mirror the committed (debounced) search into the URL, resetting to page 1 on a new
+  // term. Fires only on a real edit — not when the URL changes underneath us (an AI
+  // screen, a cleared chip, Back/Forward), which would re-add a term the user just
+  // dropped. So it keys off the debounced value alone, reading the current URL term and
+  // the writer through refs (React Router rebuilds `setSearchParams`/`update` on every
+  // navigation). External changes flow the other way, in the effect below.
+  const urlQueryRef = useRef(urlQuery)
+  const updateRef = useRef(update)
+  useEffect(() => {
+    urlQueryRef.current = urlQuery
+    updateRef.current = update
+  })
+  useEffect(() => {
+    const q = debouncedSearch.trim()
+    if (q !== urlQueryRef.current) {
+      updateRef.current((p) => {
+        writeString(p, 'q', q)
+        p.delete('page')
+      })
+    }
+  }, [debouncedSearch])
+
+  // Reflect an externally-driven query (AI screen, cleared chip, Back/Forward) back
+  // into the box — but never mid-type: if the box already debounces to the URL's term,
+  // leave its raw text (and the cursor) alone.
+  useEffect(() => {
+    setSearchInput((cur) => (cur.trim() === urlQuery ? cur : urlQuery))
+  }, [urlQuery])
+
+  // Apply the AI's interpreted filters — a fresh screen, so it replaces every axis
+  // (clearing ones the request didn't set) in a single URL write rather than layering
+  // on top. The result flows through the ordinary useEtfSearch and the user can tweak
+  // any control. Each value is validated before it drives a typed control; an
+  // off-vocabulary sort falls back to the page's default.
   const applyInterpretation = (interp: AiEtfScreenInterpretation) => {
-    setSearchInput(interp.query ?? '')
-    setCategories(interp.categories)
-    setSort(
-      interp.sort && VALID_SORTS.has(interp.sort)
-        ? (interp.sort as EtfSearchSort)
-        : 'net_assets',
-    )
-    setOrder(interp.direction === 'asc' ? 'asc' : 'desc')
+    const q = (interp.query ?? '').trim()
+    setSearchInput(q)
+    setFilter((p) => {
+      writeString(p, 'q', q)
+      writeList(p, 'categories', interp.categories)
+      writeEnum(
+        p,
+        'sort',
+        interp.sort && VALID_SORTS.has(interp.sort)
+          ? (interp.sort as EtfSearchSort)
+          : 'net_assets',
+        'net_assets',
+      )
+      writeEnum(p, 'order', interp.direction === 'asc' ? 'asc' : 'desc', 'desc')
+    })
   }
 
   const runAiScreen = (raw?: string) => {
@@ -522,14 +617,8 @@ export default function EtfScreener() {
     })
   }
 
-  // Any filter/sort change starts a new result set, so jump back to page 1 —
-  // otherwise a narrow filter could leave you stranded past its last page.
-  useEffect(() => {
-    setPage(0)
-  }, [debouncedSearch, categories, sort, order])
-
   const query = useEtfSearch({
-    q: debouncedSearch.trim() || null,
+    q: urlQuery || null,
     categories,
     sort,
     order,
@@ -550,16 +639,19 @@ export default function EtfScreener() {
   const rows = data?.results ?? []
   // Only the very first load (nothing on screen yet) surfaces an error.
   const showError = query.isError && !data
-  const hasFilters = !!searchInput || categories.length > 0
+  const hasFilters = !!urlQuery || categories.length > 0
 
   // Clicking a sorted column flips its direction; a new column starts descending
-  // (biggest / most first, the useful default for each metric).
+  // (biggest / most first, the useful default for each metric) — sort and direction
+  // land in one URL write.
   const onSort = (col: EtfSearchSort) => {
     if (sort === col) {
-      setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))
+      setOrder(order === 'asc' ? 'desc' : 'asc')
     } else {
-      setSort(col)
-      setOrder('desc')
+      setFilter((p) => {
+        writeEnum(p, 'sort', col, 'net_assets')
+        writeEnum(p, 'order', 'desc', 'desc')
+      })
     }
   }
 
@@ -568,26 +660,32 @@ export default function EtfScreener() {
 
   const clearFilters = () => {
     setSearchInput('')
-    setCategories([])
+    setFilter((p) => {
+      p.delete('q')
+      p.delete('categories')
+    })
   }
 
   // Every applied narrowing as a one-click-removable chip — the categories the
   // compact multi-select only shows as a count, plus the search term — so the row
   // is a complete, honest summary of what's applied.
   const activeChips: ActiveChip[] = [
-    ...(debouncedSearch.trim()
+    ...(urlQuery
       ? [
           {
             key: 'q',
-            label: `“${debouncedSearch.trim()}”`,
-            onDelete: () => setSearchInput(''),
+            label: `“${urlQuery}”`,
+            onDelete: () => {
+              setSearchInput('')
+              setFilter((p) => writeString(p, 'q', ''))
+            },
           },
         ]
       : []),
     ...categories.map((c) => ({
       key: `category:${c}`,
       label: humanizeClassification(c),
-      onDelete: () => setCategories((xs) => xs.filter((x) => x !== c)),
+      onDelete: () => setCategories(categories.filter((x) => x !== c)),
     })),
   ]
 
@@ -785,7 +883,7 @@ export default function EtfScreener() {
             </TextField>
             <Tooltip title={order === 'asc' ? 'Ascending' : 'Descending'}>
               <IconButton
-                onClick={() => setOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                onClick={() => setOrder(order === 'asc' ? 'desc' : 'asc')}
                 aria-label={`Sort ${order === 'asc' ? 'descending' : 'ascending'}`}
                 sx={{ color: 'text.secondary' }}
               >
@@ -988,10 +1086,7 @@ export default function EtfScreener() {
             onPageChange={(_, next) => setPage(next)}
             rowsPerPage={rowsPerPage}
             rowsPerPageOptions={ROWS_PER_PAGE}
-            onRowsPerPageChange={(e) => {
-              setRowsPerPage(Number(e.target.value))
-              setPage(0)
-            }}
+            onRowsPerPageChange={(e) => setRowsPerPage(Number(e.target.value))}
             sx={{
               mt: 1,
               '& .MuiTablePagination-toolbar': { px: { xs: 0, sm: 2 } },

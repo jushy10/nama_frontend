@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Route, Routes, useSearchParams } from 'react-router-dom'
+import { Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { renderWithProviders, screen, waitFor } from '@/test/test-utils'
 import Screener from '@/pages/Screener'
 
@@ -8,6 +8,14 @@ function StockStub() {
   const [params] = useSearchParams()
   return <div>stock page: {params.get('symbol')}</div>
 }
+
+/** Renders the live browser query string so a test can assert what the page wrote
+ *  to the address bar (the shareable URL), not just the API request it fired. */
+function LocationProbe() {
+  const { search } = useLocation()
+  return <div data-testid="loc">{search}</div>
+}
+const locSearch = () => screen.getByTestId('loc').textContent ?? ''
 
 const SEARCH_PAGE = {
   total: 2,
@@ -490,5 +498,79 @@ describe('Screener', () => {
       await screen.findByText(/AI stock screening is temporarily unavailable/i),
     ).toBeInTheDocument()
     expect(screen.getByText('NVDA')).toBeInTheDocument()
+  })
+
+  it('restores filters and sort from a deep-linked URL', async () => {
+    const calls = stubApi()
+    renderWithProviders(<Screener />, {
+      initialEntries: [
+        '/?q=nv&sectors=technology&caps=mega&sp500=1&sort=pe&order=asc',
+      ],
+    })
+
+    await screen.findByText('NVDA')
+
+    // The committed URL drives the very first request…
+    const url = lastSearchUrl(calls)
+    expect(url).toMatch(/[?&]q=nv(&|$)/)
+    expect(url).toMatch(/sector=technology/)
+    expect(url).toMatch(/market_cap=mega/)
+    expect(url).toMatch(/in_sp500=true/)
+    expect(url).toMatch(/[?&]sort=pe(&|$)/)
+    expect(url).toMatch(/[?&]order=asc(&|$)/)
+
+    // …and the restored axes surface as chips (the view is fully rehydrated). "Mega-cap"
+    // is unique to the chip row; "Technology"/"S&P 500" also appear in the result table,
+    // so assert those with getAllByText.
+    expect(screen.getByText('Mega-cap')).toBeInTheDocument()
+    expect(screen.getAllByText('Technology').length).toBeGreaterThanOrEqual(1)
+    // The search box shows the deep-linked term.
+    expect(
+      screen.getByRole('textbox', { name: /search name or ticker/i }),
+    ).toHaveValue('nv')
+  })
+
+  it('writes filter and sort changes into the browser URL (shareable)', async () => {
+    stubApi()
+    const { user } = renderWithProviders(
+      <>
+        <Screener />
+        <LocationProbe />
+      </>,
+    )
+    await screen.findByText('NVDA')
+
+    // A pristine screen keeps a clean URL — no default sort/order clutter.
+    expect(locSearch()).toBe('')
+
+    await user.click(screen.getByRole('button', { name: 'S&P 500' }))
+    await waitFor(() => expect(locSearch()).toMatch(/sp500=1/))
+
+    await user.click(screen.getByText('EPS Growth'))
+    await waitFor(() => expect(locSearch()).toMatch(/sort=eps_growth/))
+    // Descending is the default for a fresh column, so it stays out of the URL.
+    expect(locSearch()).not.toMatch(/order=/)
+  })
+
+  it('drops the search term from the URL when its chip is removed', async () => {
+    stubApi()
+    const { user } = renderWithProviders(
+      <>
+        <Screener />
+        <LocationProbe />
+      </>,
+    )
+    await screen.findByText('NVDA')
+
+    await user.type(
+      screen.getByRole('textbox', { name: /search name or ticker/i }),
+      'nv',
+    )
+    await waitFor(() => expect(locSearch()).toMatch(/q=nv/))
+
+    // The only active chip is the search term; its delete icon clears q at once
+    // (no debounce wait), and the term leaves the URL.
+    await user.click(screen.getByTestId('CancelIcon'))
+    await waitFor(() => expect(locSearch()).not.toMatch(/q=/))
   })
 })
