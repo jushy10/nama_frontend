@@ -105,6 +105,26 @@ export function useUniverseSearchOptions(
 }
 
 /**
+ * Resolve the free text a user *submits* (the Search button, or Enter with no
+ * suggestion highlighted) to the ticker we should route to. Prefer an exact
+ * ticker match among the live suggestions, then fall back to the best match —
+ * the top, highest-cap row — so typing a company name like "nvidia" lands on
+ * NVDA instead of a dead `?symbol=NVIDIA` lookup. With no suggestions loaded
+ * (e.g. an exact symbol outside the screened universe), pass the raw text
+ * through uppercased so it can still resolve. Returns '' for empty input.
+ */
+export function resolveSubmittedTicker(
+  raw: string,
+  options: SearchOption[],
+): string {
+  const upper = raw.trim().toUpperCase()
+  if (!upper) return ''
+  const exact = options.find((o) => o.ticker.toUpperCase() === upper)
+  if (exact) return exact.ticker
+  return options[0]?.ticker ?? upper
+}
+
+/**
  * Render one dropdown row — logo avatar, name over its muted classification, and
  * the ticker chip. Wired straight into `<Autocomplete renderOption>`; MUI passes
  * a `key` inside `props` that must be lifted out of the spread onto the element.
