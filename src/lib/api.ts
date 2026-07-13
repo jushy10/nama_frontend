@@ -2435,6 +2435,97 @@ export async function getInsiderTransactions(
   return data
 }
 
+/**
+ * One institutional (or mutual-fund) holder's stake in a stock as of a reported
+ * 13F quarter. `holder_type` is `"institution"` / `"mutual_fund"`; `pct_held` /
+ * `pct_change` are percent (`pct_change` the quarter-over-quarter change in the
+ * position — the buy/sell signal), and `is_buyer` / `is_seller` flag its
+ * direction. `value` is the position's market value in dollars; `share_change` /
+ * `value_change` are the size of the quarterly move (positive = added), null when
+ * the inputs are missing. `date_reported` is ISO `yyyy-mm-dd`.
+ */
+export interface InstitutionalHolder {
+  holder: string
+  holder_type: string // "institution" | "mutual_fund"
+  date_reported: string
+  shares: number | null
+  value: number | null
+  pct_held: number | null
+  pct_change: number | null
+  is_buyer: boolean
+  is_seller: boolean
+  share_change: number | null
+  value_change: number | null
+}
+
+/**
+ * The headline ownership summary — what fraction (percent) of the company
+ * institutions and insiders hold, and how many institutions hold it. Every field
+ * is best-effort (null when the source doesn't carry it).
+ */
+export interface OwnershipBreakdown {
+  institutions_pct_held: number | null
+  insiders_pct_held: number | null
+  institutions_float_pct_held: number | null
+  institutions_count: number | null
+}
+
+/**
+ * A net buy-vs-sell rollup of the latest reported snapshot — counts of holders
+ * that added vs. trimmed, the summed shares/value bought vs. sold (magnitudes),
+ * and the nets (positive = net buying).
+ */
+export interface HolderFlow {
+  buyers_count: number
+  sellers_count: number
+  shares_bought: number
+  shares_sold: number
+  value_bought: number
+  value_sold: number
+  net_share_change: number
+  net_value_change: number
+}
+
+/**
+ * A stock's institutional ownership — the response of
+ * `GET /stocks/ticker/{ticker}/institutional-ownership`. `holders` is the
+ * newest-quarter-first 13F feed, `breakdown` the "institutions own X%" summary
+ * (null when the source omits it), and `flow` the net buy-vs-sell rollup of the
+ * latest snapshot. `latest_report_date` is the most recent reported quarter (ISO
+ * `yyyy-mm-dd`, null when empty). Best-effort: a stock with no institutional
+ * coverage carries an empty `holders` (and a zeroed `flow`), not an error.
+ */
+export interface InstitutionalOwnership {
+  symbol: string
+  count: number
+  latest_report_date: string | null
+  breakdown: OwnershipBreakdown | null
+  flow: HolderFlow
+  holders: InstitutionalHolder[]
+}
+
+/**
+ * Fetch a stock's institutional ownership — its top 13F holders, the ownership
+ * breakdown, and the latest-snapshot buy-vs-sell flow.
+ */
+export async function getInstitutionalOwnership(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<InstitutionalOwnership> {
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(
+      symbol,
+    )}/institutional-ownership`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as InstitutionalOwnership
+  if (!Array.isArray(data?.holders) || data?.flow == null) {
+    throw new ApiError(res.status, 'Malformed institutional-ownership response')
+  }
+  return data
+}
+
 /** The overall read of a stock's analyst coverage — the AI ratings verdict. */
 export type RatingsVerdict = 'bullish' | 'mixed' | 'cautious'
 

@@ -29,6 +29,7 @@ import {
   getEtfDetail,
   getIndustryValuation,
   getInsiderTransactions,
+  getInstitutionalOwnership,
   getPeHistory,
   getQuarterlyEarnings,
   getHeatMap,
@@ -66,6 +67,7 @@ import {
   type EtfSearchSort,
   type IndustryValuation,
   type InsiderTransactions,
+  type InstitutionalOwnership,
   type PeHistory,
   type MarketCapTier,
   type HeatMap,
@@ -343,6 +345,27 @@ export function useInsiderTransactions(
     queryKey: ['insider-transactions', symbol],
     queryFn: ({ signal }) =>
       getInsiderTransactions(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * A stock's institutional ownership — its top 13F holders (funds, banks, asset
+ * managers), the "institutions own X%" breakdown, and the latest-quarter buy-vs-
+ * sell flow. Served from the backend's DB cache and refreshed weekly, but it rides
+ * the same Insiders tab as the insider feed, so it's gated on that tab being open
+ * and held fresh for five minutes (toggling away and back doesn't re-fetch). Idle
+ * until `symbol` is set *and* `enabled` is true.
+ */
+export function useInstitutionalOwnership(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<InstitutionalOwnership> {
+  return useQuery({
+    queryKey: ['institutional-ownership', symbol],
+    queryFn: ({ signal }) =>
+      getInstitutionalOwnership(symbol as string, { signal }),
     enabled: !!symbol && enabled,
     staleTime: 5 * 60 * 1000,
   })
