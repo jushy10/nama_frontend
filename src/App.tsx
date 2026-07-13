@@ -190,12 +190,12 @@ function App() {
                     variant="text"
                     disableRipple
                     sx={{
-                      px: 1.5,
-                      py: 0.75,
+                      px: 2,
+                      py: 1,
                       minWidth: 0,
                       borderRadius: 999,
                       fontWeight: 600,
-                      fontSize: '0.9rem',
+                      fontSize: '1.05rem',
                       lineHeight: 1.2,
                       whiteSpace: 'nowrap',
                       color: 'text.secondary',
@@ -266,6 +266,7 @@ function App() {
               sx={{
                 borderRadius: 2,
                 my: 0.5,
+                py: 1.25,
                 color: 'text.secondary',
                 transition: 'color 0.2s ease, background 0.2s ease',
                 '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
@@ -275,7 +276,10 @@ function App() {
                   boxShadow: ACTIVE_GLOW,
                   '&:hover': { color: '#fff', background: ACTIVE_PILL },
                 },
-                '& .MuiListItemText-primary': { fontWeight: 600 },
+                '& .MuiListItemText-primary': {
+                  fontWeight: 600,
+                  fontSize: '1.1rem',
+                },
               }}
             >
               <ListItemText primary={item.label} />
