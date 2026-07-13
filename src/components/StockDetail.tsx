@@ -32,6 +32,7 @@ import {
   usePeHistory,
   useAnalystInfo,
   useInsiderTransactions,
+  useInstitutionalOwnership,
   useQuarterlyEarnings,
   useRatingsAnalysis,
   useStockAnalysis,
@@ -61,6 +62,7 @@ import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
 import InsiderTransactionsCard from '@/components/InsiderTransactionsCard'
+import InstitutionalOwnershipCard from '@/components/InstitutionalOwnershipCard'
 import RatingsReviewCard from '@/components/RatingsReviewCard'
 import EarningsCard from '@/components/EarningsCard'
 import EarningsAnalysisCard from '@/components/EarningsAnalysisCard'
@@ -170,6 +172,13 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The insider feed is a live SEC read — gate it on the Insiders tab being open
   // (like the AI reads) so a detail-page load doesn't fire it.
   const insiderQuery = useInsiderTransactions(loadedSymbol, tab === 'insiders')
+  // The institutional (13F) holders ride the same Insiders tab and the same
+  // gating — a DB-cached read, so it's cheap, but there's no reason to fire it
+  // until the tab is open.
+  const institutionalQuery = useInstitutionalOwnership(
+    loadedSymbol,
+    tab === 'insiders',
+  )
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
   // The AI take is the slowest read (a live model call), so it rides the loaded
@@ -641,6 +650,27 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           )}
           {insiderQuery.data && (
             <InsiderTransactionsCard data={insiderQuery.data} />
+          )}
+
+          {/* The big-money side of the ledger: the 13F institutional holders and
+              their quarterly moves, below the insider feed. Its own DB-cached
+              read; a failure degrades to a warning without disturbing the insider
+              card above. */}
+          {institutionalQuery.isLoading && (
+            <Stack sx={{ alignItems: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+          {institutionalQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                institutionalQuery.error,
+                'Could not load institutional ownership.',
+              )}
+            </Alert>
+          )}
+          {institutionalQuery.data && (
+            <InstitutionalOwnershipCard data={institutionalQuery.data} />
           )}
         </Stack>
       )}
