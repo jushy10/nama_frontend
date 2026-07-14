@@ -4,15 +4,25 @@ import {
   CardContent,
   Chip,
   Divider,
+  Link,
   Skeleton,
   Stack,
+  Tooltip,
   Typography,
 } from '@mui/material'
+import { Link as RouterLink } from 'react-router-dom'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import TrendingDownIcon from '@mui/icons-material/TrendingDown'
+import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
 import { useSectorAnalysis } from '@/lib/queries'
-import type { MarketTone, SectorAnalysis, SectorHighlight } from '@/lib/api'
+import type {
+  MarketTone,
+  SectorAnalysis,
+  SectorHeadline,
+  SectorHighlight,
+  SectorMover,
+} from '@/lib/api'
 
 /** Signed percent, e.g. +1.84% / -0.64% — matching SectorCard's formatting. */
 const fmtPct = (n: number | null) =>
@@ -43,8 +53,112 @@ const TONE: Record<
   },
 }
 
-/** One leader/laggard: sector name + its real day move, then the AI's note. */
+/**
+ * The stocks that drove the sector, as compact chips (ticker + its real day
+ * move, colour-coded), each linking to its own stock page — the grounded "why"
+ * behind the note. Hovering a chip reveals the company name.
+ */
+function MoverChips({ movers }: { movers: SectorMover[] }) {
+  return (
+    <Stack
+      direction="row"
+      sx={{ flexWrap: 'wrap', gap: 0.75, mt: 1 }}
+      aria-label="Driving stocks"
+    >
+      {movers.map((m) => (
+        <Tooltip key={m.ticker} title={m.name ?? m.ticker} arrow>
+          <Link
+            component={RouterLink}
+            to={`/search?symbol=${encodeURIComponent(m.ticker)}`}
+            underline="none"
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'baseline',
+              gap: 0.5,
+              px: 1,
+              py: 0.25,
+              borderRadius: 999,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: 'action.hover',
+              transition: 'border-color 0.15s ease',
+              '&:hover': { borderColor: 'text.secondary' },
+            }}
+          >
+            <Box
+              component="span"
+              sx={{
+                fontWeight: 700,
+                fontSize: '0.8125rem',
+                color: 'text.primary',
+              }}
+            >
+              {m.ticker}
+            </Box>
+            <Box
+              component="span"
+              sx={{
+                fontSize: '0.8125rem',
+                color: moveColor(m.change_percent),
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {fmtPct(m.change_percent)}
+            </Box>
+          </Link>
+        </Tooltip>
+      ))}
+    </Stack>
+  )
+}
+
+/**
+ * The catalyst headlines behind the move: a subtle line per headline, linking
+ * out to the source article when one is available. Best-effort — often absent.
+ */
+function Catalysts({ headlines }: { headlines: SectorHeadline[] }) {
+  return (
+    <Stack spacing={0.5} sx={{ mt: 1 }}>
+      {headlines.map((hd, i) => {
+        const body = (
+          <Stack
+            direction="row"
+            spacing={0.75}
+            sx={{ alignItems: 'flex-start', color: 'text.secondary' }}
+          >
+            <ArticleOutlinedIcon
+              sx={{ fontSize: 15, mt: '2px', flexShrink: 0 }}
+            />
+            <Typography variant="caption" sx={{ lineHeight: 1.4 }}>
+              {hd.title}
+            </Typography>
+          </Stack>
+        )
+        return hd.link ? (
+          <Link
+            key={i}
+            href={hd.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            sx={{ color: 'text.secondary' }}
+          >
+            {body}
+          </Link>
+        ) : (
+          <Box key={i}>{body}</Box>
+        )
+      })}
+    </Stack>
+  )
+}
+
+/** One leader/laggard: sector name + its real day move, the AI's note, then the
+ *  grounded drivers behind it — the moving stocks and any catalyst headline. */
 function HighlightRow({ h }: { h: SectorHighlight }) {
+  // Guard against a not-yet-deployed backend that omits the new fields.
+  const movers = h.movers ?? []
+  const headlines = h.headlines ?? []
   return (
     <Box>
       <Stack
@@ -69,6 +183,8 @@ function HighlightRow({ h }: { h: SectorHighlight }) {
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
         {h.note}
       </Typography>
+      {movers.length > 0 && <MoverChips movers={movers} />}
+      {headlines.length > 0 && <Catalysts headlines={headlines} />}
     </Box>
   )
 }
@@ -226,7 +342,7 @@ export default function SectorPulse() {
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
           An AI read of which corners of the market are leading and lagging
-          today.
+          today — and the stocks and headlines driving each move.
         </Typography>
       </Box>
 
