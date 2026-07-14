@@ -3,6 +3,7 @@ import HomeHero from '@/components/HomeHero'
 import FeatureBento from '@/components/FeatureBento'
 import TodaysBriefCard from '@/components/TodaysBriefCard'
 import MarketIndices from '@/components/MarketIndices'
+import MarketSentiment from '@/components/MarketSentiment'
 import MarketSummary from '@/components/MarketSummary'
 import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
 import SectorPulse from '@/components/SectorPulse'
@@ -48,6 +49,14 @@ function Home() {
 
       <Reveal delay={80}>
         <MarketIndices />
+      </Reveal>
+
+      <Reveal delay={80}>
+        <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
+          <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
+            <MarketSentiment />
+          </Container>
+        </Box>
       </Reveal>
 
       {(!marketFailed || !sectorFailed) && (

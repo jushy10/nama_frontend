@@ -1085,6 +1085,54 @@ export async function getMarketSummary(
   return (await res.json()) as MarketSummary
 }
 
+// ---------------------------------------------------------------------------
+// Market sentiment (GET /market/sentiment) — VIX + CNN Fear & Greed, one payload
+// ---------------------------------------------------------------------------
+
+/** The VIX (CBOE volatility index) close. `regime` is a volatility band —
+ *  low / normal / elevated / high / extreme. `change` is day-over-day points;
+ *  `as_of` dates the reading (an end-of-day close, so it may lag ~1 day). */
+export interface VixSnapshot {
+  as_of: string
+  value: number
+  previous_close: number | null
+  change: number | null
+  change_percent: number | null
+  regime: string
+}
+
+/** The CNN Fear & Greed score (0–100, higher = greedier). `band` is the
+ *  canonical key (extreme_fear…extreme_greed), `label` its display form, and
+ *  `rating` is CNN's own word. The `previous_*` values are the score at each
+ *  trailing horizon, for a then-vs-now read. */
+export interface FearGreedSnapshot {
+  score: number
+  as_of: string
+  rating: string
+  band: string
+  label: string
+  previous_close: number | null
+  previous_1_week: number | null
+  previous_1_month: number | null
+  previous_1_year: number | null
+}
+
+/** The combined home-page read. Either leg may be `null` when its source is
+ *  briefly unavailable — the widget shows whichever it has. */
+export interface MarketSentiment {
+  vix: VixSnapshot | null
+  fear_greed: FearGreedSnapshot | null
+}
+
+/** Fetch the VIX + CNN Fear & Greed read for the home-page sentiment widget. */
+export async function getMarketSentiment(
+  signal?: AbortSignal,
+): Promise<MarketSentiment> {
+  const res = await fetch(`${API_BASE}/market/sentiment`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as MarketSentiment
+}
+
 /** Index universe the screener can narrow to. */
 export type StockIndex = 'sp500' | 'nasdaq100'
 
