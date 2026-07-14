@@ -2112,6 +2112,9 @@ export interface QuarterlyEarningsQuarter {
   revenue_actual: number | null
   beat: boolean | null
   is_reported: boolean
+  /** When in the trading day it's expected: `bmo`/`amc`/`during`/`unknown`.
+   *  Optional so a stale backend (pre-`report_session`) still parses. */
+  report_session?: string | null
 }
 
 /**
@@ -2153,9 +2156,9 @@ export async function getQuarterlyEarnings(
  * Every upcoming (scheduled, not-yet-reported) quarter from the series, mapped
  * to the `NextEarnings` shape the earnings card draws its forward "expected"
  * columns from — oldest → newest, so they append to the right of the reported
- * bars in order. The trading `session` (before/after close) came from the
- * retired `/earnings` endpoint's calendar and is no longer sourced, so it's
- * always null (the chip simply shows the date alone).
+ * bars in order. The trading `session` (before open / after close) now rides the
+ * quarterly series' `report_session`; `unknown` (no time published) maps to null so
+ * the chip falls back to showing the date alone.
  */
 export function quarterlyUpcoming(
   quarterly: QuarterlyEarnings,
@@ -2168,7 +2171,10 @@ export function quarterlyUpcoming(
       fiscal_quarter: q.fiscal_quarter,
       eps_estimate: q.eps_estimate,
       revenue_estimate: q.revenue_estimate,
-      session: null,
+      session:
+        q.report_session && q.report_session !== 'unknown'
+          ? q.report_session
+          : null,
     }))
 }
 
@@ -3192,12 +3198,15 @@ export async function getMarketBrief(
 }
 
 /** One company scheduled to report on a calendar date. `when` is the scheduled
- *  report date (our data is date-granular, no intraday session). */
+ *  report date; `session` is when in the trading day it's expected — `bmo` before
+ *  open, `amc` after close, `during` intraday, `unknown` when no time is published.
+ *  Optional so a stale backend (pre-`report_session`) still parses. */
 export interface EarningsCalendarItem {
   ticker: string
   name: string | null
   sector: string | null
   when: string
+  session?: string | null
 }
 
 /** The reports scheduled for one calendar date, alphabetical by ticker. */
