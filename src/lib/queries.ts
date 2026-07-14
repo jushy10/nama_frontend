@@ -53,6 +53,8 @@ import {
   getTickerCard,
   getTickerCards,
   getTickerType,
+  getYieldCurve,
+  getYieldHistory,
   searchEtfs,
   searchStocks,
   type AiEtfScreenResponse,
@@ -89,6 +91,8 @@ import {
   type ScreenerResult,
   type Sector,
   type SectorAnalysis,
+  type YieldCurve,
+  type YieldHistory,
   type SortOrder,
   type StockAnalysis,
   type StockNews,
@@ -627,6 +631,25 @@ export function useSectors(): UseQueryResult<Sector[]> {
   return useQuery({
     queryKey: ['sectors'],
     queryFn: ({ signal }) => getSectors(signal),
+  })
+}
+
+/** The current US Treasury par-yield curve. Moves at most once a day, so hold
+ *  it fresh for ten minutes. */
+export function useYieldCurve(): UseQueryResult<YieldCurve> {
+  return useQuery({
+    queryKey: ['yield-curve'],
+    queryFn: ({ signal }) => getYieldCurve(signal),
+    staleTime: 10 * 60 * 1000,
+  })
+}
+
+/** The 2Y/10Y Treasury yield history. Same slow-moving daily series. */
+export function useYieldHistory(): UseQueryResult<YieldHistory> {
+  return useQuery({
+    queryKey: ['yield-history'],
+    queryFn: ({ signal }) => getYieldHistory(signal),
+    staleTime: 10 * 60 * 1000,
   })
 }
 
