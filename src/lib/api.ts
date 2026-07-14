@@ -982,6 +982,91 @@ export async function getSectors(signal?: AbortSignal): Promise<Sector[]> {
   return data.sectors
 }
 
+// ---------------------------------------------------------------------------
+// US Treasury yield curve (GET /market/yield-curve + /market/yield-history)
+// ---------------------------------------------------------------------------
+
+/** One maturity point on the par-yield curve. `months` is the tenor in months
+ *  (1, 24, 120…) for ordering; `label` is the display tenor ("1M", "2Y", "10Y");
+ *  `rate` is the annualized yield in percent. */
+export interface YieldTenor {
+  label: string
+  months: number
+  rate: number
+}
+
+/** The current US Treasury par-yield curve snapshot (`GET /market/yield-curve`)
+ *  — one yield per maturity, shortest-first. `spread_2s10s` is 10Y − 2Y in
+ *  percentage points (negative = inverted); `as_of` dates the reading. */
+export interface YieldCurve {
+  as_of: string
+  two_year: number | null
+  ten_year: number | null
+  spread_2s10s: number | null
+  is_inverted: boolean | null
+  count: number
+  tenors: YieldTenor[]
+}
+
+/** One maturity's yield on one date. `date` is an ISO `yyyy-mm-dd`. */
+export interface YieldObservation {
+  date: string
+  rate: number
+}
+
+/** One maturity's yield over time (e.g. the 2Y), oldest observation first. */
+export interface YieldSeries {
+  label: string
+  observations: YieldObservation[]
+}
+
+/** The 2Y/10Y yield history (`GET /market/yield-history`) plus the derived
+ *  10Y−2Y spread series; the point the spread crosses below zero is where the
+ *  curve inverts. */
+export interface YieldHistory {
+  latest_spread: number | null
+  is_inverted: boolean | null
+  series: YieldSeries[]
+  spread: YieldObservation[]
+}
+
+/** The shape of the curve, from the 2s10s spread — the label the explainer
+ *  keys its plain-English reading on. */
+export type CurveShape = 'normal' | 'flat' | 'inverted'
+
+/** Classify the curve from its 10Y−2Y spread (percentage points). A tiny band
+ *  around zero reads as "flat" rather than pretending a 3bp gap has a slope. */
+export function curveShape(spread: number | null | undefined): CurveShape {
+  if (spread == null) return 'flat'
+  if (spread < 0) return 'inverted'
+  if (spread < 0.15) return 'flat'
+  return 'normal'
+}
+
+/** Fetch the current US Treasury par-yield curve snapshot. */
+export async function getYieldCurve(signal?: AbortSignal): Promise<YieldCurve> {
+  const res = await fetch(`${API_BASE}/market/yield-curve`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as YieldCurve
+  if (!Array.isArray(data?.tenors)) {
+    throw new ApiError(res.status, 'Malformed yield curve response')
+  }
+  return data
+}
+
+/** Fetch the 2Y/10Y Treasury yield history (default ~3 years). */
+export async function getYieldHistory(
+  signal?: AbortSignal,
+): Promise<YieldHistory> {
+  const res = await fetch(`${API_BASE}/market/yield-history`, { signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as YieldHistory
+  if (!Array.isArray(data?.series)) {
+    throw new ApiError(res.status, 'Malformed yield history response')
+  }
+  return data
+}
+
 /** Fetch the AI read of today's sectors (which are leading and which lagging). */
 export async function getSectorAnalysis(
   signal?: AbortSignal,

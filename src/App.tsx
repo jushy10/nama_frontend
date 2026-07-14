@@ -29,6 +29,7 @@ import HeatMapPage from '@/pages/HeatMap'
 import MarketBrief from '@/pages/MarketBrief'
 import EarningsCalendar from '@/pages/EarningsCalendar'
 import Congress from '@/pages/Congress'
+import YieldCurve from '@/pages/YieldCurve'
 import RedirectToSearch from '@/components/RedirectToSearch'
 
 const navItems = [
@@ -38,6 +39,7 @@ const navItems = [
   { label: 'Stock Screener', to: '/screener', end: false },
   { label: 'ETF Screener', to: '/etf-screener', end: false },
   { label: 'Sectors', to: '/sectors', end: false },
+  { label: 'Yields', to: '/yields', end: false },
   { label: 'Earnings', to: '/earnings-calendar', end: false },
   { label: 'Heat Map', to: '/heatmap', end: false },
   { label: 'Mag 7', to: '/mag7', end: false },
@@ -302,6 +304,7 @@ function App() {
           <Route path="/etf-screener" element={<EtfScreener />} />
           <Route path="/mag7" element={<Mag7 />} />
           <Route path="/sectors" element={<Sectors />} />
+          <Route path="/yields" element={<YieldCurve />} />
           <Route path="/heatmap" element={<HeatMapPage />} />
           <Route path="/market/brief" element={<MarketBrief />} />
           <Route path="/market/brief/:date" element={<MarketBrief />} />
