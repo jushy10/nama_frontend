@@ -38,6 +38,7 @@ import {
   getQuarterlyEarnings,
   getHeatMap,
   getMarketSummary,
+  getMarketSentiment,
   getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
@@ -85,6 +86,7 @@ import {
   type HeatMap,
   type MarketBrief,
   type MarketSummary,
+  type MarketSentiment,
   type QuarterlyEarnings,
   type Quote,
   type RsiSeries,
@@ -678,6 +680,21 @@ export function useMarketSummary(): UseQueryResult<MarketSummary> {
   return useQuery({
     queryKey: ['market-summary'],
     queryFn: ({ signal }) => getMarketSummary(signal),
+    staleTime: 15 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * The home-page market-sentiment read: the VIX and the CNN Fear & Greed score.
+ * Both inputs move slowly (the VIX is an end-of-day close) and the backend
+ * caches ~15 min, so stay stale-tolerant and don't retry — a 502 (both sources
+ * briefly down) just leaves the widget hidden, like the AI cards.
+ */
+export function useMarketSentiment(): UseQueryResult<MarketSentiment> {
+  return useQuery({
+    queryKey: ['market-sentiment'],
+    queryFn: ({ signal }) => getMarketSentiment(signal),
     staleTime: 15 * 60 * 1000,
     retry: false,
   })

@@ -11,6 +11,14 @@ describe('Home', () => {
     ).toBeInTheDocument()
   })
 
+  it('renders the market sentiment band', () => {
+    renderWithProviders(<Home />)
+
+    expect(
+      screen.getByRole('heading', { name: /market sentiment/i }),
+    ).toBeInTheDocument()
+  })
+
   it('no longer embeds the screener', () => {
     renderWithProviders(<Home />)
 
