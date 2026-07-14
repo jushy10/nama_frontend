@@ -43,6 +43,7 @@ import {
   getSectorAnalysis,
   getSectors,
   getStockAnalysis,
+  getStockNews,
   getSupportLevels,
   getTickerCard,
   getTickerCards,
@@ -80,6 +81,7 @@ import {
   type SectorAnalysis,
   type SortOrder,
   type StockAnalysis,
+  type StockNews,
   type StockIndex,
   type StockSearchResponse,
   type StockSearchSort,
@@ -366,6 +368,27 @@ export function useInstitutionalOwnership(
     queryKey: ['institutional-ownership', symbol],
     queryFn: ({ signal }) =>
       getInstitutionalOwnership(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * A stock's recent news headlines (`GET /stocks/{symbol}/news`) — the newest-first
+ * feed the News tab renders. It's a cheap DB-cached read on the backend, but it
+ * rides the News tab like the other tab-scoped reads: gated on the tab being open
+ * so a detail-page load doesn't fetch it, and held fresh for five minutes (matching
+ * the endpoint's Cache-Control) so toggling away and back doesn't re-fetch. Idle
+ * until `symbol` is set *and* `enabled` is true. Best-effort: a symbol with no news
+ * resolves to an empty feed, and the card shows its own empty state.
+ */
+export function useStockNews(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<StockNews> {
+  return useQuery({
+    queryKey: ['stock-news', symbol],
+    queryFn: ({ signal }) => getStockNews(symbol as string, { signal }),
     enabled: !!symbol && enabled,
     staleTime: 5 * 60 * 1000,
   })

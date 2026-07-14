@@ -37,11 +37,13 @@ import {
   useQuarterlyEarnings,
   useRatingsAnalysis,
   useStockAnalysis,
+  useStockNews,
   useSupportLevels,
   useTickerCard,
 } from '@/lib/queries'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import DashboardIcon from '@mui/icons-material/Dashboard'
+import NewspaperRoundedIcon from '@mui/icons-material/NewspaperRounded'
 import AssessmentIcon from '@mui/icons-material/Assessment'
 import GroupsIcon from '@mui/icons-material/Groups'
 import SwapVertIcon from '@mui/icons-material/SwapVert'
@@ -62,6 +64,7 @@ import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
+import NewsCard from '@/components/NewsCard'
 import InsiderTransactionsCard from '@/components/InsiderTransactionsCard'
 import InstitutionalOwnershipCard from '@/components/InstitutionalOwnershipCard'
 import RatingsReviewCard from '@/components/RatingsReviewCard'
@@ -85,6 +88,7 @@ const SNAPSHOT_BLOCKS: TickerCardInclude[] = [
 // P/E-history reads), Analysts (the sell-side ratings), Earnings, and Options.
 type StockDetailTab =
   | 'overview'
+  | 'news'
   | 'fundamentals'
   | 'analysts'
   | 'insiders'
@@ -92,14 +96,15 @@ type StockDetailTab =
   | 'options'
 
 // The tab strip's sections, each with a small leading glyph so the row scans as
-// icons + labels rather than five look-alike words — Overview, Fundamentals,
-// Analysts, Earnings, Options.
+// icons + labels rather than a run of look-alike words — Overview, News,
+// Fundamentals, Analysts, Insiders, Earnings, Options.
 const STOCK_TABS: {
   value: StockDetailTab
   label: string
   icon: ReactElement
 }[] = [
   { value: 'overview', label: 'Overview', icon: <DashboardIcon /> },
+  { value: 'news', label: 'News', icon: <NewspaperRoundedIcon /> },
   { value: 'fundamentals', label: 'Fundamentals', icon: <AssessmentIcon /> },
   { value: 'analysts', label: 'Analysts', icon: <GroupsIcon /> },
   { value: 'insiders', label: 'Insiders', icon: <SwapVertIcon /> },
@@ -198,6 +203,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
     loadedSymbol,
     tab === 'insiders',
   )
+  // The news feed is a cheap DB-cached read, but like the other tab-scoped reads
+  // it's gated on the News tab being open so a detail-page load doesn't fetch it;
+  // the hook stays mounted (with a staleTime) so switching away and back is instant.
+  const newsQuery = useStockNews(loadedSymbol, tab === 'news')
   const quarterlyQuery = useQuarterlyEarnings(loadedSymbol)
   const annualQuery = useAnnualEarnings(loadedSymbol)
   // The AI take is the slowest read (a live model call), so it rides the loaded
@@ -499,6 +508,25 @@ export default function StockDetail({ symbol }: { symbol: string }) {
             </CardContent>
           </Card>
         </Stack>
+      )}
+
+      {/* Recent headlines on their own tab: a chronological timeline of the
+          stock's news, a cheap DB-cached read gated on the tab being open, so it
+          shows a spinner then fills in; a failure degrades to a warning. */}
+      {tab === 'news' && (
+        <Box role="tabpanel">
+          {newsQuery.isLoading && (
+            <Stack sx={{ alignItems: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+          {newsQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(newsQuery.error, 'Could not load the news feed.')}
+            </Alert>
+          )}
+          {newsQuery.data && <NewsCard data={newsQuery.data} />}
+        </Box>
       )}
 
       {/* Fundamentals sorts its cards into two questions: Business quality
