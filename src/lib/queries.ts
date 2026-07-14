@@ -30,6 +30,8 @@ import {
   getIndustryValuation,
   getInsiderTransactions,
   getInstitutionalOwnership,
+  getEarningsCalendar,
+  getMarketBrief,
   getPeHistory,
   getQuarterlyEarnings,
   getHeatMap,
@@ -71,7 +73,9 @@ import {
   type InstitutionalOwnership,
   type PeHistory,
   type MarketCapTier,
+  type EarningsCalendarResponse,
   type HeatMap,
+  type MarketBrief,
   type MarketSummary,
   type QuarterlyEarnings,
   type Quote,
@@ -515,6 +519,42 @@ export function usePeHistory(
     queryFn: ({ signal }) => getPeHistory(symbol as string, signal),
     enabled: !!symbol,
     staleTime: 10 * 60 * 1000,
+  })
+}
+
+/**
+ * A daily market brief — the latest one (`date` omitted) or a specific day
+ * (`YYYY-MM-DD`). Best-effort: a day with no brief is a 404, so don't retry —
+ * the Home card hides on error and the reader shows an empty state. Briefs change
+ * at most once a day, so hold them fresh for ten minutes.
+ */
+export function useMarketBrief(
+  date?: string | null,
+): UseQueryResult<MarketBrief> {
+  return useQuery({
+    queryKey: ['market-brief', date ?? 'latest'],
+    queryFn: ({ signal }) => getMarketBrief(date, { signal }),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * The market-wide earnings calendar over a `[from, to]` window (`YYYY-MM-DD`) —
+ * upcoming scheduled reports grouped by day. Keyed by the window so each week is
+ * cached apart; `keepPreviousData` holds the current week on screen while the next
+ * loads, so week navigation doesn't flash empty. Scheduled dates move slowly, so
+ * hold them fresh for ten minutes.
+ */
+export function useEarningsCalendar(
+  from: string,
+  to: string,
+): UseQueryResult<EarningsCalendarResponse> {
+  return useQuery({
+    queryKey: ['earnings-calendar', from, to],
+    queryFn: ({ signal }) => getEarningsCalendar({ from, to, signal }),
+    staleTime: 10 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 
