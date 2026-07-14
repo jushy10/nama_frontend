@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
+import type { ComponentType } from 'react'
 import {
   Alert,
+  Avatar,
   Box,
   Chip,
   Container,
@@ -9,12 +11,17 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import type { SvgIconProps } from '@mui/material'
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
 import TodayIcon from '@mui/icons-material/Today'
+import WbTwilightIcon from '@mui/icons-material/WbTwilight'
+import NightsStayIcon from '@mui/icons-material/NightsStay'
+import WbSunnyIcon from '@mui/icons-material/WbSunny'
+import ScheduleIcon from '@mui/icons-material/Schedule'
 import { Link as RouterLink } from 'react-router-dom'
-import { humanizeClassification } from '@/lib/api'
+import { humanizeClassification, stockLogoUrl } from '@/lib/api'
 import { errorMessage, useEarningsCalendar } from '@/lib/queries'
 import {
   addDays,
@@ -27,7 +34,124 @@ import {
 import { usePageMeta } from '@/lib/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
 
-/** One company row: ticker + name, its sector as a caption, linking to the stock. */
+interface SessionMeta {
+  key: string
+  label: string
+  Icon: ComponentType<SvgIconProps>
+  color: string
+}
+
+/**
+ * How each reporting session reads at a glance, and the order the day's reports are
+ * grouped in — chronologically through the trading day: before open, intraday, after
+ * close, then time-not-set. On brand: a gold sunrise for before-open (morning), a navy
+ * moon for after-close (night) — the app's two accent colours doubling as a time-of-day
+ * cue. `during` is the rare intraday case; `unknown` (or a stale backend that omits
+ * `session`) collects under a muted "Time TBD".
+ */
+const SESSION_GROUPS: readonly SessionMeta[] = [
+  {
+    key: 'bmo',
+    label: 'Before open',
+    Icon: WbTwilightIcon,
+    color: 'secondary.main',
+  },
+  {
+    key: 'during',
+    label: 'During hours',
+    Icon: WbSunnyIcon,
+    color: 'text.secondary',
+  },
+  {
+    key: 'amc',
+    label: 'After close',
+    Icon: NightsStayIcon,
+    color: 'primary.main',
+  },
+  {
+    key: 'unknown',
+    label: 'Time TBD',
+    Icon: ScheduleIcon,
+    color: 'text.disabled',
+  },
+]
+
+const SESSION_BY_KEY: Record<string, SessionMeta> = Object.fromEntries(
+  SESSION_GROUPS.map((g) => [g.key, g]),
+)
+
+/** The session an item belongs to for grouping — anything unrecognized (or an absent
+ *  session from a stale backend) falls into `unknown` so no report is ever dropped. */
+function sessionKey(item: EarningsCalendarItem): string {
+  return item.session && SESSION_BY_KEY[item.session] ? item.session : 'unknown'
+}
+
+/** Split a day's reports into the session groups that actually have reports, in
+ *  chronological session order (before open → after close → time TBD). */
+function groupBySession(
+  items: EarningsCalendarItem[],
+): { meta: SessionMeta; items: EarningsCalendarItem[] }[] {
+  return SESSION_GROUPS.map((meta) => ({
+    meta,
+    items: items.filter((it) => sessionKey(it) === meta.key),
+  })).filter((g) => g.items.length > 0)
+}
+
+/** Company logo in a white rounded tile, falling back to the ticker's initial — the
+ *  screener's logo treatment, shrunk for this dense agenda. */
+function StockLogo({ symbol }: { symbol: string }) {
+  return (
+    <Avatar
+      variant="rounded"
+      src={stockLogoUrl(symbol)}
+      alt=""
+      slotProps={{ img: { loading: 'lazy', style: { objectFit: 'contain' } } }}
+      sx={{
+        width: 24,
+        height: 24,
+        bgcolor: '#fff',
+        color: '#111',
+        fontSize: '0.7rem',
+        fontWeight: 700,
+        p: 0.3,
+        flexShrink: 0,
+      }}
+    >
+      {symbol.charAt(0)}
+    </Avatar>
+  )
+}
+
+/** The header for one session group within a day: its icon, label, and how many report. */
+function SessionHeader({ meta, count }: { meta: SessionMeta; count: number }) {
+  const { label, Icon, color } = meta
+  return (
+    <Stack
+      direction="row"
+      spacing={0.75}
+      sx={{ alignItems: 'center', px: 1, py: 0.5 }}
+    >
+      <Icon sx={{ fontSize: 15, color }} />
+      <Typography
+        variant="caption"
+        sx={{
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          color: 'text.secondary',
+        }}
+      >
+        {label}
+      </Typography>
+      <Typography variant="caption" color="text.disabled">
+        {count}
+      </Typography>
+    </Stack>
+  )
+}
+
+/** One company row: logo, ticker over its company name, sector as a right-aligned
+ *  caption — the whole row links to the stock. */
 function ReportRow({ item }: { item: EarningsCalendarItem }) {
   return (
     <Box
@@ -49,35 +173,40 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
         },
       }}
     >
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
-      >
-        <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
-          {item.ticker}
-        </Typography>
-        {item.sector && (
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-            sx={{ flexShrink: 1, minWidth: 0, textAlign: 'right' }}
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <StockLogo symbol={item.ticker} />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
           >
-            {humanizeClassification(item.sector)}
-          </Typography>
-        )}
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+              {item.ticker}
+            </Typography>
+            {item.sector && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ flexShrink: 1, minWidth: 0, textAlign: 'right' }}
+              >
+                {humanizeClassification(item.sector)}
+              </Typography>
+            )}
+          </Stack>
+          {item.name && (
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              noWrap
+              sx={{ display: 'block' }}
+            >
+              {item.name}
+            </Typography>
+          )}
+        </Box>
       </Stack>
-      {item.name && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          noWrap
-          sx={{ display: 'block' }}
-        >
-          {item.name}
-        </Typography>
-      )}
     </Box>
   )
 }
@@ -147,9 +276,16 @@ function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
             No reports
           </Typography>
         ) : (
-          <Stack spacing={0.25}>
-            {slot.items.map((item) => (
-              <ReportRow key={item.ticker} item={item} />
+          <Stack spacing={1}>
+            {groupBySession(slot.items).map((group) => (
+              <Box key={group.meta.key}>
+                <SessionHeader meta={group.meta} count={group.items.length} />
+                <Stack spacing={0.25}>
+                  {group.items.map((item) => (
+                    <ReportRow key={item.ticker} item={item} />
+                  ))}
+                </Stack>
+              </Box>
             ))}
           </Stack>
         )}
@@ -239,9 +375,9 @@ export default function EarningsCalendar() {
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Which US companies are scheduled to report earnings this week —
-          grouped by day, newest scheduling first. Dates are estimates and can
-          change.
+          Which US companies are scheduled to report earnings this week — split
+          into before the open and after the close each day. Dates are estimates
+          and can change.
         </Typography>
       </Box>
 
