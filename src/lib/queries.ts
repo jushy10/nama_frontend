@@ -28,6 +28,8 @@ import {
   getEtfCategories,
   getEtfDetail,
   getIndustryValuation,
+  getCongressActivity,
+  getCongressTrades,
   getInsiderTransactions,
   getInstitutionalOwnership,
   getEarningsCalendar,
@@ -70,6 +72,9 @@ import {
   type EtfSearchResponse,
   type EtfSearchSort,
   type IndustryValuation,
+  type CongressActivity,
+  type CongressTrades,
+  type CongressWindow,
   type InsiderTransactions,
   type InstitutionalOwnership,
   type PeHistory,
@@ -371,6 +376,47 @@ export function useInsiderTransactions(
       getInsiderTransactions(symbol as string, { signal }),
     enabled: !!symbol && enabled,
     staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * A stock's recent Congressional trades — the STOCK Act buys and sells its members
+ * disclosed, plus the net buy-vs-sell summary. Best-effort context served from the
+ * backend's DB cache (refreshed weekly), so it rides the loaded ticker on its own
+ * and the card self-hides when there's nothing to show. Idle until `symbol` is set.
+ */
+export function useCongressTrades(
+  symbol: string | null | undefined,
+  enabled = true,
+): UseQueryResult<CongressTrades> {
+  return useQuery({
+    queryKey: ['congress-trades', symbol],
+    queryFn: ({ signal }) => getCongressTrades(symbol as string, { signal }),
+    enabled: !!symbol && enabled,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/**
+ * A window of the whole market's recent Congressional trades — the /congress board.
+ * Keeps the previous page's rows on screen while the next loads
+ * (`keepPreviousData`), so paging and switching windows don't flash empty.
+ */
+export function useCongressActivity(params: {
+  window: CongressWindow
+  limit: number
+  offset: number
+}): UseQueryResult<CongressActivity> {
+  return useQuery({
+    queryKey: ['congress-activity', params],
+    queryFn: ({ signal }) =>
+      getCongressActivity({
+        window: params.window,
+        limit: params.limit,
+        offset: params.offset,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
   })
 }
 

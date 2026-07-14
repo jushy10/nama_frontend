@@ -32,6 +32,7 @@ import {
   useIndustryValuation,
   usePeHistory,
   useAnalystInfo,
+  useCongressTrades,
   useInsiderTransactions,
   useInstitutionalOwnership,
   useQuarterlyEarnings,
@@ -68,6 +69,7 @@ import RangeReturn from '@/components/RangeReturn'
 import AnalystCard from '@/components/AnalystCard'
 import NewsCard from '@/components/NewsCard'
 import InsiderTransactionsCard from '@/components/InsiderTransactionsCard'
+import CongressTradesCard from '@/components/CongressTradesCard'
 import InstitutionalOwnershipCard from '@/components/InstitutionalOwnershipCard'
 import RatingsReviewCard from '@/components/RatingsReviewCard'
 import EarningsCard from '@/components/EarningsCard'
@@ -202,6 +204,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The insider feed is a live SEC read — gate it on the Insiders tab being open
   // (like the AI reads) so a detail-page load doesn't fire it.
   const insiderQuery = useInsiderTransactions(loadedSymbol, tab === 'insiders')
+  // Congressional (STOCK Act) trades — best-effort context on the Overview tab,
+  // a cheap DB-cached read that rides the loaded ticker. The card self-hides when
+  // Congress hasn't traded the stock, so no loading/error UI is needed.
+  const congressQuery = useCongressTrades(loadedSymbol)
   // The institutional (13F) holders ride the same Insiders tab and the same
   // gating — a DB-cached read, so it's cheap, but there's no reason to fire it
   // until the tab is open.
@@ -518,6 +524,13 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               )}
             </CardContent>
           </Card>
+
+          {/* Congressional (STOCK Act) trades — best-effort context that
+              self-hides when Congress hasn't traded the stock, so it only shows
+              up where there's a real signal and a failure just omits it. */}
+          {congressQuery.data && (
+            <CongressTradesCard data={congressQuery.data} />
+          )}
         </Stack>
       )}
 

@@ -28,6 +28,7 @@ import Mag7 from '@/pages/Mag7'
 import HeatMapPage from '@/pages/HeatMap'
 import MarketBrief from '@/pages/MarketBrief'
 import EarningsCalendar from '@/pages/EarningsCalendar'
+import Congress from '@/pages/Congress'
 import RedirectToSearch from '@/components/RedirectToSearch'
 
 const navItems = [
@@ -40,6 +41,7 @@ const navItems = [
   { label: 'Earnings', to: '/earnings-calendar', end: false },
   { label: 'Heat Map', to: '/heatmap', end: false },
   { label: 'Mag 7', to: '/mag7', end: false },
+  { label: 'Congress', to: '/congress', end: false },
 ]
 
 // House brand accents, reused across the nav. The blue→gold line mirrors the
@@ -304,6 +306,7 @@ function App() {
           <Route path="/market/brief" element={<MarketBrief />} />
           <Route path="/market/brief/:date" element={<MarketBrief />} />
           <Route path="/earnings-calendar" element={<EarningsCalendar />} />
+          <Route path="/congress" element={<Congress />} />
           {/* Legacy detail URLs — the stock/fund views now live under /search. */}
           <Route path="/stocks" element={<RedirectToSearch />} />
           <Route path="/etfs" element={<RedirectToSearch />} />

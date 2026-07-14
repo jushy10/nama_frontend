@@ -2554,6 +2554,144 @@ export async function getInsiderTransactions(
 }
 
 /**
+ * One member's one disclosed stock trade — the buys and sells US Representatives
+ * and Senators report under the STOCK Act. `chamber` is "House" or "Senate";
+ * `party` is best-effort (usually null — the public feeds don't carry it).
+ * `tx_type` is the normalized action ("Purchase" / "Sale" / "Exchange" / "Other")
+ * with `is_buy` / `is_sell` the derived flags. Congress discloses a dollar *range*,
+ * never an exact figure, so `amount_range` is that band verbatim and
+ * `amount_midpoint` a best-effort estimate of the trade's size (the middle of the
+ * band). `transaction_date` is when the trade happened; `disclosure_date` when it
+ * was reported (up to 45 days later). Dates are ISO `yyyy-mm-dd` or null.
+ */
+export interface CongressTrade {
+  member: string
+  chamber: string
+  party: string | null
+  ticker: string
+  name: string | null
+  tx_type: string
+  amount_range: string | null
+  amount_midpoint: number | null
+  transaction_date: string | null
+  disclosure_date: string | null
+  owner: string | null
+  source_url: string | null
+  is_buy: boolean
+  is_sell: boolean
+}
+
+/**
+ * A net buy-vs-sell rollup of a set of Congressional trades — counts and the
+ * *estimated* dollar flow (summed band midpoints, since Congress discloses only
+ * ranges), with `net_value` (buy − sell; positive = net buying). The dollar legs
+ * are estimates, not reported totals.
+ */
+export interface CongressSummary {
+  buy_count: number
+  sell_count: number
+  buy_value: number
+  sell_value: number
+  net_value: number
+}
+
+/**
+ * A single stock's recent Congressional trades — the response of
+ * `GET /stocks/ticker/{ticker}/congress-trades`. `items` is the newest-first feed
+ * and `summary` the net rollup over the *full* stored set (not just the page).
+ * `total` is the full count; `count` the number in this page. Best-effort: a stock
+ * Congress hasn't traded carries an empty `items`, not an error.
+ */
+export interface CongressTrades {
+  symbol: string
+  total: number
+  limit: number
+  offset: number
+  count: number
+  summary: CongressSummary
+  items: CongressTrade[]
+}
+
+/**
+ * A window of the whole market's recent Congressional trades — the response of
+ * `GET /market/congress-activity`. `window` echoes the requested token; `total`
+ * is the full match count in the window before the page was cut. `summary` rolls
+ * up the page's trades.
+ */
+export interface CongressActivity {
+  window: string
+  total: number
+  limit: number
+  offset: number
+  count: number
+  summary: CongressSummary
+  items: CongressTrade[]
+}
+
+/** The market board's time windows (over the disclosure date). */
+export const CONGRESS_WINDOWS = [
+  { key: '7d', label: '7D' },
+  { key: '30d', label: '30D' },
+  { key: '90d', label: '90D' },
+  { key: '1y', label: '1Y' },
+  { key: 'all', label: 'All' },
+] as const
+export type CongressWindow = (typeof CONGRESS_WINDOWS)[number]['key']
+
+/**
+ * Fetch a stock's recent Congressional trades — the disclosed House/Senate buys
+ * and sells plus the net buy-vs-sell summary, newest first.
+ */
+export async function getCongressTrades(
+  symbol: string,
+  opts: { limit?: number; offset?: number; signal?: AbortSignal } = {},
+): Promise<CongressTrades> {
+  const qs = new URLSearchParams()
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  if (opts.offset != null) qs.set('offset', String(opts.offset))
+  const suffix = qs.toString() ? `?${qs}` : ''
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(
+      symbol,
+    )}/congress-trades${suffix}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as CongressTrades
+  if (!Array.isArray(data?.items) || data?.summary == null) {
+    throw new ApiError(res.status, 'Malformed congress-trades response')
+  }
+  return data
+}
+
+/**
+ * Fetch a window of the whole market's recent Congressional trades — the board.
+ * `window` is one of `CONGRESS_WINDOWS` (default 30d); `limit`/`offset` page it.
+ */
+export async function getCongressActivity(
+  opts: {
+    window?: CongressWindow
+    limit?: number
+    offset?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<CongressActivity> {
+  const qs = new URLSearchParams()
+  if (opts.window) qs.set('window', opts.window)
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  if (opts.offset != null) qs.set('offset', String(opts.offset))
+  const res = await fetch(`${API_BASE}/market/congress-activity?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as CongressActivity
+  if (!Array.isArray(data?.items)) {
+    throw new ApiError(res.status, 'Malformed congress-activity response')
+  }
+  return data
+}
+
+/**
  * One institutional (or mutual-fund) holder's stake in a stock as of a reported
  * 13F quarter. `holder_type` is `"institution"` / `"mutual_fund"`; `pct_held` /
  * `pct_change` are percent (`pct_change` the quarter-over-quarter change in the
