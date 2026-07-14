@@ -168,15 +168,46 @@ export interface SectorsResponse {
 export type MarketTone = 'risk_on' | 'risk_off' | 'mixed'
 
 /**
+ * One constituent stock that drove a sector's move today — the grounded "why"
+ * behind the note. `change_percent` is the stock's real day move and
+ * `market_cap` its size, both service-supplied (a live quote + the anchor
+ * figure), never authored by the model.
+ */
+export interface SectorMover {
+  ticker: string
+  name: string | null
+  change_percent: number | null
+  market_cap: number | null
+}
+
+/**
+ * A recent headline from one of a sector's movers — the candidate catalyst.
+ * Carried straight from the news store (not authored by the model): `ticker` is
+ * the mover it belongs to and `link` opens the source article.
+ */
+export interface SectorHeadline {
+  ticker: string
+  title: string
+  published_at: string | null
+  publisher: string | null
+  link: string | null
+}
+
+/**
  * One sector called out in the AI sector analysis. `change_percent` is the
  * sector proxy's real move on the day (joined from the board, not authored by
  * the model); `note` is the model's one-line read on why it stands out.
+ * `movers` and `headlines` are the grounded receipts behind that note — the
+ * constituent stocks that drove the move and recent headlines from them — joined
+ * from the board, not authored, so the note's specifics can be verified.
  */
 export interface SectorHighlight {
   sector: string
   symbol: string
   change_percent: number | null
   note: string
+  movers: SectorMover[]
+  headlines: SectorHeadline[]
 }
 
 /**

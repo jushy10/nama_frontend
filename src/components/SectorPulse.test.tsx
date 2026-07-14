@@ -12,6 +12,29 @@ const analysisSample = {
       symbol: 'XLK',
       change_percent: 1.84,
       note: 'Chipmakers powered the tape.',
+      movers: [
+        {
+          ticker: 'NVDA',
+          name: 'NVIDIA',
+          change_percent: 6.2,
+          market_cap: 3.2e12,
+        },
+        {
+          ticker: 'AVGO',
+          name: 'Broadcom',
+          change_percent: 4.1,
+          market_cap: 8.0e11,
+        },
+      ],
+      headlines: [
+        {
+          ticker: 'NVDA',
+          title: 'NVIDIA beats on data-center demand, guides higher',
+          published_at: '2026-07-08T12:00:00Z',
+          publisher: 'Reuters',
+          link: 'https://example.com/nvda',
+        },
+      ],
     },
   ],
   laggards: [
@@ -20,6 +43,8 @@ const analysisSample = {
       symbol: 'XLU',
       change_percent: -0.92,
       note: 'Money rotated out of safe-haven names.',
+      movers: [],
+      headlines: [],
     },
   ],
   disclaimer:
@@ -71,6 +96,25 @@ describe('SectorPulse', () => {
 
     // The service-authored disclaimer rides along.
     expect(screen.getByText(/not financial advice/i)).toBeInTheDocument()
+  })
+
+  it('renders the grounded drivers: mover chips (linked) and a catalyst headline', async () => {
+    stubFetch(analysisSample)
+    renderWithProviders(<SectorPulse />)
+
+    // A driver chip shows the ticker + its real move, and links to the stock page.
+    const nvda = await screen.findByText('NVDA')
+    expect(nvda.closest('a')).toHaveAttribute('href', '/search?symbol=NVDA')
+    expect(screen.getByText('+6.20%')).toBeInTheDocument()
+    expect(screen.getByText('AVGO')).toBeInTheDocument()
+
+    // The catalyst headline renders and opens the source in a new tab.
+    const headline = screen
+      .getByText(/NVIDIA beats on data-center demand/i)
+      .closest('a')
+    expect(headline).toHaveAttribute('href', 'https://example.com/nvda')
+    expect(headline).toHaveAttribute('target', '_blank')
+    expect(headline).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
   it('quietly hides itself when the analysis is unavailable', async () => {
