@@ -46,6 +46,7 @@ import {
   getSectors,
   getStockAnalysis,
   getStockNews,
+  getStockTrend,
   getSupportLevels,
   getTickerCard,
   getTickerCards,
@@ -86,6 +87,7 @@ import {
   type SortOrder,
   type StockAnalysis,
   type StockNews,
+  type StockTrend,
   type StockIndex,
   type StockSearchResponse,
   type StockSearchSort,
@@ -269,6 +271,22 @@ export function useSupportLevels(
   return useQuery({
     queryKey: ['support-levels', symbol],
     queryFn: ({ signal }) => getSupportLevels(symbol as string, { signal }),
+    enabled: !!symbol,
+  })
+}
+
+/**
+ * A ticker's short/long-term trend read (the 1-year daily 20-vs-50 EMA slopes
+ * and their combined reading). Keyed by symbol only, like support levels — it's
+ * a property of the stock, independent of the chart's range. Idle until `symbol`
+ * is set.
+ */
+export function useStockTrend(
+  symbol: string | null | undefined,
+): UseQueryResult<StockTrend> {
+  return useQuery({
+    queryKey: ['stock-trend', symbol],
+    queryFn: ({ signal }) => getStockTrend(symbol as string, { signal }),
     enabled: !!symbol,
   })
 }

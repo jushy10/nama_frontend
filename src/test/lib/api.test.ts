@@ -10,6 +10,7 @@ import {
   getPeHistory,
   getRatingsAnalysis,
   getStockAnalysis,
+  getStockTrend,
   getSupportLevels,
   humanizeClassification,
   industryPeStance,
@@ -538,6 +539,102 @@ describe('getSupportLevels', () => {
     await expect(getSupportLevels('ZZZZ')).rejects.toThrow(
       /No stock data found/,
     )
+  })
+})
+
+describe('getStockTrend', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('requests a fixed 1Y daily read and returns the parsed trend', async () => {
+    let requestedUrl = ''
+    const body = {
+      symbol: 'AAPL',
+      timeframe: '1Day',
+      reference_price: 214.3,
+      reading: 'uptrend_pullback',
+      long_term: {
+        period: 50,
+        lookback: 50,
+        direction: 'up',
+        slope_percent: 0.22,
+        change_percent: 11.4,
+        price_vs_ema_percent: 6.5,
+        ema: 201.2,
+      },
+      short_term: {
+        period: 20,
+        lookback: 20,
+        direction: 'down',
+        slope_percent: -0.18,
+        change_percent: -3.9,
+        price_vs_ema_percent: -1.2,
+        ema: 216.9,
+      },
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(body),
+        })
+      }),
+    )
+
+    const result = await getStockTrend('AAPL')
+
+    expect(requestedUrl).toContain('/stocks/ticker/AAPL/trend')
+    expect(requestedUrl).toContain('timeframe=1Day')
+    expect(requestedUrl).toContain('range=1Y')
+    expect(result.reading).toBe('uptrend_pullback')
+    expect(result.long_term?.direction).toBe('up')
+    expect(result.short_term?.direction).toBe('down')
+  })
+
+  it('forwards custom horizons as query params', async () => {
+    let requestedUrl = ''
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string | URL) => {
+        requestedUrl = String(url)
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () =>
+            Promise.resolve({
+              symbol: 'AAPL',
+              timeframe: '1Day',
+              reference_price: 214.3,
+              reading: 'unknown',
+              long_term: null,
+              short_term: null,
+            }),
+        })
+      }),
+    )
+
+    await getStockTrend('AAPL', { shortPeriod: 50, longPeriod: 200 })
+    expect(requestedUrl).toContain('short_period=50')
+    expect(requestedUrl).toContain('long_period=200')
+  })
+
+  it('throws an ApiError carrying the server detail on a non-2xx', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 404,
+          json: () =>
+            Promise.resolve({
+              detail: "No stock data found for symbol 'ZZZZ'.",
+            }),
+        }),
+      ),
+    )
+    await expect(getStockTrend('ZZZZ')).rejects.toThrow(/No stock data found/)
   })
 })
 
