@@ -2971,3 +2971,106 @@ export async function getEtfAnalysis(
   }
   return data
 }
+
+/** The market's mood a daily brief reads off the day's moves — the same three-way
+ *  posture the market summary uses. */
+export type BriefTone = 'risk_on' | 'risk_off' | 'mixed'
+
+/** One section of a daily market brief: a short heading and a plain-language body. */
+export interface MarketBriefSection {
+  heading: string
+  body: string
+}
+
+/**
+ * A single day's AI-written market brief (`GET /market/brief` or
+ * `/market/brief/{date}`) — a plain-language read of how the whole US market moved
+ * that day. `date` is the calendar day it covers; `tone` the headline posture;
+ * `summary` the lede; `sections` the ordered body (an overview, the sector
+ * rotation, the day's movers, what to watch). `generated_at` is when it was
+ * written; `disclaimer` is informational, not financial advice.
+ */
+export interface MarketBrief {
+  date: string
+  generated_at: string
+  tone: BriefTone
+  summary: string
+  sections: MarketBriefSection[]
+  model: string | null
+  disclaimer: string
+}
+
+/**
+ * Fetch a daily market brief — the latest one when `date` is omitted, or a
+ * specific day (`YYYY-MM-DD`). Best-effort on the backend: a day with no brief is
+ * a 404 (surfaced as an `ApiError`), which the reader turns into an empty state
+ * rather than a broken page.
+ */
+export async function getMarketBrief(
+  date?: string | null,
+  opts: { signal?: AbortSignal } = {},
+): Promise<MarketBrief> {
+  const path = date
+    ? `/market/brief/${encodeURIComponent(date)}`
+    : '/market/brief'
+  const res = await fetch(`${API_BASE}${path}`, { signal: opts.signal })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as MarketBrief
+  if (typeof data?.summary !== 'string' || !Array.isArray(data?.sections)) {
+    throw new ApiError(res.status, 'Malformed market brief response')
+  }
+  return data
+}
+
+/** One company scheduled to report on a calendar date. `when` is the scheduled
+ *  report date (our data is date-granular, no intraday session). */
+export interface EarningsCalendarItem {
+  ticker: string
+  name: string | null
+  sector: string | null
+  when: string
+}
+
+/** The reports scheduled for one calendar date, alphabetical by ticker. */
+export interface EarningsCalendarDay {
+  date: string
+  count: number
+  items: EarningsCalendarItem[]
+}
+
+/**
+ * Upcoming earnings grouped by day (`GET /market/earnings-calendar`). `from`/`to`
+ * echo the (clamped) window actually read; `count` is the total reports across the
+ * window; `days` are only the days with at least one scheduled report.
+ */
+export interface EarningsCalendarResponse {
+  from: string
+  to: string
+  count: number
+  days: EarningsCalendarDay[]
+  disclaimer: string
+}
+
+/**
+ * Fetch the market-wide earnings calendar over a window (`GET
+ * /market/earnings-calendar?from=&to=`, `YYYY-MM-DD`). Both bounds are optional —
+ * the backend defaults to a two-week look-ahead and clamps an over-wide window.
+ * An inverted window (`to` before `from`) is a 400 (surfaced as an `ApiError`).
+ */
+export async function getEarningsCalendar(
+  opts: { from?: string | null; to?: string | null; signal?: AbortSignal } = {},
+): Promise<EarningsCalendarResponse> {
+  const qs = new URLSearchParams()
+  if (opts.from) qs.set('from', opts.from)
+  if (opts.to) qs.set('to', opts.to)
+  const query = qs.toString() ? `?${qs}` : ''
+  const res = await fetch(`${API_BASE}/market/earnings-calendar${query}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as EarningsCalendarResponse
+  if (!Array.isArray(data?.days)) {
+    throw new ApiError(res.status, 'Malformed earnings calendar response')
+  }
+  return data
+}

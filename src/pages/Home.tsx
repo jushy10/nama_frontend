@@ -1,6 +1,7 @@
 import { Box, Container } from '@mui/material'
 import HomeHero from '@/components/HomeHero'
 import FeatureBento from '@/components/FeatureBento'
+import TodaysBriefCard from '@/components/TodaysBriefCard'
 import MarketIndices from '@/components/MarketIndices'
 import MarketSummary from '@/components/MarketSummary'
 import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
@@ -39,6 +40,10 @@ function Home() {
 
       <Reveal>
         <FeatureBento />
+      </Reveal>
+
+      <Reveal delay={80}>
+        <TodaysBriefCard />
       </Reveal>
 
       <Reveal delay={80}>
