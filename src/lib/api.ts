@@ -2526,6 +2526,57 @@ export async function getInstitutionalOwnership(
   return data
 }
 
+/**
+ * One published news item about a stock. `id` is the source's stable article id
+ * (Yahoo's UUID) — the React key. `published_at` is when it went out (an ISO-8601
+ * UTC timestamp). `is_video` flags a video (vs. a written story) so the feed can
+ * badge it. Everything past `title` is best-effort and may be null: `publisher`
+ * is the outlet, `link` the article URL, `summary` a short teaser, `thumbnail_url`
+ * a preview image (which may 404 — treat it as decorative).
+ */
+export interface NewsArticle {
+  id: string
+  title: string
+  published_at: string
+  publisher: string | null
+  link: string | null
+  summary: string | null
+  content_type: string | null
+  thumbnail_url: string | null
+  is_video: boolean
+}
+
+/**
+ * A stock's recent news — the response of `GET /stocks/{symbol}/news`. `articles`
+ * is the newest-first headline feed and `latest` its first item (null when the
+ * feed is empty); `count` is how many were returned. Best-effort: a symbol the
+ * source carries no news for comes back with an empty `articles` (a 200, not a
+ * 404), so the card self-shows an empty state.
+ */
+export interface StockNews {
+  symbol: string
+  count: number
+  latest: NewsArticle | null
+  articles: NewsArticle[]
+}
+
+/** Fetch a stock's recent news headlines, newest article first. */
+export async function getStockNews(
+  symbol: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<StockNews> {
+  const res = await fetch(
+    `${API_BASE}/stocks/${encodeURIComponent(symbol)}/news`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as StockNews
+  if (!Array.isArray(data?.articles)) {
+    throw new ApiError(res.status, 'Malformed news response')
+  }
+  return data
+}
+
 /** The overall read of a stock's analyst coverage — the AI ratings verdict. */
 export type RatingsVerdict = 'bullish' | 'mixed' | 'cautious'
 
