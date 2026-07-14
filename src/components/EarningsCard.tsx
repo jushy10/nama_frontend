@@ -131,7 +131,8 @@ const orDash = (
 const SESSION_LABEL: Record<string, string> = {
   bmo: 'before open',
   amc: 'after close',
-  dmh: 'during hours',
+  during: 'during hours',
+  dmh: 'during hours', // legacy alias from the retired /earnings calendar
 }
 
 /** One reported point on the trend line: the reported "actual" plus the
