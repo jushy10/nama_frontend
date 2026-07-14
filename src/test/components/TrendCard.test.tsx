@@ -8,8 +8,10 @@ function leg(direction: TrendDirection, overrides = {}) {
     period: direction === 'up' ? 50 : 20,
     lookback: 50,
     direction,
-    slope_percent: direction === 'up' ? 0.22 : direction === 'down' ? -0.18 : 0.0,
-    change_percent: direction === 'up' ? 11.4 : direction === 'down' ? -3.9 : 0.2,
+    slope_percent:
+      direction === 'up' ? 0.22 : direction === 'down' ? -0.18 : 0.0,
+    change_percent:
+      direction === 'up' ? 11.4 : direction === 'down' ? -3.9 : 0.2,
     price_vs_ema_percent: direction === 'up' ? 6.5 : -1.2,
     ema: 201.2,
     ...overrides,

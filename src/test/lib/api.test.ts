@@ -628,7 +628,9 @@ describe('getStockTrend', () => {
           ok: false,
           status: 404,
           json: () =>
-            Promise.resolve({ detail: "No stock data found for symbol 'ZZZZ'." }),
+            Promise.resolve({
+              detail: "No stock data found for symbol 'ZZZZ'.",
+            }),
         }),
       ),
     )

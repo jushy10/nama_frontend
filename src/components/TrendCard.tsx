@@ -1,6 +1,11 @@
 import { Box, Card, CardContent, Stack, Typography } from '@mui/material'
 import InfoHint from '@/components/InfoHint'
-import type { StockTrend, TrendDirection, TrendLeg, TrendReading } from '@/lib/api'
+import type {
+  StockTrend,
+  TrendDirection,
+  TrendLeg,
+  TrendReading,
+} from '@/lib/api'
 
 // The house neutral: the same amber the verdict cards use for a middle call.
 // A "sideways" horizon and an "unknown" reading both read amber — neither up
@@ -15,7 +20,11 @@ const DIRECTION: Record<
   { word: string; color: string; track: string }
 > = {
   up: { word: 'Rising', color: 'success.main', track: 'rgba(52,211,153,0.1)' },
-  down: { word: 'Falling', color: 'error.main', track: 'rgba(248,113,113,0.1)' },
+  down: {
+    word: 'Falling',
+    color: 'error.main',
+    track: 'rgba(248,113,113,0.1)',
+  },
   sideways: { word: 'Flat', color: NEUTRAL, track: 'rgba(251,191,36,0.1)' },
 }
 
@@ -201,7 +210,11 @@ function HorizonTile({
 
       {leg && meta ? (
         <>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', mt: 1 }}
+          >
             <SlopeArrow slopePercent={leg.slope_percent} color={meta.color} />
             <Typography
               component="span"
@@ -226,7 +239,10 @@ function HorizonTile({
             }}
           >
             {signedPct(leg.change_percent)}{' '}
-            <Box component="span" sx={{ color: 'text.secondary', fontWeight: 400 }}>
+            <Box
+              component="span"
+              sx={{ color: 'text.secondary', fontWeight: 400 }}
+            >
               over {leg.lookback} bars
             </Box>
           </Typography>
