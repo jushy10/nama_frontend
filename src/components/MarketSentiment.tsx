@@ -165,7 +165,8 @@ function VixPanel({ data }: { data: VixSnapshot }) {
         : data.change < 0
           ? 'success.main'
           : 'text.secondary'
-  const arrow = data.change == null || data.change === 0 ? '' : data.change > 0 ? '▲' : '▼'
+  const arrow =
+    data.change == null || data.change === 0 ? '' : data.change > 0 ? '▲' : '▼'
 
   // Position on a 0–50 calm→turbulent scale (VIX rarely prints above 50).
   const pct = Math.max(0, Math.min(1, data.value / 50)) * 100
@@ -214,7 +215,11 @@ function VixPanel({ data }: { data: VixSnapshot }) {
             {data.change.toFixed(2)}
             {data.change_percent != null &&
               ` (${data.change_percent > 0 ? '+' : ''}${data.change_percent.toFixed(1)}%)`}{' '}
-            <Typography component="span" variant="caption" color="text.secondary">
+            <Typography
+              component="span"
+              variant="caption"
+              color="text.secondary"
+            >
               vs prev close
             </Typography>
           </Typography>
@@ -253,7 +258,10 @@ function VixPanel({ data }: { data: VixSnapshot }) {
             }}
           />
         </Box>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
+        <Stack
+          direction="row"
+          sx={{ justifyContent: 'space-between', mt: 0.5 }}
+        >
           <Typography variant="caption" color="text.secondary">
             Calm
           </Typography>
@@ -354,8 +362,8 @@ export default function MarketSentiment() {
           </Typography>
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          How the market feels right now — the Fear &amp; Greed Index and the VIX
-          volatility gauge, at a glance.
+          How the market feels right now — the Fear &amp; Greed Index and the
+          VIX volatility gauge, at a glance.
         </Typography>
       </Box>
 
