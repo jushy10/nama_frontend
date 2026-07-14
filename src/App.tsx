@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { NavLink, Route, Routes } from 'react-router-dom'
+import { NavLink, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AppBar,
   Box,
   Button,
+  Collapse,
   Container,
   Divider,
   Drawer,
@@ -11,11 +12,14 @@ import {
   List,
   ListItemButton,
   ListItemText,
+  Menu,
+  MenuItem,
   Stack,
   Toolbar,
   Typography,
 } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
@@ -32,19 +36,44 @@ import Congress from '@/pages/Congress'
 import YieldCurve from '@/pages/YieldCurve'
 import RedirectToSearch from '@/components/RedirectToSearch'
 
-const navItems = [
-  { label: 'Home', to: '/', end: true },
-  { label: 'Brief', to: '/market/brief', end: false },
-  { label: 'Search', to: '/search', end: false },
-  { label: 'Stock Screener', to: '/screener', end: false },
-  { label: 'ETF Screener', to: '/etf-screener', end: false },
-  { label: 'Sectors', to: '/sectors', end: false },
-  { label: 'Yields', to: '/yields', end: false },
-  { label: 'Earnings', to: '/earnings-calendar', end: false },
-  { label: 'Heat Map', to: '/heatmap', end: false },
-  { label: 'Mag 7', to: '/mag7', end: false },
-  { label: 'Congress', to: '/congress', end: false },
+type NavLeaf = { label: string; to: string; end?: boolean }
+type NavGroup = { label: string; children: NavLeaf[] }
+type NavEntry = NavLeaf | NavGroup
+
+const isGroup = (entry: NavEntry): entry is NavGroup => 'children' in entry
+
+// Home isn't listed here — the brand logo links to `/`, so the bar stays lean:
+// two direct links, then the Screener and Markets groups.
+const navItems: NavEntry[] = [
+  { label: 'Brief', to: '/market/brief' },
+  { label: 'Search', to: '/search' },
+  {
+    label: 'Screener',
+    children: [
+      { label: 'Stocks', to: '/screener' },
+      { label: 'ETFs', to: '/etf-screener' },
+    ],
+  },
+  {
+    label: 'Markets',
+    children: [
+      { label: 'Yields', to: '/yields' },
+      { label: 'Earnings', to: '/earnings-calendar' },
+      { label: 'Heat Map', to: '/heatmap' },
+      { label: 'Sectors', to: '/sectors' },
+      { label: 'Congress', to: '/congress' },
+      { label: 'Mag 7', to: '/mag7' },
+    ],
+  },
 ]
+
+/** True when the current URL sits inside one of the group's child routes. */
+function useGroupActive(group: NavGroup) {
+  const { pathname } = useLocation()
+  return group.children.some(
+    (child) => pathname === child.to || pathname.startsWith(`${child.to}/`),
+  )
+}
 
 // House brand accents, reused across the nav. The blue→gold line mirrors the
 // hero headline gradient; the active pill stays navy so white text keeps its
@@ -147,6 +176,184 @@ function ColorModeToggle() {
   )
 }
 
+/** Desktop nav: a pill button that opens a dropdown of its child routes. Lights
+ *  up with the active-pill fill whenever a child route is open or the menu is. */
+function DesktopNavGroup({ group }: { group: NavGroup }) {
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
+  const open = Boolean(anchorEl)
+  const lit = useGroupActive(group) || open
+
+  return (
+    <>
+      <Button
+        variant="text"
+        disableRipple
+        onClick={(event) => setAnchorEl(event.currentTarget)}
+        aria-haspopup="menu"
+        aria-expanded={open ? 'true' : undefined}
+        endIcon={
+          <KeyboardArrowDownRoundedIcon
+            sx={{
+              fontSize: 20,
+              transition: 'transform 0.2s ease',
+              transform: open ? 'rotate(180deg)' : 'none',
+            }}
+          />
+        }
+        sx={{
+          px: 2,
+          py: 1,
+          minWidth: 0,
+          borderRadius: 999,
+          fontWeight: 600,
+          fontSize: '1.05rem',
+          lineHeight: 1.2,
+          whiteSpace: 'nowrap',
+          color: lit ? '#fff' : 'text.secondary',
+          background: lit ? ACTIVE_PILL : 'transparent',
+          boxShadow: lit ? ACTIVE_GLOW : 'none',
+          transition:
+            'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
+          '& .MuiButton-endIcon': { ml: 0.25 },
+          '&:hover': {
+            color: lit ? '#fff' : 'text.primary',
+            background: lit ? ACTIVE_PILL : 'action.hover',
+          },
+        }}
+      >
+        {group.label}
+      </Button>
+      <Menu
+        anchorEl={anchorEl}
+        open={open}
+        onClose={() => setAnchorEl(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 1,
+              minWidth: 200,
+              p: 0.75,
+              borderRadius: 3,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: (theme) =>
+                theme.palette.mode === 'dark'
+                  ? 'rgba(16,18,27,0.94)'
+                  : 'rgba(255,255,255,0.97)',
+              backdropFilter: 'blur(12px)',
+              boxShadow: '0 16px 40px rgba(0,0,0,0.24)',
+            },
+          },
+          list: { sx: { py: 0 } },
+        }}
+      >
+        {group.children.map((item) => (
+          <MenuItem
+            key={item.to}
+            component={NavLink}
+            to={item.to}
+            end={item.end}
+            onClick={() => setAnchorEl(null)}
+            sx={{
+              borderRadius: 2,
+              px: 1.75,
+              py: 1.1,
+              my: 0.25,
+              fontWeight: 600,
+              fontSize: '1rem',
+              color: 'text.secondary',
+              transition: 'color 0.15s ease, background 0.2s ease',
+              '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+              '&.active': {
+                color: '#fff',
+                background: ACTIVE_PILL,
+                boxShadow: ACTIVE_GLOW,
+                '&:hover': { color: '#fff', background: ACTIVE_PILL },
+              },
+            }}
+          >
+            {item.label}
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
+  )
+}
+
+/** Mobile drawer: a collapsible section listing the group's child routes,
+ *  auto-expanded when one of them is the current page. */
+function MobileNavGroup({
+  group,
+  onNavigate,
+}: {
+  group: NavGroup
+  onNavigate: () => void
+}) {
+  const active = useGroupActive(group)
+  const [open, setOpen] = useState(active)
+
+  return (
+    <>
+      <ListItemButton
+        onClick={() => setOpen((value) => !value)}
+        sx={{
+          borderRadius: 2,
+          my: 0.5,
+          py: 1.25,
+          color: active ? 'text.primary' : 'text.secondary',
+          '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+          '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.1rem' },
+        }}
+      >
+        <ListItemText primary={group.label} />
+        <KeyboardArrowDownRoundedIcon
+          sx={{
+            color: 'text.secondary',
+            transition: 'transform 0.2s ease',
+            transform: open ? 'rotate(180deg)' : 'none',
+          }}
+        />
+      </ListItemButton>
+      <Collapse in={open} timeout="auto" unmountOnExit>
+        <List disablePadding sx={{ pl: 1 }}>
+          {group.children.map((item) => (
+            <ListItemButton
+              key={item.to}
+              component={NavLink}
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              sx={{
+                borderRadius: 2,
+                my: 0.5,
+                py: 1,
+                pl: 3,
+                color: 'text.secondary',
+                transition: 'color 0.2s ease, background 0.2s ease',
+                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                '&.active': {
+                  color: '#fff',
+                  background: ACTIVE_PILL,
+                  boxShadow: ACTIVE_GLOW,
+                  '&:hover': { color: '#fff', background: ACTIVE_PILL },
+                },
+                '& .MuiListItemText-primary': {
+                  fontWeight: 600,
+                  fontSize: '1.02rem',
+                },
+              }}
+            >
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Collapse>
+    </>
+  )
+}
+
 function App() {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -189,40 +396,44 @@ function App() {
                 spacing={0.5}
                 sx={{ alignItems: 'center' }}
               >
-                {navItems.map((item) => (
-                  <Button
-                    key={item.to}
-                    component={NavLink}
-                    to={item.to}
-                    end={item.end}
-                    variant="text"
-                    disableRipple
-                    sx={{
-                      px: 2,
-                      py: 1,
-                      minWidth: 0,
-                      borderRadius: 999,
-                      fontWeight: 600,
-                      fontSize: '1.05rem',
-                      lineHeight: 1.2,
-                      whiteSpace: 'nowrap',
-                      color: 'text.secondary',
-                      transition:
-                        'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
-                      '&:hover:not(.active)': {
-                        color: 'text.primary',
-                        bgcolor: 'action.hover',
-                      },
-                      '&.active': {
-                        color: '#fff',
-                        background: ACTIVE_PILL,
-                        boxShadow: ACTIVE_GLOW,
-                      },
-                    }}
-                  >
-                    {item.label}
-                  </Button>
-                ))}
+                {navItems.map((item) =>
+                  isGroup(item) ? (
+                    <DesktopNavGroup key={item.label} group={item} />
+                  ) : (
+                    <Button
+                      key={item.to}
+                      component={NavLink}
+                      to={item.to}
+                      end={item.end}
+                      variant="text"
+                      disableRipple
+                      sx={{
+                        px: 2,
+                        py: 1,
+                        minWidth: 0,
+                        borderRadius: 999,
+                        fontWeight: 600,
+                        fontSize: '1.05rem',
+                        lineHeight: 1.2,
+                        whiteSpace: 'nowrap',
+                        color: 'text.secondary',
+                        transition:
+                          'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
+                        '&:hover:not(.active)': {
+                          color: 'text.primary',
+                          bgcolor: 'action.hover',
+                        },
+                        '&.active': {
+                          color: '#fff',
+                          background: ACTIVE_PILL,
+                          boxShadow: ACTIVE_GLOW,
+                        },
+                      }}
+                    >
+                      {item.label}
+                    </Button>
+                  ),
+                )}
               </Stack>
               <ColorModeToggle />
             </Stack>
@@ -264,35 +475,43 @@ function App() {
         </Box>
         <Divider />
         <List sx={{ px: 1, py: 1.5 }}>
-          {navItems.map((item) => (
-            <ListItemButton
-              key={item.to}
-              component={NavLink}
-              to={item.to}
-              end={item.end}
-              onClick={() => setDrawerOpen(false)}
-              sx={{
-                borderRadius: 2,
-                my: 0.5,
-                py: 1.25,
-                color: 'text.secondary',
-                transition: 'color 0.2s ease, background 0.2s ease',
-                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
-                '&.active': {
-                  color: '#fff',
-                  background: ACTIVE_PILL,
-                  boxShadow: ACTIVE_GLOW,
-                  '&:hover': { color: '#fff', background: ACTIVE_PILL },
-                },
-                '& .MuiListItemText-primary': {
-                  fontWeight: 600,
-                  fontSize: '1.1rem',
-                },
-              }}
-            >
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
+          {navItems.map((item) =>
+            isGroup(item) ? (
+              <MobileNavGroup
+                key={item.label}
+                group={item}
+                onNavigate={() => setDrawerOpen(false)}
+              />
+            ) : (
+              <ListItemButton
+                key={item.to}
+                component={NavLink}
+                to={item.to}
+                end={item.end}
+                onClick={() => setDrawerOpen(false)}
+                sx={{
+                  borderRadius: 2,
+                  my: 0.5,
+                  py: 1.25,
+                  color: 'text.secondary',
+                  transition: 'color 0.2s ease, background 0.2s ease',
+                  '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                  '&.active': {
+                    color: '#fff',
+                    background: ACTIVE_PILL,
+                    boxShadow: ACTIVE_GLOW,
+                    '&:hover': { color: '#fff', background: ACTIVE_PILL },
+                  },
+                  '& .MuiListItemText-primary': {
+                    fontWeight: 600,
+                    fontSize: '1.1rem',
+                  },
+                }}
+              >
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            ),
+          )}
         </List>
       </Drawer>
 
