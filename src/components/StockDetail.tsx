@@ -38,6 +38,7 @@ import {
   useRatingsAnalysis,
   useStockAnalysis,
   useStockNews,
+  useStockTrend,
   useSupportLevels,
   useTickerCard,
 } from '@/lib/queries'
@@ -50,6 +51,7 @@ import SwapVertIcon from '@mui/icons-material/SwapVert'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
 import ScorecardCard from '@/components/ScorecardCard'
+import TrendCard from '@/components/TrendCard'
 import StockHeader from '@/components/StockHeader'
 import StockCard from '@/components/StockCard'
 import ValuationCard from '@/components/ValuationCard'
@@ -187,6 +189,10 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // scan that doesn't refetch as the range changes; the chart draws just the
   // ones inside the visible price range.
   const supportQuery = useSupportLevels(loadedSymbol)
+  // The short/long-term trend read (a fixed 1Y daily EMA-slope read, keyed by
+  // symbol only like support levels). Best-effort context that pairs with the
+  // price chart: a failure just omits the card, never disturbs the tab.
+  const trendQuery = useStockTrend(loadedSymbol)
   // EMA overlay follows the chart's range (so the lines sit under the same bars)
   // and is only fetched while the toggle is on. Best-effort: a failure just
   // leaves the overlay off, never disturbs the price chart.
@@ -402,6 +408,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           {analysisQuery.data && (
             <ScorecardCard analysis={analysisQuery.data} />
           )}
+
+          {/* The trend read pairs with the chart: which way the stock is
+              heading short- vs long-term. Best-effort context, so it just
+              appears once it lands and self-hides on a failure. */}
+          {trendQuery.data && <TrendCard trend={trendQuery.data} />}
 
           {/* The price chart anchors the tab. */}
           <Card variant="outlined" sx={{ borderColor: 'divider' }}>

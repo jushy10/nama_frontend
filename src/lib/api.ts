@@ -385,6 +385,59 @@ export interface EmaSeries {
   lines: EmaLine[]
 }
 
+/** Which way one horizon is heading, read off the slope of its EMA. */
+export type TrendDirection = 'up' | 'down' | 'sideways'
+
+/**
+ * The two horizons combined into one plain reading — the headline. The long
+ * horizon sets the primary trend; the short one qualifies it (e.g. an uptrend
+ * that's `uptrend_pullback` when the short term has turned down). `unknown` when
+ * there isn't enough history to read a horizon.
+ */
+export type TrendReading =
+  | 'uptrend'
+  | 'uptrend_pullback'
+  | 'uptrend_consolidating'
+  | 'downtrend'
+  | 'downtrend_bounce'
+  | 'downtrend_stalling'
+  | 'range_bound'
+  | 'range_turning_up'
+  | 'range_turning_down'
+  | 'unknown'
+
+/**
+ * One horizon's trend read, from the slope of its EMA. `slope_percent` is that
+ * slope averaged per bar (what the sideways band is applied to); `change_percent`
+ * is the same move totalled over the `lookback` bars it was measured across.
+ * `price_vs_ema_percent` is where the latest close sits relative to the EMA
+ * (positive = above), context the direction doesn't fold in.
+ */
+export interface TrendLeg {
+  period: number
+  lookback: number
+  direction: TrendDirection
+  slope_percent: number
+  change_percent: number
+  price_vs_ema_percent: number
+  ema: number
+}
+
+/**
+ * A ticker's trend at a short and a long horizon, plus their combined `reading`.
+ * `short_term` / `long_term` are null when a horizon lacks the history to warm
+ * its EMA (and the reading is then `unknown`). `reference_price` is the latest
+ * close the read was taken at.
+ */
+export interface StockTrend {
+  symbol: string
+  timeframe: string
+  reference_price: number
+  reading: TrendReading
+  short_term: TrendLeg | null
+  long_term: TrendLeg | null
+}
+
 /** A trading suggestion derived from RSI, from Strong Buy down to Strong Sell. */
 export type RsiAction = 'Strong Buy' | 'Buy' | 'Hold' | 'Sell' | 'Strong Sell'
 
@@ -1842,6 +1895,40 @@ export async function getSupportLevels(
   const data = (await res.json()) as SupportLevels
   if (!Array.isArray(data?.levels)) {
     throw new ApiError(res.status, 'Malformed support-levels response')
+  }
+  return data
+}
+
+/**
+ * Fetch a ticker's short/long-term trend read (the direction at two EMA
+ * horizons plus their combined reading). Defaults to a 1-year daily read with
+ * the 20-period short vs 50-period long horizons; pass 50/200 for the classic
+ * long-term read. Like support levels it's a fixed window independent of the
+ * chart's range. Best-effort context: a caller treats a failure as "no read".
+ */
+export async function getStockTrend(
+  symbol: string,
+  opts: {
+    range?: ChartRange
+    timeframe?: Timeframe
+    shortPeriod?: number
+    longPeriod?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<StockTrend> {
+  const timeframe = opts.timeframe ?? '1Day'
+  const range = opts.range ?? '1Y'
+  const qs = new URLSearchParams({ timeframe, range })
+  if (opts.shortPeriod) qs.set('short_period', String(opts.shortPeriod))
+  if (opts.longPeriod) qs.set('long_period', String(opts.longPeriod))
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/trend?${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as StockTrend
+  if (typeof data?.reading !== 'string') {
+    throw new ApiError(res.status, 'Malformed trend response')
   }
   return data
 }
