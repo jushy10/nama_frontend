@@ -159,6 +159,9 @@ function ColorModeToggle() {
       aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       sx={{
+        // 44x44 minimum tap target (10px padding + 24px icon) for comfortable
+        // thumb use — this sits in the top bar on mobile.
+        p: 1.25,
         color: 'text.secondary',
         border: 1,
         borderColor: 'divider',
@@ -446,7 +449,8 @@ function App() {
               <IconButton
                 aria-label="Open navigation menu"
                 onClick={() => setDrawerOpen(true)}
-                sx={{ color: 'text.primary' }}
+                // 44x44 minimum tap target (10px padding + 24px icon).
+                sx={{ color: 'text.primary', p: 1.25 }}
               >
                 <MenuIcon />
               </IconButton>
