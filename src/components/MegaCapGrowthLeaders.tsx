@@ -316,7 +316,7 @@ function GrowthLeadersCard({ list }: { list: GrowthList }) {
 export default function MegaCapGrowthLeaders() {
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 5, md: 6 } }}>
         <BandHeader
           icon={<RocketLaunchIcon />}
           title="Mega-cap growth leaders"

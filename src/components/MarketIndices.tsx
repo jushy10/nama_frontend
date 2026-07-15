@@ -37,12 +37,12 @@ const INDICES: QuoteDef[] = [
   { label: 'Dow Jones', symbol: 'DIA' },
 ]
 
-// The band runs the full `xl` width on desktop, so the chart gets extra height
-// there to keep a balanced landscape shape at that span (the stock page's chart
-// defaults to 360). Phones keep the original height so a portrait-tall chart
-// doesn't dominate the screen.
-const CHART_HEIGHT_DESKTOP = 440
-const CHART_HEIGHT_MOBILE = 360
+// A compact landscape chart for the home band — trimmed from the stock page's
+// taller default so the section reads as a slim strip and more of the page's
+// market data lands in view without scrolling. Phones go shorter still so a
+// portrait-tall chart doesn't dominate the screen.
+const CHART_HEIGHT_DESKTOP = 340
+const CHART_HEIGHT_MOBILE = 280
 
 /**
  * Home-page band of major US index proxies with their move for the day, plus a
@@ -83,7 +83,7 @@ export default function MarketIndices() {
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 5, md: 6 } }}>
         <BandHeader
           icon={<ShowChartIcon />}
           title="Markets today"
