@@ -10,6 +10,7 @@ import LockOpenIcon from '@mui/icons-material/LockOpen'
 import { heroWash } from '@/components/heroWash'
 import { fontFamilyMono } from '@/theme'
 import HomeSearchBar from '@/components/HomeSearchBar'
+import MarketSnapshot from '@/components/MarketSnapshot'
 import MarketStatusDot from '@/components/MarketStatusDot'
 import { getMarketStatus, marketLabel } from '@/lib/market'
 
@@ -33,16 +34,15 @@ const MARKERS: { icon: SvgIconComponent; label: string }[] = [
 ]
 
 /**
- * Home-page hero: the app's front door, built around what it is — an AI-driven
- * stock screener. A live market-status line set in mono like a ticker, a
- * headline that states the pitch with the accent phrase in solid brand blue, one
- * tight line of description, and — as the primary call to action — the universe
- * search itself, so a visitor's first move is to look something up rather than
- * read about it. Two secondary buttons open the screener and heat map; a row of
- * quiet coverage tags underlines the reach and the AI angle. The soft brand wash
- * (shared with the stock-detail hero cards) plus a masked grid give the band
- * depth; the stack eases in on load (reduced-motion safe) and everything scales
- * down cleanly on phones.
+ * Home-page hero, redesigned as a split: the pitch and the universe search on
+ * the left, a live "market at a glance" snapshot on the right — so a visitor
+ * sees how the market is doing *and* can look up any name without scrolling. The
+ * left column keeps the search-first identity (a live market-status ticker line,
+ * a two-tone headline, one tight line of copy, the search itself as the primary
+ * action, two jumps into the screener/heat map, and quiet coverage tags); the
+ * right column carries {@link MarketSnapshot}. On phones the two columns stack,
+ * search above the snapshot. The soft brand wash + masked grid give the band
+ * depth; the left stack eases in on load (reduced-motion safe).
  */
 export default function HomeHero() {
   const now = new Date()
@@ -77,162 +77,178 @@ export default function HomeHero() {
 
       <Container
         maxWidth="xl"
-        sx={{ position: 'relative', py: { xs: 6, sm: 9, md: 11 } }}
+        sx={{ position: 'relative', py: { xs: 5, sm: 6, md: 8 } }}
       >
-        <Stack
-          spacing={{ xs: 2.5, sm: 3 }}
+        <Box
           sx={{
-            maxWidth: { xs: '100%', md: 960 },
-            // A single, gentle entrance on load — the hero settles into place
-            // rather than snapping in. Purely additive, and disabled for
-            // visitors who ask for less motion.
-            '@keyframes heroIn': {
-              from: { opacity: 0, transform: 'translateY(14px)' },
-              to: { opacity: 1, transform: 'none' },
+            display: 'grid',
+            gap: { xs: 4, md: 6 },
+            alignItems: 'center',
+            gridTemplateColumns: {
+              xs: '1fr',
+              md: 'minmax(0, 1.3fr) minmax(0, 1fr)',
             },
-            animation: 'heroIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both',
-            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
           }}
         >
-          {/* Eyebrow: the live market phase + today's date, set in mono like a
-              ticker, reading the same phase as the app-bar status dot. */}
           <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', color: 'text.primary' }}
-          >
-            <MarketStatusDot phase={phase} />
-            <Typography
-              variant="caption"
-              sx={{
-                fontFamily: fontFamilyMono,
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.1em',
-                fontSize: '0.72rem',
-              }}
-            >
-              {marketLabel(now)} · {todayLabel(now)}
-            </Typography>
-          </Stack>
-
-          {/* Headline: the accent phrase in solid brand blue (not a gradient) —
-              restraint, and it holds contrast on the wash in both modes. */}
-          <Typography
-            variant="h1"
-            component="h1"
+            spacing={{ xs: 2.25, sm: 2.75 }}
             sx={{
-              fontWeight: 700,
-              letterSpacing: '-0.035em',
-              lineHeight: 1.02,
-              fontSize: { xs: '2.4rem', sm: '3.4rem', md: '4rem' },
+              // A single, gentle entrance on load — the hero settles into place
+              // rather than snapping in. Purely additive, and disabled for
+              // visitors who ask for less motion.
+              '@keyframes heroIn': {
+                from: { opacity: 0, transform: 'translateY(14px)' },
+                to: { opacity: 1, transform: 'none' },
+              },
+              animation: 'heroIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both',
+              '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
             }}
           >
-            The stock screener,{' '}
-            {/* Keep the accent phrase "driven by AI" on one line so it never
-                breaks mid-phrase (or clips "AI"). */}
-            <Box
-              component="span"
-              sx={{ whiteSpace: 'nowrap', color: 'primary.main' }}
+            {/* Eyebrow: the live market phase + today's date, set in mono like a
+                ticker, reading the same phase as the app-bar status dot. */}
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ alignItems: 'center', color: 'text.primary' }}
             >
-              driven by AI
-            </Box>
-          </Typography>
-
-          <Typography
-            sx={{
-              color: 'text.secondary',
-              fontSize: { xs: '1.05rem', sm: '1.2rem' },
-              lineHeight: 1.6,
-              maxWidth: 640,
-            }}
-          >
-            Screen 1,000+ US stocks and ETFs, then let AI read any name in plain
-            English: fundamentals, earnings, analyst coverage and the options
-            market.
-          </Typography>
-
-          {/* Primary action: the universe search itself. */}
-          <Box sx={{ pt: 0.5 }}>
-            <HomeSearchBar />
-          </Box>
-
-          <Stack
-            direction={{ xs: 'column', sm: 'row' }}
-            spacing={1.5}
-            sx={{ width: { xs: '100%', sm: 'auto' } }}
-          >
-            <Button
-              component={RouterLink}
-              to="/screener"
-              variant="outlined"
-              size="large"
-              startIcon={<TableRowsIcon />}
-              sx={{
-                borderColor: 'divider',
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  bgcolor: 'action.hover',
-                },
-              }}
-            >
-              Open the Screener
-            </Button>
-            <Button
-              component={RouterLink}
-              to="/heatmap"
-              variant="outlined"
-              size="large"
-              startIcon={<BoltIcon />}
-              sx={{
-                borderColor: 'divider',
-                color: 'text.primary',
-                '&:hover': {
-                  borderColor: 'primary.main',
-                  bgcolor: 'action.hover',
-                },
-              }}
-            >
-              Market heat map
-            </Button>
-          </Stack>
-
-          {/* Coverage tags — quiet proof of what the engine spans and that it's
-              free, each a small bordered marker instead of dot-separated text. */}
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ pt: 0.5, flexWrap: 'wrap' }}
-          >
-            {MARKERS.map(({ icon: Icon, label }) => (
-              <Stack
-                key={label}
-                direction="row"
-                spacing={0.75}
+              <MarketStatusDot phase={phase} />
+              <Typography
+                variant="caption"
                 sx={{
-                  alignItems: 'center',
-                  px: 1.25,
-                  py: 0.5,
-                  borderRadius: 999,
-                  border: 1,
-                  borderColor: 'divider',
-                  bgcolor: 'background.paper',
-                  color: 'text.secondary',
+                  fontFamily: fontFamilyMono,
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1em',
+                  fontSize: '0.72rem',
                 }}
               >
-                <Icon sx={{ fontSize: 15, color: 'secondary.main' }} />
-                <Typography
-                  variant="caption"
-                  sx={{ fontWeight: 600, lineHeight: 1 }}
+                {marketLabel(now)} · {todayLabel(now)}
+              </Typography>
+            </Stack>
+
+            {/* Headline: the accent phrase in solid brand blue (not a gradient) —
+                restraint, and it holds contrast on the wash in both modes. */}
+            <Typography
+              variant="h1"
+              component="h1"
+              sx={{
+                fontWeight: 700,
+                letterSpacing: '-0.035em',
+                lineHeight: 1.03,
+                fontSize: { xs: '2.2rem', sm: '2.9rem', md: '3.35rem' },
+              }}
+            >
+              The stock screener,{' '}
+              {/* Keep the accent phrase "driven by AI" on one line so it never
+                  breaks mid-phrase (or clips "AI"). */}
+              <Box
+                component="span"
+                sx={{ whiteSpace: 'nowrap', color: 'primary.main' }}
+              >
+                driven by AI
+              </Box>
+            </Typography>
+
+            <Typography
+              sx={{
+                color: 'text.secondary',
+                fontSize: { xs: '1.05rem', sm: '1.15rem' },
+                lineHeight: 1.55,
+                maxWidth: 520,
+              }}
+            >
+              Screen 1,000+ US stocks and ETFs, then let AI read any name in
+              plain English.
+            </Typography>
+
+            {/* Primary action: the universe search itself. */}
+            <Box sx={{ pt: 0.5 }}>
+              <HomeSearchBar />
+            </Box>
+
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              sx={{ width: { xs: '100%', sm: 'auto' } }}
+            >
+              <Button
+                component={RouterLink}
+                to="/screener"
+                variant="outlined"
+                size="large"
+                startIcon={<TableRowsIcon />}
+                sx={{
+                  borderColor: 'divider',
+                  color: 'text.primary',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                Open the Screener
+              </Button>
+              <Button
+                component={RouterLink}
+                to="/heatmap"
+                variant="outlined"
+                size="large"
+                startIcon={<BoltIcon />}
+                sx={{
+                  borderColor: 'divider',
+                  color: 'text.primary',
+                  '&:hover': {
+                    borderColor: 'primary.main',
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                Market heat map
+              </Button>
+            </Stack>
+
+            {/* Coverage tags — quiet proof of what the engine spans and that it's
+                free, each a small bordered marker instead of dot-separated text. */}
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ pt: 0.5, flexWrap: 'wrap' }}
+            >
+              {MARKERS.map(({ icon: Icon, label }) => (
+                <Stack
+                  key={label}
+                  direction="row"
+                  spacing={0.75}
+                  sx={{
+                    alignItems: 'center',
+                    px: 1.25,
+                    py: 0.5,
+                    borderRadius: 999,
+                    border: 1,
+                    borderColor: 'divider',
+                    bgcolor: 'background.paper',
+                    color: 'text.secondary',
+                  }}
                 >
-                  {label}
-                </Typography>
-              </Stack>
-            ))}
+                  <Icon sx={{ fontSize: 15, color: 'secondary.main' }} />
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 600, lineHeight: 1 }}
+                  >
+                    {label}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
           </Stack>
-        </Stack>
+
+          {/* Right column: the live market snapshot. On phones it drops below the
+              search (source order), so the pitch and the primary action stay first. */}
+          <Box sx={{ width: '100%' }}>
+            <MarketSnapshot />
+          </Box>
+        </Box>
       </Container>
     </Box>
   )

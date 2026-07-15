@@ -1,9 +1,7 @@
 import { Box, Container } from '@mui/material'
 import HomeHero from '@/components/HomeHero'
 import FeatureBento from '@/components/FeatureBento'
-import TodaysBriefCard from '@/components/TodaysBriefCard'
 import MarketIndices from '@/components/MarketIndices'
-import MarketSentiment from '@/components/MarketSentiment'
 import MarketSummary from '@/components/MarketSummary'
 import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
 import SectorPulse from '@/components/SectorPulse'
@@ -12,14 +10,17 @@ import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
 import { usePageMeta } from '@/lib/usePageMeta'
 
 /**
- * Home dashboard, read top to bottom as one story: a search-first hero that
- * states the pitch (an AI-driven stock screener), a bento grid of what the app
- * can do, then the day's live index moves (what's happening now), the AI market
- * + sector reads (what it means), and finally the mega-cap growth leaders (where
- * to look). Every band shares the same `xl` width and vertical rhythm so the
- * page reads as one system — the same width as the app bar and the rest of the
- * app — and each stacks cleanly on phones. Bands below the fold ease in on
- * scroll (see `Reveal`), a light cascade that respects reduced-motion.
+ * Home dashboard, read top to bottom as one story that leads with the market,
+ * not the marketing. A split search-first hero states the pitch and carries a
+ * live "market at a glance" snapshot beside the search — the three index moves
+ * plus the market's mood as a compact Fear & Greed dial and VIX scale — so a
+ * visitor reads how the market is doing without scrolling. Below it the reads a
+ * visitor comes for lead the page: the AI market summary and sector pulse (what
+ * it means), then the mega-cap growth leaders (where to look). The index chart
+ * follows, and the feature grid (explore the app) sits at the foot. Every band
+ * shares the same `xl` width and a slim vertical rhythm so the page reads as one
+ * tight system; bands below the fold ease in on scroll (see `Reveal`), a light
+ * cascade that respects reduced-motion.
  *
  * The two AI reads are best-effort and side by side. Each is gated on its own
  * query, so if one model read fails the survivor flexes to the full width; the
@@ -39,36 +40,16 @@ function Home() {
     <>
       <HomeHero />
 
-      <Reveal>
-        <FeatureBento />
-      </Reveal>
-
-      <Reveal delay={80}>
-        <TodaysBriefCard />
-      </Reveal>
-
-      <Reveal delay={80}>
-        <MarketIndices />
-      </Reveal>
-
-      <Reveal delay={80}>
-        <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-          <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
-            <MarketSentiment />
-          </Container>
-        </Box>
-      </Reveal>
-
       {(!marketFailed || !sectorFailed) && (
-        <Reveal delay={80}>
+        <Reveal>
           <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-            <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+            <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 5, md: 6 } }}>
               <Box
                 sx={{
                   display: 'flex',
                   flexDirection: { xs: 'column', md: 'row' },
                   alignItems: { xs: 'stretch', md: 'flex-start' },
-                  gap: { xs: 5, md: 4 },
+                  gap: { xs: 4, md: 4 },
                 }}
               >
                 {!marketFailed && (
@@ -89,6 +70,14 @@ function Home() {
 
       <Reveal delay={80}>
         <MegaCapGrowthLeaders />
+      </Reveal>
+
+      <Reveal delay={80}>
+        <MarketIndices />
+      </Reveal>
+
+      <Reveal delay={80}>
+        <FeatureBento />
       </Reveal>
     </>
   )

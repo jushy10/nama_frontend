@@ -11,11 +11,16 @@ describe('Home', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders the market sentiment band', () => {
+  it('leads with the AI market read', () => {
     renderWithProviders(<Home />)
 
+    // The two AI reads open with an <h2>; use the level to disambiguate from the
+    // like-named <h3> tiles in the feature grid lower down the page.
     expect(
-      screen.getByRole('heading', { name: /market sentiment/i }),
+      screen.getByRole('heading', { level: 2, name: /market summary/i }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { level: 2, name: /sector pulse/i }),
     ).toBeInTheDocument()
   })
 
