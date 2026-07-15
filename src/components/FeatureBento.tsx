@@ -123,8 +123,12 @@ function FeatureTile({ tile }: { tile: Tile }) {
       >
         {tile.icon}
       </Box>
+      {/* Uniform <h3> under the section's <h2> — the visual size still varies
+          by tile via `variant`, but the semantic level must not (screen-reader
+          heading order was jumping H2 -> H5/H6 and alternating between tiles). */}
       <Typography
         variant={tile.featured ? 'h5' : 'h6'}
+        component="h3"
         sx={{ fontWeight: 700, mb: 0.75 }}
       >
         {tile.title}
