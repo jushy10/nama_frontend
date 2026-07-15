@@ -7,7 +7,6 @@ import {
   Container,
   Link,
   Skeleton,
-  Stack,
   Table,
   TableBody,
   TableCell,
@@ -27,6 +26,7 @@ import {
 } from '@/lib/api'
 import { errorMessage, useCongressActivity } from '@/lib/queries'
 import { usePageMeta } from '@/lib/usePageMeta'
+import PageHero from '@/components/PageHero'
 
 const ROWS_PER_PAGE = [25, 50, 100]
 
@@ -130,26 +130,19 @@ export default function Congress() {
   const showError = query.isError && !data
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-        <AccountBalanceIcon sx={{ color: 'primary.light' }} />
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{
-            color: 'primary.light',
-            fontWeight: 700,
-            fontSize: { xs: '1.5rem', sm: '2.125rem' },
-          }}
-        >
-          Congress Stock Trades
-        </Typography>
-      </Stack>
-      <Typography color="text.secondary" sx={{ mt: 1, maxWidth: '68ch' }}>
-        Recent stock trades disclosed by members of the US House and Senate
-        under the STOCK Act. Congress reports a dollar <em>range</em>, not an
-        exact amount, and can file up to 45 days after the trade.
-      </Typography>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+      <PageHero
+        eyebrowIcon={AccountBalanceIcon}
+        eyebrow="Congress trades"
+        title="Congress stock trades"
+        subtitle={
+          <>
+            Recent stock trades disclosed by members of the US House and Senate
+            under the STOCK Act. Congress reports a dollar <em>range</em>, not
+            an exact amount, and can file up to 45 days after the trade.
+          </>
+        }
+      />
 
       {/* Window selector — over the disclosure date. */}
       <Box sx={{ mt: 3 }}>

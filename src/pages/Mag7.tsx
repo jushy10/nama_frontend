@@ -1,6 +1,8 @@
-import { Box, Container, Stack, Typography } from '@mui/material'
+import { Container, Stack } from '@mui/material'
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import Mag7ComparisonCard from '@/components/Mag7ComparisonCard'
+import PageHero from '@/components/PageHero'
 import { usePageMeta } from '@/lib/usePageMeta'
 
 // The "Magnificent 7" mega-caps. These are tradeable tickers Alpaca quotes
@@ -28,23 +30,15 @@ export default function Mag7() {
   )
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ color: 'primary.light', fontWeight: 700 }}
-        >
-          Magnificent 7
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          The seven mega-cap stocks driving the market — Apple, Microsoft,
-          Alphabet, Amazon, Nvidia, Meta and Tesla — with their move for the
-          day.
-        </Typography>
-      </Box>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+      <PageHero
+        eyebrowIcon={AutoAwesomeOutlined}
+        eyebrow="Mega-cap leaders"
+        title="The Magnificent 7"
+        subtitle="Apple, Microsoft, Alphabet, Amazon, Nvidia, Meta and Tesla, with their move for the day and how they track the Nasdaq 100."
+      />
 
-      <Stack spacing={4}>
+      <Stack spacing={4} sx={{ mt: { xs: 2.5, sm: 3 } }}>
         <QuoteGrid items={MAG7} linkToStock />
         <Mag7ComparisonCard items={MAG7} benchmarks={BENCHMARKS} />
       </Stack>

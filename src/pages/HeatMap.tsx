@@ -16,10 +16,12 @@ import {
   type SectorWindow,
   type StockIndex,
 } from '@/lib/api'
+import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
 import { errorMessage, useHeatMap } from '@/lib/queries'
 import { dedupeShareClasses } from '@/lib/heatmap'
 import { usePageMeta } from '@/lib/usePageMeta'
 import HeatMapChart, { HeatMapLegend } from '@/components/HeatMap'
+import PageHero from '@/components/PageHero'
 
 const SCOPES: { value: StockIndex; label: string }[] = [
   { value: 'sp500', label: 'S&P 500' },
@@ -66,21 +68,19 @@ export default function HeatMapPage() {
   }, [board, timeframe])
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Box>
-        <Typography
-          variant="h4"
-          component="h1"
-          sx={{ color: 'primary.light', fontWeight: 700 }}
-        >
-          Market Heat Map
-        </Typography>
-        <Typography color="text.secondary" sx={{ mt: 1 }}>
-          Every stock a tile — sized by market cap, coloured by its move over
-          the timeframe you pick — grouped by sector and industry.{' '}
-          {isMobile ? 'Tap a tile for details.' : 'Click a tile to open it.'}
-        </Typography>
-      </Box>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+      <PageHero
+        eyebrowIcon={GridViewOutlined}
+        eyebrow="Market heat map"
+        title="The market at a glance"
+        subtitle={
+          <>
+            Every stock is a tile, sized by market cap and coloured by its move
+            over the timeframe you pick, grouped by sector and industry.{' '}
+            {isMobile ? 'Tap a tile for details.' : 'Click a tile to open it.'}
+          </>
+        }
+      />
 
       <Stack
         direction={{ xs: 'column', sm: 'row' }}

@@ -1,4 +1,5 @@
 import {
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -7,6 +8,7 @@ import {
 } from 'react'
 import { Box, Stack, Typography, useTheme } from '@mui/material'
 import type { Candle, EmaLine, SupportLevel } from '@/lib/api'
+import { fontFamilyMono } from '@/theme'
 
 // The chart's viewBox width tracks the container's pixel width (measured below),
 // so one viewBox unit ≈ one CSS pixel and the in-SVG axis text stays legible on
@@ -109,6 +111,8 @@ export default function CandleChart({
 }: Props) {
   const theme = useTheme()
   const [hover, setHover] = useState<number | null>(null)
+  // Stable, unique gradient id so several charts on one page don't collide.
+  const gradId = useId().replace(/:/g, '')
 
   // Measure the container so the viewBox width matches it 1:1 (see W_FALLBACK).
   // useLayoutEffect runs before paint, so the chart never flashes at the
@@ -299,6 +303,25 @@ export default function CandleChart({
     </Box>
   )
 
+  // A soft close-price area (drawn behind the candles) gives the plot depth; the
+  // "last price" marker and neutral crosshair-tag colours orient the eye. The
+  // area is tinted by the net move across the visible window.
+  const lastIdx = candles.length - 1
+  const lastCandle = candles[lastIdx]
+  const lastColor = lastCandle.close >= lastCandle.open ? up : down
+  const areaColor = lastCandle.close >= candles[0].close ? up : down
+  const areaD =
+    'M' +
+    candles
+      .map((d, i) => `${x(i).toFixed(2)},${y(d.close).toFixed(2)}`)
+      .join('L') +
+    `L${x(lastIdx).toFixed(2)},${volTop.toFixed(2)}L${x(0).toFixed(2)},${volTop.toFixed(2)}Z`
+  // Neutral tag: inverted from the surface so it reads in either mode. Dark ink
+  // sits on the coloured last-price tag (legible on both the emerald and red).
+  const tagBg = theme.palette.text.primary
+  const tagText = theme.palette.background.paper
+  const priceInk = '#0b0f14'
+
   return (
     <Box ref={wrapRef}>
       <Stack
@@ -362,6 +385,17 @@ export default function CandleChart({
           cursor: 'crosshair',
         }}
       >
+        <defs>
+          <linearGradient id={`area-${gradId}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={areaColor} stopOpacity={0.16} />
+            <stop offset="55%" stopColor={areaColor} stopOpacity={0.05} />
+            <stop offset="100%" stopColor={areaColor} stopOpacity={0} />
+          </linearGradient>
+        </defs>
+
+        {/* Soft close-price area — depth behind the candles. */}
+        <path d={areaD} fill={`url(#area-${gradId})`} pointerEvents="none" />
+
         {/* horizontal gridlines + price axis labels (right) */}
         {priceTicks.map((p, i) => (
           <g key={`p${i}`}>
@@ -373,7 +407,13 @@ export default function CandleChart({
               stroke={grid}
               strokeWidth={1}
             />
-            <text x={W - padRight + 6} y={y(p) + 3.5} fontSize={11} fill={axis}>
+            <text
+              x={W - padRight + 6}
+              y={y(p) + 3.5}
+              fontSize={11}
+              fill={axis}
+              fontFamily={fontFamilyMono}
+            >
               {fmtAxis(p)}
             </text>
           </g>
@@ -403,6 +443,7 @@ export default function CandleChart({
               fontSize={11}
               fill={axis}
               textAnchor={anchor}
+              fontFamily={fontFamilyMono}
             >
               {fmtDate(candles[i].timestamp, intraday)}
             </text>
@@ -514,7 +555,42 @@ export default function CandleChart({
           )
         })}
 
-        {/* hover crosshair */}
+        {/* last price: a coloured line + axis tag orienting the eye to "now",
+            drawn over the series but under the hover crosshair. */}
+        <g pointerEvents="none">
+          <line
+            x1={PAD.left}
+            x2={W - padRight}
+            y1={y(lastCandle.close)}
+            y2={y(lastCandle.close)}
+            stroke={lastColor}
+            strokeWidth={1}
+            strokeDasharray="2 3"
+            opacity={0.75}
+          />
+          <rect
+            x={W - padRight + 1}
+            y={y(lastCandle.close) - 8}
+            width={padRight - 2}
+            height={16}
+            rx={3}
+            fill={lastColor}
+          />
+          <text
+            x={W - padRight + (padRight - 1) / 2}
+            y={y(lastCandle.close) + 3.5}
+            fontSize={10.5}
+            fontWeight={700}
+            fill={priceInk}
+            textAnchor="middle"
+            fontFamily={fontFamilyMono}
+          >
+            {fmtPrice(lastCandle.close)}
+          </text>
+        </g>
+
+        {/* hover crosshair: vertical + horizontal lines through the hovered
+            close, a dot on the close, and price + date tags on the axes. */}
         {hover != null && (
           <g pointerEvents="none">
             <line
@@ -527,6 +603,76 @@ export default function CandleChart({
               strokeDasharray="3 3"
               opacity={0.6}
             />
+            <line
+              x1={PAD.left}
+              x2={W - padRight}
+              y1={y(c.close)}
+              y2={y(c.close)}
+              stroke={axis}
+              strokeWidth={1}
+              strokeDasharray="3 3"
+              opacity={0.45}
+            />
+            <circle
+              cx={x(hover)}
+              cy={y(c.close)}
+              r={3.2}
+              fill={cUp ? up : down}
+              stroke={theme.palette.background.paper}
+              strokeWidth={1.5}
+            />
+            {/* price tag on the right axis */}
+            <rect
+              x={W - padRight + 1}
+              y={y(c.close) - 8}
+              width={padRight - 2}
+              height={16}
+              rx={3}
+              fill={tagBg}
+            />
+            <text
+              x={W - padRight + (padRight - 1) / 2}
+              y={y(c.close) + 3.5}
+              fontSize={10.5}
+              fontWeight={700}
+              fill={tagText}
+              textAnchor="middle"
+              fontFamily={fontFamilyMono}
+            >
+              {fmtPrice(c.close)}
+            </text>
+            {/* date tag pinned to the bottom axis, clamped inside the plot */}
+            {(() => {
+              const label = fmtDate(c.timestamp, intraday)
+              const tw = Math.max(48, label.length * 6.4)
+              const tx = Math.max(
+                PAD.left + tw / 2,
+                Math.min(W - padRight - tw / 2, x(hover)),
+              )
+              return (
+                <>
+                  <rect
+                    x={tx - tw / 2}
+                    y={H - PAD.bottom + 4}
+                    width={tw}
+                    height={15}
+                    rx={3}
+                    fill={tagBg}
+                  />
+                  <text
+                    x={tx}
+                    y={H - PAD.bottom + 14.5}
+                    fontSize={10}
+                    fontWeight={600}
+                    fill={tagText}
+                    textAnchor="middle"
+                    fontFamily={fontFamilyMono}
+                  >
+                    {label}
+                  </text>
+                </>
+              )
+            })()}
           </g>
         )}
       </Box>
