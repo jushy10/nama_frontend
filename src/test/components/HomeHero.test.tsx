@@ -12,13 +12,16 @@ describe('HomeHero', () => {
       screen.getByRole('heading', { level: 1, name: /driven by ai/i }),
     ).toBeInTheDocument()
 
-    // The eyebrow carries the live market phase and today's spelled-out date,
-    // e.g. "Market Closed · Thursday, July 10".
+    // The status pill carries the live market phase and today's compact date,
+    // e.g. "Market Closed · Jul 14".
     expect(
       screen.getByText(
-        /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday),/i,
+        /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)\s+\d{1,2}\b/i,
       ),
     ).toBeInTheDocument()
+
+    // The coverage markers spell out what the engine spans, incl. the free angle.
+    expect(screen.getByText(/no login, no paywall/i)).toBeInTheDocument()
 
     // The primary action is the universe search box itself.
     expect(
