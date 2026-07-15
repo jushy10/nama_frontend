@@ -24,6 +24,8 @@ import { trackEvent } from '@/lib/analytics'
 import { usePageMeta } from '@/lib/usePageMeta'
 import StockDetail from '@/components/StockDetail'
 import EtfDetail from '@/components/EtfDetail'
+import SearchRecommendations from '@/components/SearchRecommendations'
+import { recordRecentSymbol } from '@/lib/recentSymbols'
 
 // How many suggestions to pull per kind — enough to surface the obvious names
 // without a wall of options. Stocks lead (they're what people search most), ETFs
@@ -70,9 +72,12 @@ export default function Search() {
   // its own data. Idle until a ticker is set.
   const typeQuery = useTickerType(urlSymbol || null)
 
-  // Keep the search box in sync with the URL ticker on deep links / back-forward.
+  // Keep the search box in sync with the URL ticker on deep links / back-forward,
+  // and clear it when navigation lands back on the bare page (?symbol dropped),
+  // so the empty landing doesn't show a stale query. Only fires on URL change,
+  // so typing on the landing is never wiped.
   useEffect(() => {
-    if (urlSymbol) setInput(urlSymbol)
+    setInput(urlSymbol)
   }, [urlSymbol])
 
   // Record which tickers actually get opened — fires once per resolved symbol
@@ -86,6 +91,9 @@ export default function Search() {
         ticker: resolved.ticker,
         asset_type: resolved.asset_type,
       })
+      // Also stash it locally so it resurfaces under "Recently viewed" on the
+      // next empty search (bad lookups never classify, so never land here).
+      recordRecentSymbol(resolved.ticker)
     }
   }, [typeQuery.data])
 
@@ -108,6 +116,9 @@ export default function Search() {
   const loading = typeQuery.isLoading
   const type = typeQuery.data
   const isEtf = type?.asset_type === 'etf'
+  // The recommendation landing owns the empty state: nothing requested in the
+  // URL and nothing loaded or in flight. It falls away the moment a search runs.
+  const showLanding = !urlSymbol && !type && !loading && !typeQuery.isError
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
@@ -188,6 +199,12 @@ export default function Search() {
           {loading ? 'Searching…' : 'Search'}
         </Button>
       </Stack>
+
+      {showLanding && (
+        <Box sx={{ mt: { xs: 5, md: 7 }, mx: 'auto', maxWidth: 920 }}>
+          <SearchRecommendations onPick={go} />
+        </Box>
+      )}
 
       <Box sx={{ mt: 4 }}>
         {loading && (
