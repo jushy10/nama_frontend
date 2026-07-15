@@ -1,38 +1,48 @@
 import { Link as RouterLink } from 'react-router-dom'
-import { Box, Button, Chip, Container, Stack, Typography } from '@mui/material'
+import { Box, Button, Container, Stack, Typography } from '@mui/material'
+import type { SvgIconComponent } from '@mui/icons-material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import TableRowsIcon from '@mui/icons-material/TableRows'
 import BoltIcon from '@mui/icons-material/Bolt'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
+import UpdateIcon from '@mui/icons-material/Update'
+import LockOpenIcon from '@mui/icons-material/LockOpen'
 import { heroWash } from '@/components/heroWash'
+import { fontFamilyMono } from '@/theme'
 import HomeSearchBar from '@/components/HomeSearchBar'
 import MarketStatusDot from '@/components/MarketStatusDot'
 import { getMarketStatus, marketLabel } from '@/lib/market'
 
-/** Today, spelled out (e.g. "Thursday, July 10") for the hero eyebrow. */
+/** Today, compact (e.g. "Tue, Jul 10") for the mono market-status line. */
 function todayLabel(now: Date): string {
   return now.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
+    weekday: 'short',
+    month: 'short',
     day: 'numeric',
   })
 }
 
-/** The three trust markers under the search bar — what the engine covers. */
-const TRUST = [
-  '1,000+ US stocks & ETFs',
-  'Refreshed daily',
-  'Powered by Claude',
+/** The coverage markers under the search bar — what the engine spans and that
+ *  it's free, each a quiet tag rather than a run of middle-dots. "Powered by
+ *  Claude" lives here, so it isn't repeated in a separate badge above. */
+const MARKERS: { icon: SvgIconComponent; label: string }[] = [
+  { icon: ShowChartIcon, label: '1,000+ US stocks & ETFs' },
+  { icon: UpdateIcon, label: 'Refreshed daily' },
+  { icon: AutoAwesomeIcon, label: 'Powered by Claude' },
+  { icon: LockOpenIcon, label: 'No login, no paywall' },
 ]
 
 /**
  * Home-page hero: the app's front door, built around what it is — an AI-driven
- * stock screener. A live market-status eyebrow, a two-tone headline that states
- * the pitch, a one-line description of the coverage, and — as the primary call
- * to action — the universe search itself, so a visitor's first move is to look
- * something up rather than read about it. A "Powered by Claude" badge and a few
- * coverage chips underline the AI angle; a secondary button opens the full
- * screener. The blue→gold wash (shared with the stock-detail hero cards) plus a
- * faint grid gives the band depth; everything stacks and scales on phones.
+ * stock screener. A live market-status line set in mono like a ticker, a
+ * headline that states the pitch with the accent phrase in solid brand blue, one
+ * tight line of description, and — as the primary call to action — the universe
+ * search itself, so a visitor's first move is to look something up rather than
+ * read about it. Two secondary buttons open the screener and heat map; a row of
+ * quiet coverage tags underlines the reach and the AI angle. The soft brand wash
+ * (shared with the stock-detail hero cards) plus a masked grid give the band
+ * depth; the stack eases in on load (reduced-motion safe) and everything scales
+ * down cleanly on phones.
  */
 export default function HomeHero() {
   const now = new Date()
@@ -43,7 +53,7 @@ export default function HomeHero() {
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        // The blue→gold wash, shared with the stock-detail hero cards.
+        // The soft blue→gold wash, shared with the stock-detail hero cards.
         background: (theme) => heroWash(theme),
       }}
     >
@@ -67,14 +77,25 @@ export default function HomeHero() {
 
       <Container
         maxWidth="xl"
-        sx={{ position: 'relative', py: { xs: 5, sm: 8 } }}
+        sx={{ position: 'relative', py: { xs: 6, sm: 9, md: 11 } }}
       >
         <Stack
-          spacing={{ xs: 2, sm: 2.5 }}
-          sx={{ maxWidth: { xs: '100%', md: 940 } }}
+          spacing={{ xs: 2.5, sm: 3 }}
+          sx={{
+            maxWidth: { xs: '100%', md: 960 },
+            // A single, gentle entrance on load — the hero settles into place
+            // rather than snapping in. Purely additive, and disabled for
+            // visitors who ask for less motion.
+            '@keyframes heroIn': {
+              from: { opacity: 0, transform: 'translateY(14px)' },
+              to: { opacity: 1, transform: 'none' },
+            },
+            animation: 'heroIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) both',
+            '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
+          }}
         >
-          {/* Eyebrow: live market phase + today's date, reading the same phase
-              as the app-bar status dot. */}
+          {/* Eyebrow: the live market phase + today's date, set in mono like a
+              ticker, reading the same phase as the app-bar status dot. */}
           <Stack
             direction="row"
             spacing={1}
@@ -84,40 +105,27 @@ export default function HomeHero() {
             <Typography
               variant="caption"
               sx={{
-                fontWeight: 700,
+                fontFamily: fontFamilyMono,
+                fontWeight: 600,
                 textTransform: 'uppercase',
-                letterSpacing: '0.08em',
+                letterSpacing: '0.1em',
+                fontSize: '0.72rem',
               }}
             >
               {marketLabel(now)} · {todayLabel(now)}
             </Typography>
           </Stack>
 
-          {/* Powered-by-Claude badge — the AI angle, stated plainly. */}
-          <Chip
-            icon={<AutoAwesomeIcon />}
-            label="AI stock screener · Powered by Claude"
-            size="small"
-            sx={{
-              alignSelf: 'flex-start',
-              fontWeight: 600,
-              color: 'text.primary',
-              bgcolor: 'background.paper',
-              border: 1,
-              borderColor: 'divider',
-              '& .MuiChip-icon': { color: 'secondary.main' },
-            }}
-          />
-
-          {/* Two-tone headline: the accent phrase in solid brand blue. */}
+          {/* Headline: the accent phrase in solid brand blue (not a gradient) —
+              restraint, and it holds contrast on the wash in both modes. */}
           <Typography
             variant="h1"
             component="h1"
             sx={{
               fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.08,
-              fontSize: { xs: '2.1rem', sm: '3rem', md: '3.5rem' },
+              letterSpacing: '-0.035em',
+              lineHeight: 1.02,
+              fontSize: { xs: '2.4rem', sm: '3.4rem', md: '4rem' },
             }}
           >
             The stock screener,{' '}
@@ -125,15 +133,7 @@ export default function HomeHero() {
                 breaks mid-phrase (or clips "AI"). */}
             <Box
               component="span"
-              sx={{
-                whiteSpace: 'nowrap',
-                // Solid brand blue — the "Nama" wordmark colour, adapting per
-                // mode (navy on light, lifted blue on dark). Replaces a
-                // blue→gold gradient text fill whose gold end fell below the
-                // 3:1 large-text contrast floor on the light wash and read as
-                // a generic "AI gradient" tell.
-                color: 'primary.main',
-              }}
+              sx={{ whiteSpace: 'nowrap', color: 'primary.main' }}
             >
               driven by AI
             </Box>
@@ -142,14 +142,14 @@ export default function HomeHero() {
           <Typography
             sx={{
               color: 'text.secondary',
-              fontSize: { xs: '1rem', sm: '1.15rem' },
+              fontSize: { xs: '1.05rem', sm: '1.2rem' },
               lineHeight: 1.6,
-              maxWidth: 720,
+              maxWidth: 640,
             }}
           >
-            Screen 1,000+ US stocks and ETFs, then let AI read each one for you
-            — fundamentals, earnings, analyst coverage and options, in plain
-            English. Start with any name below.
+            Screen 1,000+ US stocks and ETFs, then let AI read any name in plain
+            English: fundamentals, earnings, analyst coverage and the options
+            market.
           </Typography>
 
           {/* Primary action: the universe search itself. */}
@@ -160,7 +160,7 @@ export default function HomeHero() {
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
             spacing={1.5}
-            sx={{ pt: 0.5, width: { xs: '100%', sm: 'auto' } }}
+            sx={{ width: { xs: '100%', sm: 'auto' } }}
           >
             <Button
               component={RouterLink}
@@ -168,7 +168,14 @@ export default function HomeHero() {
               variant="outlined"
               size="large"
               startIcon={<TableRowsIcon />}
-              sx={{ borderColor: 'divider', color: 'text.primary' }}
+              sx={{
+                borderColor: 'divider',
+                color: 'text.primary',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: 'action.hover',
+                },
+              }}
             >
               Open the Screener
             </Button>
@@ -178,35 +185,51 @@ export default function HomeHero() {
               variant="outlined"
               size="large"
               startIcon={<BoltIcon />}
-              sx={{ borderColor: 'divider', color: 'text.primary' }}
+              sx={{
+                borderColor: 'divider',
+                color: 'text.primary',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: 'action.hover',
+                },
+              }}
             >
               Market heat map
             </Button>
           </Stack>
 
-          {/* Coverage chips — quiet proof of what the engine spans. */}
+          {/* Coverage tags — quiet proof of what the engine spans and that it's
+              free, each a small bordered marker instead of dot-separated text. */}
           <Stack
             direction="row"
-            spacing={0}
+            spacing={1}
             useFlexGap
-            sx={{ pt: 1, flexWrap: 'wrap' }}
+            sx={{ pt: 0.5, flexWrap: 'wrap' }}
           >
-            {TRUST.map((t) => (
-              <Typography
-                key={t}
-                variant="caption"
+            {MARKERS.map(({ icon: Icon, label }) => (
+              <Stack
+                key={label}
+                direction="row"
+                spacing={0.75}
                 sx={{
+                  alignItems: 'center',
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: 999,
+                  border: 1,
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
                   color: 'text.secondary',
-                  fontWeight: 600,
-                  '&:not(:last-of-type):after': {
-                    content: '"·"',
-                    px: 1.25,
-                    opacity: 0.5,
-                  },
                 }}
               >
-                {t}
-              </Typography>
+                <Icon sx={{ fontSize: 15, color: 'secondary.main' }} />
+                <Typography
+                  variant="caption"
+                  sx={{ fontWeight: 600, lineHeight: 1 }}
+                >
+                  {label}
+                </Typography>
+              </Stack>
             ))}
           </Stack>
         </Stack>

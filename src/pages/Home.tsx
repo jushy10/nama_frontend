@@ -53,7 +53,7 @@ function Home() {
 
       <Reveal delay={80}>
         <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-          <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
+          <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
             <MarketSentiment />
           </Container>
         </Box>
@@ -62,13 +62,13 @@ function Home() {
       {(!marketFailed || !sectorFailed) && (
         <Reveal delay={80}>
           <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-            <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
+            <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
               <Box
                 sx={{
                   display: 'flex',
                   flexDirection: { xs: 'column', md: 'row' },
                   alignItems: { xs: 'stretch', md: 'flex-start' },
-                  gap: { xs: 4, md: 3 },
+                  gap: { xs: 5, md: 4 },
                 }}
               >
                 {!marketFailed && (

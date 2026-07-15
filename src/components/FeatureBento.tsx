@@ -8,7 +8,7 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import DonutLargeIcon from '@mui/icons-material/DonutLarge'
 import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium'
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
-import SectionHeading from '@/components/SectionHeading'
+import BandHeader from '@/components/BandHeader'
 import { heroWash } from '@/components/heroWash'
 
 /** One feature tile: where it goes, its glyph, copy, and its grid footprint at
@@ -22,7 +22,8 @@ interface Tile {
   /** md column span (of 6) and row span. */
   cols: number
   rows?: number
-  /** The featured tile carries the brand wash instead of plain paper. */
+  /** The one featured tile carries the soft brand wash; the rest stay paper, so
+   *  hierarchy — not decoration — is what makes the grid read. */
   featured?: boolean
 }
 
@@ -31,7 +32,7 @@ const TILES: Tile[] = [
     to: '/search',
     icon: <AutoAwesomeIcon />,
     title: 'AI deep-dive on any name',
-    body: 'Search a stock or ETF and get an AI read in plain English — a fair-value verdict woven from fundamentals, earnings, analyst coverage and the options market.',
+    body: 'Search a stock or ETF and get an AI read in plain English: a fair-value verdict woven from fundamentals, earnings, analyst coverage and the options market.',
     cols: 3,
     rows: 2,
     featured: true,
@@ -40,14 +41,14 @@ const TILES: Tile[] = [
     to: '/heatmap',
     icon: <GridViewIcon />,
     title: 'Market heat map',
-    body: 'The whole market on one screen — every sector and industry, sized by market cap and coloured by the day’s move.',
+    body: 'The whole market on one screen: every sector and industry, sized by market cap and coloured by the day’s move.',
     cols: 3,
   },
   {
     to: '/screener',
     icon: <TableRowsIcon />,
     title: 'Stock screener',
-    body: 'Filter 1,000+ US stocks by growth, valuation, sector and index — sorted your way.',
+    body: 'Filter 1,000+ US stocks by growth, valuation, sector and index, sorted your way.',
     cols: 3,
   },
   {
@@ -113,12 +114,15 @@ function FeatureTile({ tile }: { tile: Tile }) {
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 40,
-          height: 40,
-          borderRadius: 2,
+          width: tile.featured ? 48 : 42,
+          height: tile.featured ? 48 : 42,
+          borderRadius: 2.5,
           color: tile.featured ? 'secondary.main' : 'primary.main',
           bgcolor: 'action.hover',
-          mb: 1.5,
+          border: 1,
+          borderColor: 'divider',
+          mb: tile.featured ? 2 : 1.5,
+          '& svg': { fontSize: tile.featured ? 26 : 22 },
         }}
       >
         {tile.icon}
@@ -170,22 +174,21 @@ function FeatureTile({ tile }: { tile: Tile }) {
 
 /**
  * A bento grid of what the app can do — the screener, heat map, sector reads,
- * ETF screen, Mag-7 comparison, and (featured, in the brand wash) the AI
- * deep-dive. Mixed tile sizes on desktop for a modern, magazine-y feel; a clean
- * two-up on tablets and a single stack on phones. Every tile is a link into the
- * matching page, lifting on hover so the whole band reads as interactive.
+ * ETF screen, Mag-7 comparison, and (featured, in the soft brand wash) the AI
+ * deep-dive. One prominent featured tile plus mixed sizes give the grid a clear
+ * hierarchy rather than six identical cards; a clean two-up on tablets and a
+ * single stack on phones. Every tile is a link into the matching page, lifting
+ * on hover so the band reads as interactive.
  */
 export default function FeatureBento() {
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7 } }}>
-        <Box sx={{ mb: { xs: 3, sm: 4 } }}>
-          <SectionHeading
-            icon={<AutoAwesomeIcon fontSize="small" />}
-            title="Everything in one place"
-            subtitle="Screen, compare and dig in — the whole US market, read by AI."
-          />
-        </Box>
+      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+        <BandHeader
+          icon={<AutoAwesomeIcon />}
+          title="Everything in one place"
+          subtitle="Screen, compare and dig in across the whole US market, read by AI."
+        />
         <Box
           sx={{
             display: 'grid',

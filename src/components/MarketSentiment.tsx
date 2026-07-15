@@ -10,7 +10,9 @@ import {
   useTheme,
 } from '@mui/material'
 import SpeedIcon from '@mui/icons-material/Speed'
+import BandHeader from '@/components/BandHeader'
 import FearGreedGauge from '@/components/FearGreedGauge'
+import { fontFamilyMono } from '@/theme'
 import { useMarketSentiment } from '@/lib/queries'
 import type {
   FearGreedSnapshot,
@@ -83,6 +85,60 @@ function useFearGreedColor() {
   }
 }
 
+/** A panel's header: a status-coloured dot, a mono title, and the muted source
+ *  it comes from — the same shape on both sides so the two reads read as a pair
+ *  and every figure stays attributable. */
+function PanelHeader({
+  title,
+  source,
+  dotColor,
+}: {
+  title: string
+  source: string
+  dotColor: string
+}) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={{ alignItems: 'center', justifyContent: 'space-between' }}
+    >
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+        <Box
+          sx={{
+            width: 9,
+            height: 9,
+            borderRadius: '50%',
+            bgcolor: dotColor,
+            flexShrink: 0,
+          }}
+        />
+        <Typography
+          sx={{
+            fontFamily: fontFamilyMono,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.09em',
+            fontSize: '0.74rem',
+          }}
+        >
+          {title}
+        </Typography>
+      </Stack>
+      <Typography
+        variant="caption"
+        sx={{
+          color: 'text.disabled',
+          fontWeight: 600,
+          letterSpacing: '0.02em',
+        }}
+      >
+        {source}
+      </Typography>
+    </Stack>
+  )
+}
+
 /** One trailing Fear & Greed reading: its label and the score, in its band colour. */
 function Comparison({
   label,
@@ -102,14 +158,17 @@ function Comparison({
           color: 'text.secondary',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
-          fontSize: '0.65rem',
+          fontSize: '0.62rem',
+          mb: 0.25,
         }}
       >
         {label}
       </Typography>
       <Typography
         sx={{
+          fontFamily: fontFamilyMono,
           fontWeight: 700,
+          fontSize: '1.05rem',
           fontVariantNumeric: 'tabular-nums',
           color: value == null ? 'text.secondary' : color,
         }}
@@ -123,29 +182,42 @@ function Comparison({
 /** The left panel: the Fear & Greed dial with its trailing then-vs-now scores. */
 function FearGreedPanel({ data }: { data: FearGreedSnapshot }) {
   const colorFor = useFearGreedColor()
+  const activeColor = colorFor(data.score)
   return (
-    <Stack spacing={2.5} sx={{ alignItems: 'center' }}>
+    <Stack spacing={2.5} sx={{ height: '100%' }}>
+      <PanelHeader title="Fear & Greed" source="CNN" dotColor={activeColor} />
       <FearGreedGauge score={data.score} label={data.label} />
-      <Box
-        sx={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 1.5,
-          width: '100%',
-          textAlign: 'center',
-        }}
-      >
-        {COMPARISONS.map(({ key, label }) => {
-          const value = data[key] as number | null
-          return (
-            <Comparison
-              key={key}
-              label={label}
-              value={value}
-              color={value == null ? '' : colorFor(value)}
-            />
-          )
-        })}
+      <Box sx={{ mt: 'auto', borderTop: 1, borderColor: 'divider', pt: 1.75 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            display: 'block',
+            color: 'text.secondary',
+            fontWeight: 600,
+            mb: 1,
+          }}
+        >
+          Recent readings
+        </Typography>
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 1.5,
+          }}
+        >
+          {COMPARISONS.map(({ key, label }) => {
+            const value = data[key] as number | null
+            return (
+              <Comparison
+                key={key}
+                label={label}
+                value={value}
+                color={value == null ? '' : colorFor(value)}
+              />
+            )
+          })}
+        </Box>
       </Box>
     </Stack>
   )
@@ -154,7 +226,19 @@ function FearGreedPanel({ data }: { data: FearGreedSnapshot }) {
 /** The right panel: the VIX level, its day move, regime, and a calm→turbulent bar. */
 function VixPanel({ data }: { data: VixSnapshot }) {
   const theme = useTheme()
-  const regime = REGIME[data.regime] ?? { label: data.regime, color: 'default' }
+  const regime = REGIME[data.regime] ?? {
+    label: data.regime,
+    color: 'default' as const,
+    help: '',
+  }
+  const regimeColor =
+    regime.color === 'success'
+      ? theme.palette.success.main
+      : regime.color === 'warning'
+        ? theme.palette.warning.main
+        : regime.color === 'error'
+          ? theme.palette.error.main
+          : theme.palette.text.secondary
   // A rising VIX is rising fear, so up reads red and down reads calm-green —
   // the inverse of a price move.
   const changeColor =
@@ -172,104 +256,109 @@ function VixPanel({ data }: { data: VixSnapshot }) {
   const pct = Math.max(0, Math.min(1, data.value / 50)) * 100
 
   return (
-    <Stack spacing={2} sx={{ height: '100%', justifyContent: 'center' }}>
-      <Box>
-        <Typography
-          variant="caption"
-          sx={{
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            color: 'text.secondary',
-          }}
-        >
-          VIX · Volatility
-        </Typography>
-        <Stack
-          direction="row"
-          spacing={1.5}
-          sx={{ alignItems: 'baseline', flexWrap: 'wrap', mt: 0.5 }}
-        >
-          <Typography
-            sx={{
-              fontSize: { xs: '2.25rem', sm: '2.5rem' },
-              fontWeight: 800,
-              lineHeight: 1,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {data.value.toFixed(2)}
-          </Typography>
-          <Chip label={regime.label} color={regime.color} size="small" />
-        </Stack>
-        {data.change != null && (
-          <Typography
-            sx={{
-              mt: 0.75,
-              fontWeight: 600,
-              color: changeColor,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {arrow} {data.change > 0 ? '+' : ''}
-            {data.change.toFixed(2)}
-            {data.change_percent != null &&
-              ` (${data.change_percent > 0 ? '+' : ''}${data.change_percent.toFixed(1)}%)`}{' '}
-            <Typography
-              component="span"
-              variant="caption"
-              color="text.secondary"
-            >
-              vs prev close
-            </Typography>
-          </Typography>
-        )}
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: 'block', mt: 0.75, lineHeight: 1.5 }}
-        >
-          {regime.help}
-        </Typography>
-      </Box>
+    <Stack spacing={2.5} sx={{ height: '100%' }}>
+      <PanelHeader
+        title="Volatility"
+        source="VIX · CBOE"
+        dotColor={regimeColor}
+      />
 
-      {/* Calm → turbulent scale with a marker at the current level. */}
-      <Box>
-        <Box
-          sx={{
-            position: 'relative',
-            height: 8,
-            borderRadius: 4,
-            background: `linear-gradient(90deg, ${theme.palette.success.main} 0%, ${theme.palette.warning.main} 55%, ${theme.palette.error.main} 100%)`,
-          }}
-        >
+      {/* The reading + scale, centred in the space beside the dial. */}
+      <Stack spacing={2.5} sx={{ flex: 1, justifyContent: 'center' }}>
+        <Box>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ alignItems: 'baseline', flexWrap: 'wrap' }}
+          >
+            <Typography
+              sx={{
+                fontFamily: fontFamilyMono,
+                fontSize: { xs: '2.75rem', sm: '3.25rem' },
+                fontWeight: 700,
+                lineHeight: 1,
+                letterSpacing: '-0.02em',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {data.value.toFixed(2)}
+            </Typography>
+            <Chip label={regime.label} color={regime.color} size="small" />
+          </Stack>
+          {data.change != null && (
+            <Typography
+              sx={{
+                mt: 1,
+                fontFamily: fontFamilyMono,
+                fontWeight: 600,
+                color: changeColor,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {arrow} {data.change > 0 ? '+' : ''}
+              {data.change.toFixed(2)}
+              {data.change_percent != null &&
+                ` (${data.change_percent > 0 ? '+' : ''}${data.change_percent.toFixed(1)}%)`}{' '}
+              <Typography
+                component="span"
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontFamily: (t) => t.typography.fontFamily }}
+              >
+                vs prev close
+              </Typography>
+            </Typography>
+          )}
+          {regime.help && (
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ display: 'block', mt: 1, lineHeight: 1.5 }}
+            >
+              {regime.help}
+            </Typography>
+          )}
+        </Box>
+
+        {/* Calm → turbulent scale with a marker at the current level. */}
+        <Box>
           <Box
             sx={{
-              position: 'absolute',
-              top: '50%',
-              left: `${pct}%`,
-              width: 14,
-              height: 14,
-              borderRadius: '50%',
-              transform: 'translate(-50%, -50%)',
-              bgcolor: 'background.paper',
-              border: 2,
-              borderColor: 'text.primary',
+              position: 'relative',
+              height: 8,
+              borderRadius: 4,
+              background: `linear-gradient(90deg, ${theme.palette.success.main} 0%, ${theme.palette.warning.main} 55%, ${theme.palette.error.main} 100%)`,
             }}
-          />
+          >
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '50%',
+                left: `${pct}%`,
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                transform: 'translate(-50%, -50%)',
+                bgcolor: 'background.paper',
+                border: 2,
+                borderColor: 'text.primary',
+                boxShadow: 1,
+              }}
+            />
+          </Box>
+          <Stack
+            direction="row"
+            sx={{ justifyContent: 'space-between', mt: 0.75 }}
+          >
+            <Typography variant="caption" color="text.secondary">
+              Calm
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Turbulent
+            </Typography>
+          </Stack>
         </Box>
-        <Stack
-          direction="row"
-          sx={{ justifyContent: 'space-between', mt: 0.5 }}
-        >
-          <Typography variant="caption" color="text.secondary">
-            Calm
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Turbulent
-          </Typography>
-        </Stack>
-      </Box>
+      </Stack>
     </Stack>
   )
 }
@@ -278,13 +367,13 @@ function VixPanel({ data }: { data: VixSnapshot }) {
 function Loaded({ data }: { data: MarketSentimentData }) {
   const asOf = data.vix?.as_of ?? data.fear_greed?.as_of
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={3}>
       <Box
         sx={{
           display: 'flex',
           flexDirection: { xs: 'column', md: 'row' },
           alignItems: 'stretch',
-          gap: { xs: 3, md: 4 },
+          gap: { xs: 3, md: 5 },
         }}
       >
         {data.fear_greed && (
@@ -293,11 +382,16 @@ function Loaded({ data }: { data: MarketSentimentData }) {
           </Box>
         )}
         {data.fear_greed && data.vix && (
-          <Divider
-            orientation="vertical"
-            flexItem
-            sx={{ display: { xs: 'none', md: 'block' } }}
-          />
+          <>
+            {/* Horizontal rule between the stacked panels on phones; a vertical
+                rule between the columns from md up. */}
+            <Divider sx={{ display: { xs: 'block', md: 'none' } }} />
+            <Divider
+              orientation="vertical"
+              flexItem
+              sx={{ display: { xs: 'none', md: 'block' } }}
+            />
+          </>
         )}
         {data.vix && (
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -310,7 +404,7 @@ function Loaded({ data }: { data: MarketSentimentData }) {
       <Typography variant="caption" color="text.secondary">
         Fear &amp; Greed is CNN&apos;s index (0 = extreme fear, 100 = extreme
         greed). VIX is CBOE&apos;s volatility index
-        {asOf ? `, as of ${fmtDate(asOf)}` : ''}. For information only — not
+        {asOf ? `, as of ${fmtDate(asOf)}` : ''}. For information only, not
         financial advice.
       </Typography>
     </Stack>
@@ -324,16 +418,21 @@ function LoadingState() {
       sx={{
         display: 'flex',
         flexDirection: { xs: 'column', md: 'row' },
-        gap: { xs: 3, md: 4 },
+        gap: { xs: 3, md: 5 },
       }}
     >
-      <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-        <Skeleton variant="rounded" width={260} height={150} />
+      <Box sx={{ flex: 1 }}>
+        <Stack spacing={2.5} sx={{ alignItems: 'center' }}>
+          <Skeleton variant="text" width="100%" height={20} />
+          <Skeleton variant="rounded" width={240} height={140} />
+          <Skeleton variant="rounded" width="100%" height={44} />
+        </Stack>
       </Box>
       <Box sx={{ flex: 1 }}>
-        <Stack spacing={1.5}>
-          <Skeleton variant="text" width={120} />
-          <Skeleton variant="rounded" width={140} height={40} />
+        <Stack spacing={2}>
+          <Skeleton variant="text" width={140} />
+          <Skeleton variant="rounded" width={160} height={52} />
+          <Skeleton variant="text" width={200} />
           <Skeleton variant="rounded" width="100%" height={8} />
         </Stack>
       </Box>
@@ -343,32 +442,26 @@ function LoadingState() {
 
 /**
  * Home-page "Market sentiment" widget: the market's mood at a glance — the CNN
- * Fear & Greed Index on a dial beside the VIX volatility gauge. Best-effort,
- * like the AI cards: the two legs come from separate keyless sources, so the
- * backend serves whichever it has and the widget renders each leg only when it's
- * present. If both are briefly down (a 502) the query doesn't retry and the whole
- * widget quietly hides rather than showing a broken card.
+ * Fear & Greed Index on a dial beside the VIX volatility gauge, each in a titled,
+ * sourced panel so the two reads balance and every figure stays attributable.
+ * Best-effort, like the AI cards: the two legs come from separate keyless
+ * sources, so the backend serves whichever it has and the widget renders each
+ * leg only when it's present. If both are briefly down (a 502) the query doesn't
+ * retry and the whole widget quietly hides rather than showing a broken card.
  */
 export default function MarketSentiment() {
   const { data, isLoading, isError } = useMarketSentiment()
   if (isError) return null
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <SpeedIcon fontSize="small" sx={{ color: 'primary.main' }} />
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-            Market sentiment
-          </Typography>
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          How the market feels right now — the Fear &amp; Greed Index and the
-          VIX volatility gauge, at a glance.
-        </Typography>
-      </Box>
+      <BandHeader
+        icon={<SpeedIcon />}
+        title="Market sentiment"
+        subtitle="How the market feels right now: the Fear & Greed Index and the VIX volatility gauge, at a glance."
+      />
 
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
           {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
         </CardContent>
       </Card>

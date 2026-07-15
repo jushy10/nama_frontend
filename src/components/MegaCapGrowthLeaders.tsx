@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material'
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
+import BandHeader from '@/components/BandHeader'
 import { stockLogoUrl, type StockSearchResult } from '@/lib/api'
 import { useStockSearch } from '@/lib/queries'
 
@@ -315,19 +316,12 @@ function GrowthLeadersCard({ list }: { list: GrowthList }) {
 export default function MegaCapGrowthLeaders() {
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <RocketLaunchIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-              Mega-cap growth leaders
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            The largest US companies growing the fastest — by trailing results
-            and by what analysts expect next year.
-          </Typography>
-        </Box>
+      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+        <BandHeader
+          icon={<RocketLaunchIcon />}
+          title="Mega-cap growth leaders"
+          subtitle="The largest US companies growing the fastest, by trailing results and by what analysts expect next year."
+        />
 
         <Box
           sx={{

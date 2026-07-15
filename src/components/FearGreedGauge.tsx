@@ -1,39 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { Box, useMediaQuery, useTheme } from '@mui/material'
+import { fontFamilyMono } from '@/theme'
 
-/**
- * The five CNN Fear & Greed bands, in score order, each with the theme token it
- * paints with. Red (extreme fear) → amber (fear) → grey (neutral) → light green
- * (greed) → emerald (extreme greed): the sentiment reads left-to-right the way
- * the dial sweeps. Boundaries match CNN's published thresholds.
- */
-const ZONES = [
-  { from: 0, to: 25, token: 'error' as const },
-  { from: 25, to: 45, token: 'fear' as const },
-  { from: 45, to: 55, token: 'neutral' as const },
-  { from: 55, to: 75, token: 'greed' as const },
-  { from: 75, to: 100, token: 'greedStrong' as const },
-]
-
+// Geometry of the semicircular scale, in the SVG's own coordinate space.
 const CX = 100
 const CY = 100
-const R = 84
-const STROKE = 15
-// A hair of empty arc between zones reads as five deliberate segments, not one
-// smeared rainbow.
-const GAP = 1.4
+const R = 82
+const STROKE = 13
 
 /** Point on the dial's arc for a 0–100 score (left = 0, top = 50, right = 100). */
 function pointFor(score: number): [number, number] {
   const alpha = (Math.PI * (100 - score)) / 100 // π at 0 → 0 at 100
   return [CX + R * Math.cos(alpha), CY - R * Math.sin(alpha)]
-}
-
-/** SVG arc path along the dial between two scores (over the top, left → right). */
-function arcPath(from: number, to: number): string {
-  const [x1, y1] = pointFor(from)
-  const [x2, y2] = pointFor(to)
-  return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`
 }
 
 interface Props {
@@ -44,20 +22,24 @@ interface Props {
 }
 
 /**
- * The Fear & Greed dial — the home page's signature "market mood" read. A
- * five-zone semicircle with a needle at the current score and the number in the
- * well. Pure SVG on a fixed `viewBox` (number and label are `<text>` inside it),
- * so the whole thing scales as one unit from phone to desktop and never needs
- * pixel-positioning; colours are theme tokens, so it reads in light and dark. On
- * mount the needle sweeps up from the fearful end to its resting angle — one
- * deliberate motion moment, skipped when the viewer prefers reduced motion.
+ * The Fear & Greed dial — the home page's signature "market mood" read. A single
+ * smooth semicircular scale that runs red (fear) → grey (neutral) → green (greed)
+ * as one gradient, with a rounded marker knob riding the arc at the current score
+ * and the number in the well. Pure SVG on a fixed `viewBox` (the number and label
+ * are `<text>` inside it), so the whole thing scales as one unit from phone to
+ * desktop and never needs pixel-positioning; every colour is a theme token, so it
+ * reads in light and dark. On mount the marker sweeps up from the fearful end to
+ * its resting position — one deliberate motion moment, skipped for reduced motion.
  */
 export default function FearGreedGauge({ score, label }: Props) {
   const theme = useTheme()
   const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
+  const uid = useId().replace(/:/g, '')
+  const gradientId = `fg-scale-${uid}`
+  const shadowId = `fg-marker-${uid}`
   const clamped = Math.max(0, Math.min(100, score))
 
-  // Needle rests at `restDeg`; it starts at the fearful extreme (−90°) and eases
+  // Marker rests at `restDeg`; it starts at the fearful extreme (−90°) and eases
   // to rest once mounted, unless reduced motion is preferred.
   const restDeg = (clamped / 100) * 180 - 90
   const [settled, setSettled] = useState(reduceMotion)
@@ -66,102 +48,130 @@ export default function FearGreedGauge({ score, label }: Props) {
     const id = requestAnimationFrame(() => setSettled(true))
     return () => cancelAnimationFrame(id)
   }, [reduceMotion])
-  const needleDeg = settled ? restDeg : -90
+  const markerDeg = settled ? restDeg : -90
 
-  const colorFor = (token: (typeof ZONES)[number]['token']): string => {
-    switch (token) {
-      case 'error':
-        return theme.palette.error.main
-      case 'fear':
-        return theme.palette.warning.main
-      case 'neutral':
-        return theme.palette.text.disabled
-      case 'greed':
-        return theme.palette.success.light
-      case 'greedStrong':
-        return theme.palette.success.main
-    }
-  }
+  // The colour the number + marker take, on CNN's bands: extreme fear (red) →
+  // fear (amber) → neutral (grey) → greed (light green) → extreme greed (emerald).
+  const activeColor =
+    clamped < 25
+      ? theme.palette.error.main
+      : clamped < 45
+        ? theme.palette.warning.main
+        : clamped <= 55
+          ? theme.palette.text.secondary
+          : clamped <= 75
+            ? theme.palette.success.light
+            : theme.palette.success.main
 
-  const activeToken =
-    ZONES.find((z) => clamped >= z.from && clamped <= z.to)?.token ?? 'neutral'
-  const activeColor = colorFor(activeToken)
-  const fontFamily = theme.typography.fontFamily
+  // The full scale, left (0) to right (100), drawn over the top.
+  const [x0, y0] = pointFor(0)
+  const [x100, y100] = pointFor(100)
+  const scalePath = `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 0 1 ${x100.toFixed(2)} ${y100.toFixed(2)}`
+  const [mx, my] = [CX, CY - R] // marker rests at the top; the group rotates it
 
   return (
     <Box
       component="svg"
-      viewBox="0 0 200 122"
+      viewBox="0 0 200 118"
       role="img"
       aria-label={`Fear and Greed Index: ${Math.round(clamped)}, ${label}`}
       sx={{
         display: 'block',
         width: '100%',
-        maxWidth: 280,
+        maxWidth: 260,
         height: 'auto',
         mx: 'auto',
       }}
     >
-      {ZONES.map((z) => (
-        <path
-          key={z.token}
-          d={arcPath(z.from + GAP, z.to - GAP)}
-          fill="none"
-          stroke={colorFor(z.token)}
-          strokeWidth={STROKE}
-          strokeLinecap="round"
-        />
-      ))}
+      <defs>
+        {/* Horizontal gradient across the arc's bounding box: the left end reads
+            red (fear), the top-centre grey (neutral), the right end emerald
+            (greed) — exactly how the scale sweeps. */}
+        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={theme.palette.error.main} />
+          <stop offset="27%" stopColor={theme.palette.warning.main} />
+          <stop offset="50%" stopColor={theme.palette.text.disabled} />
+          <stop offset="73%" stopColor={theme.palette.success.light} />
+          <stop offset="100%" stopColor={theme.palette.success.main} />
+        </linearGradient>
+        <filter id={shadowId} x="-60%" y="-60%" width="220%" height="220%">
+          <feDropShadow
+            dx="0"
+            dy="1.5"
+            stdDeviation="1.5"
+            floodColor="#000"
+            floodOpacity="0.3"
+          />
+        </filter>
+      </defs>
 
-      {/* Needle: drawn pointing up, rotated to the score; eases in on mount. */}
+      {/* A faint channel behind the scale gives the arc a little depth. */}
+      <path
+        d={scalePath}
+        fill="none"
+        stroke={theme.palette.divider}
+        strokeWidth={STROKE + 5}
+        strokeLinecap="round"
+      />
+      {/* The scale itself: one smooth red→grey→green gradient. */}
+      <path
+        d={scalePath}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+      />
+
+      {/* Marker knob riding the arc at the current score. It sits at the top of
+          the arc and the group rotates it into position, so the mount sweep is a
+          simple rotation from the fearful end. */}
       <g
         style={{
-          transform: `rotate(${needleDeg}deg)`,
+          transform: `rotate(${markerDeg}deg)`,
           transformOrigin: `${CX}px ${CY}px`,
           transition: reduceMotion
             ? undefined
             : 'transform 1.1s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
       >
-        <line
-          x1={CX}
-          y1={CY}
-          x2={CX}
-          y2={CY - (R - STROKE / 2 - 4)}
-          stroke={theme.palette.text.primary}
-          strokeWidth={3}
-          strokeLinecap="round"
+        <circle
+          cx={mx}
+          cy={my}
+          r={9.5}
+          fill={theme.palette.background.paper}
+          stroke={activeColor}
+          strokeWidth={3.5}
+          filter={`url(#${shadowId})`}
         />
+        <circle cx={mx} cy={my} r={3.5} fill={activeColor} />
       </g>
-      <circle cx={CX} cy={CY} r={7} fill={theme.palette.text.primary} />
-      <circle cx={CX} cy={CY} r={3} fill={theme.palette.background.paper} />
 
-      {/* The score and band label live in the well of the dial, as part of the
-          scaling artwork. */}
+      {/* The score and band label live in the well of the dial, part of the
+          scaling artwork. The number picks up the active band colour. */}
       <text
         x={CX}
-        y={76}
+        y={74}
         textAnchor="middle"
         dominantBaseline="middle"
-        fontFamily={fontFamily}
-        fontSize={30}
-        fontWeight={800}
+        fontFamily={fontFamilyMono}
+        fontSize={34}
+        fontWeight={700}
         fill={activeColor}
-        style={{ fontVariantNumeric: 'tabular-nums' }}
+        style={{ fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}
       >
         {Math.round(clamped)}
       </text>
       <text
         x={CX}
-        y={116}
+        y={102}
         textAnchor="middle"
-        fontFamily={fontFamily}
-        fontSize={11}
+        fontFamily={theme.typography.fontFamily}
+        fontSize={11.5}
         fontWeight={700}
-        letterSpacing="0.04em"
+        letterSpacing="0.08em"
         fill={theme.palette.text.primary}
       >
-        {label}
+        {label.toUpperCase()}
       </text>
     </Box>
   )

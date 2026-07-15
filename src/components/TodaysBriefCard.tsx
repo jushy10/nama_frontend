@@ -11,8 +11,9 @@ import {
 import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link as RouterLink } from 'react-router-dom'
+import BandHeader from '@/components/BandHeader'
 import { useMarketBrief } from '@/lib/queries'
-import { BRIEF_TONE, SERIF } from '@/lib/briefTone'
+import { BRIEF_TONE } from '@/lib/briefTone'
 import { longDate } from '@/lib/earningsWeek'
 import type { MarketBrief } from '@/lib/api'
 
@@ -20,7 +21,7 @@ import type { MarketBrief } from '@/lib/api'
  *  the brand (the same accent the app bar and drawer carry). */
 const MASTHEAD_RULE = 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)'
 
-/** The loaded teaser: masthead (date + posture), the serif lede, a read link. */
+/** The loaded teaser: masthead (date + posture), the lede, a read link. */
 function Loaded({ data }: { data: MarketBrief }) {
   const tone = BRIEF_TONE[data.tone] ?? BRIEF_TONE.mixed
   return (
@@ -36,10 +37,9 @@ function Loaded({ data }: { data: MarketBrief }) {
         <Typography
           component="p"
           sx={{
-            fontFamily: SERIF,
             fontSize: { xs: '1.15rem', sm: '1.3rem' },
-            fontWeight: 600,
-            letterSpacing: '-0.01em',
+            fontWeight: 700,
+            letterSpacing: '-0.02em',
           }}
         >
           {longDate(data.date)}
@@ -49,9 +49,9 @@ function Loaded({ data }: { data: MarketBrief }) {
 
       <Typography
         sx={{
-          fontFamily: SERIF,
-          fontSize: { xs: '1.15rem', sm: '1.3rem' },
+          fontSize: { xs: '1.1rem', sm: '1.25rem' },
           lineHeight: 1.55,
+          color: 'text.primary',
           // Clamp the lede to a few lines — the full brief is one click away.
           display: '-webkit-box',
           WebkitLineClamp: 3,
@@ -105,19 +105,12 @@ export default function TodaysBriefCard() {
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-              Today&apos;s brief
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            A plain-language AI read of how the US market is moving today — the
-            indices, the sectors, and the day&apos;s biggest movers.
-          </Typography>
-        </Box>
+      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+        <BandHeader
+          icon={<AutoAwesomeIcon />}
+          title="Today's brief"
+          subtitle="A plain-language AI read of how the US market is moving today: the indices, the sectors, and the day's biggest movers."
+        />
 
         <Card
           variant="outlined"

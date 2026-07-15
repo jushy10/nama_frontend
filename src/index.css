@@ -7,3 +7,9 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Brand-tinted text selection — a translucent "Nama" blue that reads on both
+   the light paper and the near-black dark canvas. */
+::selection {
+  background: rgba(79, 131, 230, 0.28);
+}
