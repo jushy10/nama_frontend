@@ -84,7 +84,12 @@ const leaderboard = (
   count: 2,
   items: [
     entry(),
-    entry({ ticker: 'MSFT', name: 'Microsoft Corp.', member_count: 4, trade_count: 5 }),
+    entry({
+      ticker: 'MSFT',
+      name: 'Microsoft Corp.',
+      member_count: 4,
+      trade_count: 5,
+    }),
   ],
   ...overrides,
 })
@@ -115,7 +120,9 @@ function stub({
           json: () => Promise.resolve({ detail: 'Congress feed unavailable.' }),
         })
       }
-      const payload = u.includes('/market/congress-leaderboard') ? ranked : activity
+      const payload = u.includes('/market/congress-leaderboard')
+        ? ranked
+        : activity
       return Promise.resolve({
         ok: true,
         status: 200,
@@ -138,7 +145,9 @@ describe('Congress trades board', () => {
     expect(screen.getByText('Buy')).toBeInTheDocument()
     expect(screen.getByText('Sell')).toBeInTheDocument()
     // Defaults to the 30-day disclosure window.
-    expect(calls.some((u) => u.includes('/market/congress-activity'))).toBe(true)
+    expect(calls.some((u) => u.includes('/market/congress-activity'))).toBe(
+      true,
+    )
     expect(calls.some((u) => u.includes('window=30d'))).toBe(true)
     // The window total line is shown.
     expect(
@@ -176,7 +185,9 @@ describe('Congress trades board', () => {
 
     const alerts = await screen.findAllByRole('alert')
     expect(
-      alerts.some((a) => /congress feed unavailable/i.test(a.textContent ?? '')),
+      alerts.some((a) =>
+        /congress feed unavailable/i.test(a.textContent ?? ''),
+      ),
     ).toBe(true)
   })
 

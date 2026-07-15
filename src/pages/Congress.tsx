@@ -78,7 +78,8 @@ const CARD_STATS: { key: CongressMetric; label: string }[] = [
 
 /** A one-line description of what the active ranking metric means. */
 function metricBlurb(metric: CongressMetric): string {
-  if (metric === 'members') return 'the number of distinct members trading each stock'
+  if (metric === 'members')
+    return 'the number of distinct members trading each stock'
   if (metric === 'trades') return 'the number of disclosed trades'
   return 'estimated dollars traded (band midpoints)'
 }
@@ -424,7 +425,10 @@ export default function Congress() {
 
         {boardShowError && (
           <Alert severity="error" variant="outlined" sx={{ mt: 2 }}>
-            {errorMessage(boardQuery.error, 'Could not load the attention board.')}
+            {errorMessage(
+              boardQuery.error,
+              'Could not load the attention board.',
+            )}
           </Alert>
         )}
 
