@@ -19,6 +19,9 @@ interface Props {
   score: number
   /** The band label to sit under the number, e.g. "Extreme Fear". */
   label: string
+  /** Max rendered width in px. Defaults to the full 260; pass a smaller value
+   *  for a compact inline dial (e.g. the hero's market snapshot). */
+  maxWidth?: number
 }
 
 /**
@@ -31,7 +34,11 @@ interface Props {
  * reads in light and dark. On mount the marker sweeps up from the fearful end to
  * its resting position — one deliberate motion moment, skipped for reduced motion.
  */
-export default function FearGreedGauge({ score, label }: Props) {
+export default function FearGreedGauge({
+  score,
+  label,
+  maxWidth = 260,
+}: Props) {
   const theme = useTheme()
   const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)')
   const uid = useId().replace(/:/g, '')
@@ -78,7 +85,7 @@ export default function FearGreedGauge({ score, label }: Props) {
       sx={{
         display: 'block',
         width: '100%',
-        maxWidth: 260,
+        maxWidth,
         height: 'auto',
         mx: 'auto',
       }}

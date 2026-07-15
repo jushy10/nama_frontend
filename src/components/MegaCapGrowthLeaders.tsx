@@ -15,13 +15,14 @@ import { stockLogoUrl, type StockSearchResult } from '@/lib/api'
 import { useStockSearch } from '@/lib/queries'
 
 // How many names each list shows. The backend ranks the whole mega-cap slice by
-// the blend; we only ever paint the leaders.
-const TOP_N = 10
+// the blend; we only ever paint the leaders. Kept to a short, scannable list so
+// each row can breathe rather than packing a dense leaderboard.
+const TOP_N = 8
 
 // Fixed widths that keep the two metric columns aligned across the column header,
 // the loaded rows and the skeletons — the same lockstep trick the screener uses.
-const RANK_W = 20
-const METRIC_W = 62
+const RANK_W = 22
+const METRIC_W = 72
 
 /** Signed percent to one decimal, matching the screener's growth formatting. */
 const fmtPct = (n: number | null) =>
@@ -68,7 +69,7 @@ const FORWARD: GrowthList = {
 }
 
 /** Company logo in a white rounded tile, falling back to the ticker's initial —
- *  the screener's `StockLogo`, shrunk for a denser list. */
+ *  the screener's `StockLogo`, sized up so the leaders read at a glance. */
 function LeaderLogo({ symbol }: { symbol: string }) {
   return (
     <Avatar
@@ -76,7 +77,7 @@ function LeaderLogo({ symbol }: { symbol: string }) {
       src={stockLogoUrl(symbol)}
       alt={`${symbol} logo`}
       slotProps={{ img: { loading: 'lazy', style: { objectFit: 'contain' } } }}
-      sx={{ width: 28, height: 28, bgcolor: '#fff', color: '#111', p: 0.4 }}
+      sx={{ width: 36, height: 36, bgcolor: '#fff', color: '#111', p: 0.5 }}
     >
       {symbol.charAt(0)}
     </Avatar>
@@ -112,9 +113,9 @@ function LeaderRow({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        gap: 1.25,
+        gap: 1.5,
         px: 1,
-        py: 0.85,
+        py: 1.15,
         borderRadius: 1.5,
         cursor: 'pointer',
         transition: 'background-color 120ms ease',
@@ -141,7 +142,9 @@ function LeaderRow({
       </Typography>
       <LeaderLogo symbol={stock.ticker} />
       <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+        <Typography
+          sx={{ fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2 }}
+        >
           {stock.ticker}
         </Typography>
         {stock.name && (
@@ -164,7 +167,8 @@ function LeaderRow({
               width: METRIC_W,
               flexShrink: 0,
               textAlign: 'right',
-              fontWeight: 600,
+              fontWeight: 700,
+              fontSize: '1rem',
               color: growthColor(v),
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -182,13 +186,13 @@ function LeaderRow({
 function SkeletonRow() {
   return (
     <Box
-      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, py: 0.85 }}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, py: 1.15 }}
     >
       <Skeleton variant="text" width={RANK_W - 6} sx={{ flexShrink: 0 }} />
       <Skeleton
         variant="rounded"
-        width={28}
-        height={28}
+        width={36}
+        height={36}
         sx={{ flexShrink: 0 }}
       />
       <Box sx={{ flex: 1 }}>
@@ -206,7 +210,7 @@ function SkeletonRow() {
 function ColumnHeader({ metrics }: { metrics: [Metric, Metric] }) {
   return (
     <Box
-      sx={{ display: 'flex', alignItems: 'center', gap: 1.25, px: 1, pb: 0.5 }}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, pb: 0.5 }}
     >
       <Box sx={{ flex: 1 }} />
       {metrics.map((m) => (

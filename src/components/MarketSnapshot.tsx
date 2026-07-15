@@ -6,14 +6,16 @@ import {
   Typography,
   useTheme,
 } from '@mui/material'
+import type { SxProps, Theme } from '@mui/material/styles'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import { Link as RouterLink } from 'react-router-dom'
 import MarketStatusDot from '@/components/MarketStatusDot'
+import FearGreedGauge from '@/components/FearGreedGauge'
 import { fontFamilyMono } from '@/theme'
 import { getMarketStatus } from '@/lib/market'
 import { useMarketSentiment, useQuoteCards } from '@/lib/queries'
-import type { Quote } from '@/lib/api'
+import type { FearGreedSnapshot, Quote, VixSnapshot } from '@/lib/api'
 
 /** The three major US indices, tracked via their most liquid ETF proxies — the
  *  same proxies the "Markets today" chart below the fold charts. */
@@ -22,6 +24,15 @@ const INDICES: { label: string; symbol: string }[] = [
   { label: 'Nasdaq 100', symbol: 'QQQ' },
   { label: 'Dow Jones', symbol: 'DIA' },
 ]
+
+/** Shared style for the two small section labels above each sentiment gauge. */
+const GAUGE_LABEL_SX: SxProps<Theme> = {
+  fontSize: '0.62rem',
+  fontWeight: 700,
+  textTransform: 'uppercase',
+  letterSpacing: '0.07em',
+  color: 'text.secondary',
+}
 
 const fmtPrice = (n: number) =>
   n.toLocaleString('en-US', {
@@ -89,73 +100,19 @@ function IndexRow({ label, quote }: { label: string; quote: Quote | null }) {
   )
 }
 
-/** One sentiment read in the footer — a tiny label, a big mono figure in its
- *  band colour, and the band's word beneath. */
-function SentimentStat({
-  label,
-  value,
-  caption,
-  color,
-}: {
-  label: string
-  value: string
-  caption: string
-  color: string
-}) {
+/** The Fear & Greed leg: the compact semicircular dial (its own score + band
+ *  label live in the well), under a small section label. */
+function FearGreedMini({ fg }: { fg: FearGreedSnapshot }) {
   return (
-    <Box sx={{ flex: 1, minWidth: 0 }}>
+    <Box sx={{ width: { xs: '100%', sm: 152 }, flexShrink: 0 }}>
       <Typography
-        sx={{
-          fontSize: '0.62rem',
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.07em',
-          color: 'text.secondary',
-        }}
+        sx={{ ...GAUGE_LABEL_SX, textAlign: { xs: 'center', sm: 'left' } }}
       >
-        {label}
+        Fear &amp; Greed
       </Typography>
-      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline' }}>
-        <Typography
-          sx={{
-            fontFamily: fontFamilyMono,
-            fontWeight: 700,
-            fontSize: '1.15rem',
-            lineHeight: 1.1,
-            color,
-            fontVariantNumeric: 'tabular-nums',
-          }}
-        >
-          {value}
-        </Typography>
-        <Typography
-          noWrap
-          sx={{
-            fontSize: '0.72rem',
-            color: 'text.secondary',
-            textTransform: 'capitalize',
-          }}
-        >
-          {caption}
-        </Typography>
-      </Stack>
+      <FearGreedGauge score={fg.score} label={fg.label} maxWidth={152} />
     </Box>
   )
-}
-
-/** The colour a 0–100 Fear & Greed score paints in, on CNN's bands. */
-function useFearGreedColor() {
-  const theme = useTheme()
-  return (score: number): string =>
-    score < 25
-      ? theme.palette.error.main
-      : score < 45
-        ? theme.palette.warning.main
-        : score <= 55
-          ? theme.palette.text.secondary
-          : score <= 75
-            ? theme.palette.success.light
-            : theme.palette.success.main
 }
 
 /** How each VIX regime colours its figure — calm reads green, stress red. */
@@ -170,15 +127,88 @@ const VIX_REGIME_COLOR: Record<
   extreme: 'error.main',
 }
 
+/** The volatility leg: the VIX level + regime, and the calm→turbulent scale with
+ *  a marker riding it at the current level (VIX rarely prints above 50). */
+function VixMini({ vix }: { vix: VixSnapshot }) {
+  const theme = useTheme()
+  const regimeColor = VIX_REGIME_COLOR[vix.regime] ?? 'text.secondary'
+  const pct = Math.max(0, Math.min(1, vix.value / 50)) * 100
+
+  return (
+    <Box sx={{ flex: 1, minWidth: 0, alignSelf: { sm: 'center' } }}>
+      <Typography sx={GAUGE_LABEL_SX}>Volatility</Typography>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: 'baseline', mt: 0.25, mb: 1.25 }}
+      >
+        <Typography
+          sx={{
+            fontFamily: fontFamilyMono,
+            fontWeight: 700,
+            fontSize: '1.4rem',
+            lineHeight: 1,
+            color: regimeColor,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          {vix.value.toFixed(1)}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: '0.72rem',
+            color: 'text.secondary',
+            textTransform: 'capitalize',
+          }}
+        >
+          {vix.regime}
+        </Typography>
+      </Stack>
+      <Box
+        sx={{
+          position: 'relative',
+          height: 8,
+          borderRadius: 4,
+          background: `linear-gradient(90deg, ${theme.palette.success.main} 0%, ${theme.palette.warning.main} 55%, ${theme.palette.error.main} 100%)`,
+        }}
+      >
+        <Box
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: `${pct}%`,
+            width: 14,
+            height: 14,
+            borderRadius: '50%',
+            transform: 'translate(-50%, -50%)',
+            bgcolor: 'background.paper',
+            border: 2,
+            borderColor: 'text.primary',
+            boxShadow: 1,
+          }}
+        />
+      </Box>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', mt: 0.5 }}>
+        <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary' }}>
+          Calm
+        </Typography>
+        <Typography sx={{ fontSize: '0.62rem', color: 'text.secondary' }}>
+          Turbulent
+        </Typography>
+      </Stack>
+    </Box>
+  )
+}
+
 /**
  * The hero's live "market at a glance" card: the three major US indices with
- * their day move, and — where the two keyless sources are up — a compact
- * Fear & Greed + VIX read beneath. It puts "how the market is doing" on the
- * first screen, beside the search, so a visitor sees the market before scrolling
- * to the fuller chart and sentiment bands below.
+ * their day move, and — where the two keyless sources are up — the market's mood
+ * beneath, shown as a compact Fear & Greed dial beside the VIX calm→turbulent
+ * scale. It puts "how the market is doing" on the first screen, beside the
+ * search, so a visitor reads the market before scrolling to the fuller bands.
  *
  * Everything here is best-effort: index quotes self-refresh each minute and a
- * symbol that fails shows a dash; the sentiment footer simply drops out when its
+ * symbol that fails shows a dash; the sentiment gauges simply drop out when their
  * read is unavailable — the card can only ever add context, never break the hero.
  */
 export default function MarketSnapshot() {
@@ -189,12 +219,11 @@ export default function MarketSnapshot() {
     { source: 'etf', refetchInterval: 60_000 },
   )
   const { data: sentiment, isError: sentimentError } = useMarketSentiment()
-  const fearGreedColor = useFearGreedColor()
 
   const allFailed = quotes != null && quotes.every((q) => q == null)
   const fg = sentiment?.fear_greed ?? null
   const vix = sentiment?.vix ?? null
-  const showFooter = !sentimentError && (fg != null || vix != null)
+  const showSentiment = !sentimentError && (fg != null || vix != null)
 
   return (
     <Box
@@ -248,31 +277,20 @@ export default function MarketSnapshot() {
         </Stack>
       )}
 
-      {showFooter && (
+      {showSentiment && (
         <>
           <Divider sx={{ my: 2 }} />
-          <Stack
-            direction="row"
-            spacing={2}
-            divider={<Divider orientation="vertical" flexItem />}
+          <Box
+            sx={{
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 2, sm: 2.5 },
+              alignItems: { xs: 'stretch', sm: 'flex-start' },
+            }}
           >
-            {fg != null && (
-              <SentimentStat
-                label="Fear & Greed"
-                value={String(Math.round(fg.score))}
-                caption={fg.label}
-                color={fearGreedColor(fg.score)}
-              />
-            )}
-            {vix != null && (
-              <SentimentStat
-                label="Volatility · VIX"
-                value={vix.value.toFixed(1)}
-                caption={vix.regime}
-                color={VIX_REGIME_COLOR[vix.regime] ?? 'text.secondary'}
-              />
-            )}
-          </Stack>
+            {fg != null && <FearGreedMini fg={fg} />}
+            {vix != null && <VixMini vix={vix} />}
+          </Box>
         </>
       )}
 
