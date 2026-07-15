@@ -11,6 +11,7 @@ import {
   IconButton,
   List,
   ListItemButton,
+  ListItemIcon,
   ListItemText,
   Menu,
   MenuItem,
@@ -18,10 +19,24 @@ import {
   Toolbar,
   Typography,
 } from '@mui/material'
+import type { CSSObject } from '@mui/material/styles'
+import type { SvgIconComponent } from '@mui/icons-material'
 import MenuIcon from '@mui/icons-material/Menu'
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded'
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
+import ArticleOutlined from '@mui/icons-material/ArticleOutlined'
+import SearchOutlined from '@mui/icons-material/SearchOutlined'
+import TuneOutlined from '@mui/icons-material/TuneOutlined'
+import ShowChartOutlined from '@mui/icons-material/ShowChartOutlined'
+import LayersOutlined from '@mui/icons-material/LayersOutlined'
+import TrendingUpOutlined from '@mui/icons-material/TrendingUpOutlined'
+import TimelineOutlined from '@mui/icons-material/TimelineOutlined'
+import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined'
+import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
+import CategoryOutlined from '@mui/icons-material/CategoryOutlined'
+import AccountBalanceOutlined from '@mui/icons-material/AccountBalanceOutlined'
+import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
 import { brand } from '@/theme'
 import Home from '@/pages/Home'
@@ -37,8 +52,18 @@ import Congress from '@/pages/Congress'
 import YieldCurve from '@/pages/YieldCurve'
 import RedirectToSearch from '@/components/RedirectToSearch'
 
-type NavLeaf = { label: string; to: string; end?: boolean }
-type NavGroup = { label: string; children: NavLeaf[] }
+// Leaves carry an icon (shown in the drawer + dropdowns) and, for grouped
+// destinations, a one-line description that turns the dropdowns into a compact
+// mega-menu instead of a plain text list. Groups carry an icon too, so the
+// drawer's rows stay aligned whether they're a single link or a section header.
+type NavLeaf = {
+  label: string
+  to: string
+  end?: boolean
+  icon: SvgIconComponent
+  description?: string
+}
+type NavGroup = { label: string; icon: SvgIconComponent; children: NavLeaf[] }
 type NavEntry = NavLeaf | NavGroup
 
 const isGroup = (entry: NavEntry): entry is NavGroup => 'children' in entry
@@ -46,24 +71,66 @@ const isGroup = (entry: NavEntry): entry is NavGroup => 'children' in entry
 // Home isn't listed here — the brand logo links to `/`, so the bar stays lean:
 // two direct links, then the Screener and Markets groups.
 const navItems: NavEntry[] = [
-  { label: 'Brief', to: '/market/brief' },
-  { label: 'Search', to: '/search' },
+  { label: 'Brief', to: '/market/brief', icon: ArticleOutlined },
+  { label: 'Search', to: '/search', icon: SearchOutlined },
   {
     label: 'Screener',
+    icon: TuneOutlined,
     children: [
-      { label: 'Stocks', to: '/screener' },
-      { label: 'ETFs', to: '/etf-screener' },
+      {
+        label: 'Stocks',
+        to: '/screener',
+        icon: ShowChartOutlined,
+        description: 'Filter US stocks by fundamentals',
+      },
+      {
+        label: 'ETFs',
+        to: '/etf-screener',
+        icon: LayersOutlined,
+        description: 'Screen funds by assets and fees',
+      },
     ],
   },
   {
     label: 'Markets',
+    icon: TrendingUpOutlined,
     children: [
-      { label: 'Yields', to: '/yields' },
-      { label: 'Earnings', to: '/earnings-calendar' },
-      { label: 'Heat Map', to: '/heatmap' },
-      { label: 'Sectors', to: '/sectors' },
-      { label: 'Congress', to: '/congress' },
-      { label: 'Mag 7', to: '/mag7' },
+      {
+        label: 'Yields',
+        to: '/yields',
+        icon: TimelineOutlined,
+        description: 'Treasury curve and spreads',
+      },
+      {
+        label: 'Earnings',
+        to: '/earnings-calendar',
+        icon: CalendarMonthOutlined,
+        description: 'Upcoming reports and estimates',
+      },
+      {
+        label: 'Heat Map',
+        to: '/heatmap',
+        icon: GridViewOutlined,
+        description: 'Market moves at a glance',
+      },
+      {
+        label: 'Sectors',
+        to: '/sectors',
+        icon: CategoryOutlined,
+        description: 'Performance by sector',
+      },
+      {
+        label: 'Congress',
+        to: '/congress',
+        icon: AccountBalanceOutlined,
+        description: 'Congressional trading activity',
+      },
+      {
+        label: 'Mag 7',
+        to: '/mag7',
+        icon: AutoAwesomeOutlined,
+        description: 'The mega-cap tech leaders',
+      },
     ],
   },
 ]
@@ -78,13 +145,38 @@ function useGroupActive(group: NavGroup) {
 
 // House brand accents, reused across the nav — all derived from the shared
 // `brand` tokens (src/theme.ts) so they can't drift from the wordmark colours.
-// The blue→gold line mirrors the hero; the active pill stays navy so white text
-// keeps its contrast (a gold-ended fill would wash it out).
+// The blue→gold hairline is the identity motif: it edges the AppBar and drawer,
+// and reappears as the animated underline under desktop nav items. Dropdown and
+// drawer rows mark the current page with a quiet brand-tinted fill + 1px ring
+// (a highlighted row reads better than an underline inside a list).
 const BRAND_LINE = `linear-gradient(90deg, transparent 0%, ${brand.blue} 28%, ${brand.gold} 72%, transparent 100%)`
-const ACTIVE_PILL = `linear-gradient(135deg, ${brand.navy} 0%, ${brand.blue} 100%)`
-const ACTIVE_GLOW = `0 6px 16px -5px rgba(${brand.blueGlowRgb}, 0.55)`
-const LOGO_GLOW = `drop-shadow(0 0 8px rgba(${brand.blueGlowRgb}, 0.4))`
-const LOGO_GLOW_HOVER = `drop-shadow(0 0 12px rgba(${brand.blueGlowRgb}, 0.65))`
+const NAV_UNDERLINE = `linear-gradient(90deg, ${brand.blue}, ${brand.gold})`
+const ACTIVE_TINT = `rgba(${brand.blueGlowRgb}, 0.12)`
+const ACTIVE_TINT_HOVER = `rgba(${brand.blueGlowRgb}, 0.18)`
+const ACTIVE_RING = `inset 0 0 0 1px rgba(${brand.blueGlowRgb}, 0.30)`
+// The logo stays crisp at rest; a soft brand glow only blooms on hover.
+const LOGO_GLOW_HOVER = `drop-shadow(0 0 10px rgba(${brand.blueGlowRgb}, 0.55))`
+
+// The blue→gold underline drawn under desktop nav items. Hidden at rest, it
+// grows from the centre on hover and locks in solid under the active item.
+// Transform + opacity only, so it stays on the compositor; under reduced-motion
+// it swaps instantly instead of sliding.
+const navUnderline: CSSObject = {
+  content: '""',
+  position: 'absolute',
+  left: 14,
+  right: 14,
+  bottom: 4,
+  height: '2px',
+  borderRadius: '2px',
+  background: NAV_UNDERLINE,
+  transform: 'scaleX(0)',
+  transformOrigin: 'center',
+  opacity: 0,
+  transition:
+    'transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease',
+  '@media (prefers-reduced-motion: reduce)': { transition: 'none' },
+}
 
 /** `large` is for the top banner; the drawer keeps the compact size so the
  *  wordmark still fits its 260px panel. */
@@ -108,26 +200,25 @@ function Brand({ large = false }: { large?: boolean }) {
         src="/nama-icon.png"
         alt="Nama Insights logo"
         sx={{
-          height: large ? { xs: 40, md: 64 } : 48,
-          width: large ? { xs: 40, md: 64 } : 48,
+          height: large ? { xs: 36, md: 46 } : 40,
+          width: large ? { xs: 36, md: 46 } : 40,
           display: 'block',
           flexShrink: 0,
-          filter: LOGO_GLOW,
           transition: 'filter 0.25s ease',
         }}
       />
-      {/* The large wordmark only fits beside the phone toolbar's buttons at
-          its compact size, so `large` scales up from md; nowrap so a squeeze
-          can never split "Nama Insights" onto two lines. */}
+      {/* Slimmed wordmark — a compact lockup keeps the bar low. `large` still
+          scales up a touch from md; nowrap so a squeeze can never split
+          "Nama Insights" onto two lines. */}
       <Typography
-        variant={large ? 'h4' : 'h5'}
+        variant={large ? 'h5' : 'h6'}
         sx={{
           fontWeight: 700,
-          letterSpacing: '-0.01em',
+          letterSpacing: '-0.015em',
           whiteSpace: 'nowrap',
-          ...(large && {
-            fontSize: { xs: '1.25rem', sm: '1.75rem', md: '2.125rem' },
-          }),
+          fontSize: large
+            ? { xs: '1.3rem', sm: '1.45rem', md: '1.6rem' }
+            : '1.3rem',
         }}
       >
         <Box
@@ -161,16 +252,13 @@ function ColorModeToggle() {
       title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
       sx={{
         // 44x44 minimum tap target (10px padding + 24px icon) for comfortable
-        // thumb use — this sits in the top bar on mobile.
+        // thumb use — this sits in the top bar on mobile. Borderless ghost so it
+        // sits quietly beside the underline nav; brand tint blooms on hover.
         p: 1.25,
         color: 'text.secondary',
-        border: 1,
-        borderColor: 'divider',
-        transition:
-          'color 0.2s ease, border-color 0.2s ease, background 0.2s ease',
+        transition: 'color 0.2s ease, background-color 0.2s ease',
         '&:hover': {
-          color: 'primary.light',
-          borderColor: 'primary.main',
+          color: 'primary.main',
           bgcolor: 'action.hover',
         },
       }}
@@ -180,8 +268,8 @@ function ColorModeToggle() {
   )
 }
 
-/** Desktop nav: a pill button that opens a dropdown of its child routes. Lights
- *  up with the active-pill fill whenever a child route is open or the menu is. */
+/** Desktop nav: a text button that opens a dropdown of its child routes. The
+ *  brand underline locks in whenever a child route is open or the menu is. */
 function DesktopNavGroup({ group }: { group: NavGroup }) {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const open = Boolean(anchorEl)
@@ -205,24 +293,27 @@ function DesktopNavGroup({ group }: { group: NavGroup }) {
           />
         }
         sx={{
-          px: 2,
-          py: 1,
+          position: 'relative',
+          px: 1.75,
+          py: 0.75,
           minWidth: 0,
           borderRadius: 999,
           fontWeight: 600,
-          fontSize: '1.05rem',
+          fontSize: '1rem',
           lineHeight: 1.2,
           whiteSpace: 'nowrap',
-          color: lit ? '#fff' : 'text.secondary',
-          background: lit ? ACTIVE_PILL : 'transparent',
-          boxShadow: lit ? ACTIVE_GLOW : 'none',
-          transition:
-            'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
+          color: lit ? 'primary.main' : 'text.secondary',
+          transition: 'color 0.2s ease',
           '& .MuiButton-endIcon': { ml: 0.25 },
-          '&:hover': {
-            color: lit ? '#fff' : 'text.primary',
-            background: lit ? ACTIVE_PILL : 'action.hover',
+          '&::after': {
+            ...navUnderline,
+            ...(lit && { transform: 'scaleX(1)', opacity: 1 }),
           },
+          '&:hover': {
+            color: lit ? 'primary.main' : 'text.primary',
+            bgcolor: 'transparent',
+          },
+          '&:hover::after': { transform: 'scaleX(1)', opacity: lit ? 1 : 0.5 },
         }}
       >
         {group.label}
@@ -237,9 +328,9 @@ function DesktopNavGroup({ group }: { group: NavGroup }) {
           paper: {
             sx: {
               mt: 1,
-              minWidth: 200,
+              minWidth: 284,
               p: 0.75,
-              borderRadius: 3,
+              borderRadius: 2.5,
               border: 1,
               borderColor: 'divider',
               bgcolor: (theme) =>
@@ -247,40 +338,97 @@ function DesktopNavGroup({ group }: { group: NavGroup }) {
                   ? 'rgba(16,18,27,0.94)'
                   : 'rgba(255,255,255,0.97)',
               backdropFilter: 'blur(12px)',
-              boxShadow: '0 16px 40px rgba(0,0,0,0.24)',
+              boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
             },
           },
           list: { sx: { py: 0 } },
         }}
       >
-        {group.children.map((item) => (
-          <MenuItem
-            key={item.to}
-            component={NavLink}
-            to={item.to}
-            end={item.end}
-            onClick={() => setAnchorEl(null)}
-            sx={{
-              borderRadius: 2,
-              px: 1.75,
-              py: 1.1,
-              my: 0.25,
-              fontWeight: 600,
-              fontSize: '1rem',
-              color: 'text.secondary',
-              transition: 'color 0.15s ease, background 0.2s ease',
-              '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
-              '&.active': {
-                color: '#fff',
-                background: ACTIVE_PILL,
-                boxShadow: ACTIVE_GLOW,
-                '&:hover': { color: '#fff', background: ACTIVE_PILL },
-              },
-            }}
-          >
-            {item.label}
-          </MenuItem>
-        ))}
+        {group.children.map((item) => {
+          const Icon = item.icon
+          // Keep the menu item's accessible name the label alone; the one-line
+          // description rides along as `aria-describedby` so a screen reader
+          // announces "Stocks, Filter US stocks by fundamentals" without the
+          // description bloating the name.
+          const descId = item.description
+            ? `nav-desc-${item.to.replace(/[^a-z0-9]+/gi, '-')}`
+            : undefined
+          return (
+            <MenuItem
+              key={item.to}
+              component={NavLink}
+              to={item.to}
+              end={item.end}
+              aria-label={item.label}
+              aria-describedby={descId}
+              onClick={() => setAnchorEl(null)}
+              sx={{
+                borderRadius: 2,
+                px: 1,
+                py: 1,
+                my: 0.25,
+                gap: 1.25,
+                alignItems: 'center',
+                color: 'text.secondary',
+                transition: 'color 0.15s ease, background-color 0.2s ease',
+                '& .nav-tile': {
+                  display: 'grid',
+                  placeItems: 'center',
+                  flexShrink: 0,
+                  width: 38,
+                  height: 38,
+                  borderRadius: 1.5,
+                  border: 1,
+                  borderColor: 'divider',
+                  color: 'text.secondary',
+                  transition:
+                    'color 0.15s ease, background-color 0.2s ease, border-color 0.2s ease',
+                },
+                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                '&:hover .nav-tile': { color: 'text.primary' },
+                '&.active': {
+                  color: 'primary.main',
+                  bgcolor: ACTIVE_TINT,
+                  boxShadow: ACTIVE_RING,
+                  '&:hover': { bgcolor: ACTIVE_TINT_HOVER },
+                },
+                '&.active .nav-tile': {
+                  color: 'primary.main',
+                  bgcolor: ACTIVE_TINT,
+                  borderColor: 'transparent',
+                },
+              }}
+            >
+              <Box className="nav-tile">
+                <Icon sx={{ fontSize: 20 }} />
+              </Box>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: '0.9rem',
+                    lineHeight: 1.35,
+                    color: 'inherit',
+                  }}
+                >
+                  {item.label}
+                </Typography>
+                {item.description && (
+                  <Typography
+                    id={descId}
+                    sx={{
+                      fontSize: '0.78rem',
+                      lineHeight: 1.35,
+                      color: 'text.secondary',
+                    }}
+                  >
+                    {item.description}
+                  </Typography>
+                )}
+              </Box>
+            </MenuItem>
+          )
+        })}
       </Menu>
     </>
   )
@@ -297,6 +445,7 @@ function MobileNavGroup({
 }) {
   const active = useGroupActive(group)
   const [open, setOpen] = useState(active)
+  const GroupIcon = group.icon
 
   return (
     <>
@@ -311,6 +460,9 @@ function MobileNavGroup({
           '& .MuiListItemText-primary': { fontWeight: 600, fontSize: '1.1rem' },
         }}
       >
+        <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+          <GroupIcon sx={{ fontSize: 22 }} />
+        </ListItemIcon>
         <ListItemText primary={group.label} />
         <KeyboardArrowDownRoundedIcon
           sx={{
@@ -322,36 +474,45 @@ function MobileNavGroup({
       </ListItemButton>
       <Collapse in={open} timeout="auto" unmountOnExit>
         <List disablePadding sx={{ pl: 1 }}>
-          {group.children.map((item) => (
-            <ListItemButton
-              key={item.to}
-              component={NavLink}
-              to={item.to}
-              end={item.end}
-              onClick={onNavigate}
-              sx={{
-                borderRadius: 2,
-                my: 0.5,
-                py: 1,
-                pl: 3,
-                color: 'text.secondary',
-                transition: 'color 0.2s ease, background 0.2s ease',
-                '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
-                '&.active': {
-                  color: '#fff',
-                  background: ACTIVE_PILL,
-                  boxShadow: ACTIVE_GLOW,
-                  '&:hover': { color: '#fff', background: ACTIVE_PILL },
-                },
-                '& .MuiListItemText-primary': {
-                  fontWeight: 600,
-                  fontSize: '1.02rem',
-                },
-              }}
-            >
-              <ListItemText primary={item.label} />
-            </ListItemButton>
-          ))}
+          {group.children.map((item) => {
+            const Icon = item.icon
+            return (
+              <ListItemButton
+                key={item.to}
+                component={NavLink}
+                to={item.to}
+                end={item.end}
+                onClick={onNavigate}
+                sx={{
+                  borderRadius: 2,
+                  my: 0.5,
+                  py: 1,
+                  pl: 2,
+                  color: 'text.secondary',
+                  transition: 'color 0.2s ease, background-color 0.2s ease',
+                  '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
+                  '&.active': {
+                    color: 'primary.main',
+                    bgcolor: ACTIVE_TINT,
+                    boxShadow: ACTIVE_RING,
+                    '&:hover': {
+                      color: 'primary.main',
+                      bgcolor: ACTIVE_TINT_HOVER,
+                    },
+                  },
+                  '& .MuiListItemText-primary': {
+                    fontWeight: 600,
+                    fontSize: '1.02rem',
+                  },
+                }}
+              >
+                <ListItemIcon sx={{ minWidth: 34, color: 'inherit' }}>
+                  <Icon sx={{ fontSize: 20 }} />
+                </ListItemIcon>
+                <ListItemText primary={item.label} />
+              </ListItemButton>
+            )
+          })}
         </List>
       </Collapse>
     </>
@@ -386,7 +547,13 @@ function App() {
         {/* Thin blue→gold ticker line echoing the hero headline gradient. */}
         <Box sx={{ height: 2, background: BRAND_LINE }} />
         <Container maxWidth="xl">
-          <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
+          <Toolbar
+            disableGutters
+            sx={{
+              justifyContent: 'space-between',
+              minHeight: { xs: 62, md: 70 },
+            }}
+          >
             <Brand large />
             {/* Desktop (lg+): inline nav. Below lg the seven items no longer fit
                 beside the wordmark, so the bar collapses to the drawer. */}
@@ -412,25 +579,30 @@ function App() {
                       variant="text"
                       disableRipple
                       sx={{
-                        px: 2,
-                        py: 1,
+                        position: 'relative',
+                        px: 1.75,
+                        py: 0.75,
                         minWidth: 0,
                         borderRadius: 999,
                         fontWeight: 600,
-                        fontSize: '1.05rem',
+                        fontSize: '1rem',
                         lineHeight: 1.2,
                         whiteSpace: 'nowrap',
                         color: 'text.secondary',
-                        transition:
-                          'color 0.2s ease, background 0.25s ease, box-shadow 0.25s ease',
-                        '&:hover:not(.active)': {
+                        transition: 'color 0.2s ease',
+                        '&::after': navUnderline,
+                        '&:hover': {
                           color: 'text.primary',
-                          bgcolor: 'action.hover',
+                          bgcolor: 'transparent',
                         },
-                        '&.active': {
-                          color: '#fff',
-                          background: ACTIVE_PILL,
-                          boxShadow: ACTIVE_GLOW,
+                        '&:hover::after': {
+                          transform: 'scaleX(1)',
+                          opacity: 0.5,
+                        },
+                        '&.active': { color: 'primary.main' },
+                        '&.active::after': {
+                          transform: 'scaleX(1)',
+                          opacity: 1,
                         },
                       }}
                     >
@@ -465,7 +637,7 @@ function App() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         slotProps={{
-          paper: { sx: { width: 272, bgcolor: 'background.paper' } },
+          paper: { sx: { width: 288, bgcolor: 'background.paper' } },
         }}
       >
         {/* Mirror the AppBar's blue→gold accent along the drawer's top edge. */}
@@ -488,33 +660,47 @@ function App() {
                 onNavigate={() => setDrawerOpen(false)}
               />
             ) : (
-              <ListItemButton
-                key={item.to}
-                component={NavLink}
-                to={item.to}
-                end={item.end}
-                onClick={() => setDrawerOpen(false)}
-                sx={{
-                  borderRadius: 2,
-                  my: 0.5,
-                  py: 1.25,
-                  color: 'text.secondary',
-                  transition: 'color 0.2s ease, background 0.2s ease',
-                  '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
-                  '&.active': {
-                    color: '#fff',
-                    background: ACTIVE_PILL,
-                    boxShadow: ACTIVE_GLOW,
-                    '&:hover': { color: '#fff', background: ACTIVE_PILL },
-                  },
-                  '& .MuiListItemText-primary': {
-                    fontWeight: 600,
-                    fontSize: '1.1rem',
-                  },
-                }}
-              >
-                <ListItemText primary={item.label} />
-              </ListItemButton>
+              (() => {
+                const Icon = item.icon
+                return (
+                  <ListItemButton
+                    key={item.to}
+                    component={NavLink}
+                    to={item.to}
+                    end={item.end}
+                    onClick={() => setDrawerOpen(false)}
+                    sx={{
+                      borderRadius: 2,
+                      my: 0.5,
+                      py: 1.25,
+                      color: 'text.secondary',
+                      transition: 'color 0.2s ease, background-color 0.2s ease',
+                      '&:hover': {
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                      },
+                      '&.active': {
+                        color: 'primary.main',
+                        bgcolor: ACTIVE_TINT,
+                        boxShadow: ACTIVE_RING,
+                        '&:hover': {
+                          color: 'primary.main',
+                          bgcolor: ACTIVE_TINT_HOVER,
+                        },
+                      },
+                      '& .MuiListItemText-primary': {
+                        fontWeight: 600,
+                        fontSize: '1.1rem',
+                      },
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 40, color: 'inherit' }}>
+                      <Icon sx={{ fontSize: 22 }} />
+                    </ListItemIcon>
+                    <ListItemText primary={item.label} />
+                  </ListItemButton>
+                )
+              })()
             ),
           )}
         </List>
