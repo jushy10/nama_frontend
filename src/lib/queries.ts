@@ -29,6 +29,7 @@ import {
   getEtfDetail,
   getIndustryValuation,
   getCongressActivity,
+  getCongressLeaderboard,
   getCongressTrades,
   getInsiderTransactions,
   getInstitutionalOwnership,
@@ -77,6 +78,8 @@ import {
   type EtfSearchSort,
   type IndustryValuation,
   type CongressActivity,
+  type CongressLeaderboard,
+  type CongressMetric,
   type CongressTrades,
   type CongressWindow,
   type InsiderTransactions,
@@ -422,6 +425,29 @@ export function useCongressActivity(params: {
         window: params.window,
         limit: params.limit,
         offset: params.offset,
+        signal,
+      }),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/**
+ * The stocks getting the most Congressional attention over a window — the ranked
+ * leaderboard atop the /congress board. Keeps the previous ranking on screen while
+ * a new window/metric loads (`keepPreviousData`), so switching doesn't flash empty.
+ */
+export function useCongressLeaderboard(params: {
+  window: CongressWindow
+  metric: CongressMetric
+  limit: number
+}): UseQueryResult<CongressLeaderboard> {
+  return useQuery({
+    queryKey: ['congress-leaderboard', params],
+    queryFn: ({ signal }) =>
+      getCongressLeaderboard({
+        window: params.window,
+        metric: params.metric,
+        limit: params.limit,
         signal,
       }),
     placeholderData: keepPreviousData,

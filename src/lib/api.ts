@@ -2927,6 +2927,78 @@ export async function getCongressActivity(
 }
 
 /**
+ * One stock's aggregated Congressional activity over a window — a row of the
+ * attention board (`GET /market/congress-leaderboard`). A rollup across *every*
+ * member who traded the stock, not a single disclosure: `trade_count` disclosures
+ * from `member_count` distinct members (the breadth of attention), split into
+ * buys and sells. The dollar legs sum best-effort band midpoints (Congress
+ * discloses only ranges), so `net_value` / `total_value` are *estimates*, not
+ * reported totals. `last_activity` is the freshest disclosure date (ISO or null).
+ */
+export interface CongressLeaderboardEntry {
+  ticker: string
+  name: string | null
+  trade_count: number
+  member_count: number
+  buy_count: number
+  sell_count: number
+  buy_value: number
+  sell_value: number
+  net_value: number
+  total_value: number
+  last_activity: string | null
+}
+
+/**
+ * The stocks getting the most Congressional attention over a window, ranked by
+ * `metric` — the response of `GET /market/congress-leaderboard`. `total` is the
+ * number of distinct stocks Congress traded in the window before the top-N cut.
+ */
+export interface CongressLeaderboard {
+  window: string
+  metric: string
+  total: number
+  count: number
+  items: CongressLeaderboardEntry[]
+}
+
+/** How the attention leaderboard ranks stocks — the metric selector's options. */
+export const CONGRESS_METRICS = [
+  { key: 'members', label: 'Members' },
+  { key: 'trades', label: 'Trades' },
+  { key: 'value', label: '$ Volume' },
+] as const
+export type CongressMetric = (typeof CONGRESS_METRICS)[number]['key']
+
+/**
+ * Fetch the stocks getting the most Congressional attention — the ranked board.
+ * `window` is one of `CONGRESS_WINDOWS` (default 30d); `metric` one of
+ * `CONGRESS_METRICS` (default members); `limit` caps the rows (backend ≤ 100).
+ */
+export async function getCongressLeaderboard(
+  opts: {
+    window?: CongressWindow
+    metric?: CongressMetric
+    limit?: number
+    signal?: AbortSignal
+  } = {},
+): Promise<CongressLeaderboard> {
+  const qs = new URLSearchParams()
+  if (opts.window) qs.set('window', opts.window)
+  if (opts.metric) qs.set('metric', opts.metric)
+  if (opts.limit != null) qs.set('limit', String(opts.limit))
+  const res = await fetch(`${API_BASE}/market/congress-leaderboard?${qs}`, {
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  const data = (await res.json()) as CongressLeaderboard
+  if (!Array.isArray(data?.items)) {
+    throw new ApiError(res.status, 'Malformed congress-leaderboard response')
+  }
+  return data
+}
+
+/**
  * One institutional (or mutual-fund) holder's stake in a stock as of a reported
  * 13F quarter. `holder_type` is `"institution"` / `"mutual_fund"`; `pct_held` /
  * `pct_change` are percent (`pct_change` the quarter-over-quarter change in the

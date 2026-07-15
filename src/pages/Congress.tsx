@@ -3,8 +3,10 @@ import { Link as RouterLink } from 'react-router-dom'
 import {
   Alert,
   Box,
+  Card,
   Chip,
   Container,
+  Divider,
   Link,
   Skeleton,
   Table,
@@ -20,11 +22,18 @@ import {
 } from '@mui/material'
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import {
+  CONGRESS_METRICS,
   CONGRESS_WINDOWS,
+  type CongressLeaderboardEntry,
+  type CongressMetric,
   type CongressTrade,
   type CongressWindow,
 } from '@/lib/api'
-import { errorMessage, useCongressActivity } from '@/lib/queries'
+import {
+  errorMessage,
+  useCongressActivity,
+  useCongressLeaderboard,
+} from '@/lib/queries'
 import { usePageMeta } from '@/lib/usePageMeta'
 import PageHero from '@/components/PageHero'
 
@@ -44,6 +53,190 @@ function dayLabel(iso: string | null): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+// How many stocks to rank on the attention board.
+const LEADERBOARD_LIMIT = 12
+
+/** Compact USD like "$1.2M" — an *estimate*, since Congress discloses only bands. */
+function compactUsd(n: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(n)
+}
+
+// The three attention stats a card shows, in display order — the active ranking
+// metric is emphasised, the other two read as supporting context.
+const CARD_STATS: { key: CongressMetric; label: string }[] = [
+  { key: 'members', label: 'Members' },
+  { key: 'trades', label: 'Trades' },
+  { key: 'value', label: '$ Volume' },
+]
+
+/** A one-line description of what the active ranking metric means. */
+function metricBlurb(metric: CongressMetric): string {
+  if (metric === 'members') return 'the number of distinct members trading each stock'
+  if (metric === 'trades') return 'the number of disclosed trades'
+  return 'estimated dollars traded (band midpoints)'
+}
+
+/**
+ * One stock on the attention board: its rank, ticker, the three attention stats
+ * (with the active ranking metric emphasised), and the buy-vs-sell lean as a split
+ * bar plus the estimated net dollar flow.
+ */
+function LeaderboardCard({
+  rank,
+  entry,
+  metric,
+}: {
+  rank: number
+  entry: CongressLeaderboardEntry
+  metric: CongressMetric
+}) {
+  const decided = entry.buy_count + entry.sell_count
+  const buyPct = decided ? (entry.buy_count / decided) * 100 : 0
+  const netTone =
+    entry.net_value > 0
+      ? 'success.main'
+      : entry.net_value < 0
+        ? 'error.main'
+        : 'text.secondary'
+  const statValue = (key: CongressMetric): string =>
+    key === 'members'
+      ? String(entry.member_count)
+      : key === 'trades'
+        ? String(entry.trade_count)
+        : compactUsd(entry.total_value)
+
+  return (
+    <Card
+      variant="outlined"
+      sx={{
+        p: 2,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 1.25,
+        borderColor: 'divider',
+      }}
+    >
+      <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+        <Typography
+          sx={{ color: 'text.secondary', fontWeight: 700, fontSize: '0.8rem' }}
+        >
+          #{rank}
+        </Typography>
+        <Link
+          component={RouterLink}
+          to={`/search?symbol=${encodeURIComponent(entry.ticker)}`}
+          aria-label={`View ${entry.ticker} details`}
+          sx={{ fontWeight: 800, fontSize: '1.05rem', textDecoration: 'none' }}
+        >
+          {entry.ticker}
+        </Link>
+      </Box>
+      {entry.name && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          noWrap
+          title={entry.name}
+          sx={{ mt: -1 }}
+        >
+          {entry.name}
+        </Typography>
+      )}
+
+      <Box sx={{ display: 'flex', gap: 1.5 }}>
+        {CARD_STATS.map((stat) => {
+          const active = stat.key === metric
+          return (
+            <Box key={stat.key} sx={{ flex: 1, minWidth: 0 }}>
+              <Typography
+                sx={{
+                  fontWeight: active ? 800 : 600,
+                  fontSize: active ? '1.2rem' : '1rem',
+                  lineHeight: 1.2,
+                  color: active ? 'text.primary' : 'text.secondary',
+                  fontVariantNumeric: 'tabular-nums',
+                }}
+              >
+                {statValue(stat.key)}
+              </Typography>
+              <Typography
+                variant="caption"
+                sx={{
+                  display: 'block',
+                  color: active ? 'primary.main' : 'text.secondary',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                  fontWeight: active ? 700 : 400,
+                }}
+              >
+                {stat.label}
+              </Typography>
+            </Box>
+          )
+        })}
+      </Box>
+
+      {/* Buy-vs-sell lean, with the estimated net dollar flow between the counts. */}
+      <Box sx={{ mt: 'auto' }}>
+        <Box
+          sx={{
+            display: 'flex',
+            height: 6,
+            borderRadius: 3,
+            overflow: 'hidden',
+            bgcolor: 'action.hover',
+          }}
+        >
+          {decided > 0 && (
+            <>
+              <Box sx={{ width: `${buyPct}%`, bgcolor: 'success.main' }} />
+              <Box sx={{ width: `${100 - buyPct}%`, bgcolor: 'error.main' }} />
+            </>
+          )}
+        </Box>
+        <Box
+          sx={{
+            mt: 0.5,
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: 1,
+            fontSize: '0.72rem',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          <Box component="span" sx={{ color: 'success.main', fontWeight: 600 }}>
+            {entry.buy_count} buy{entry.buy_count === 1 ? '' : 's'}
+          </Box>
+          <Box component="span" sx={{ color: netTone, fontWeight: 700 }}>
+            {entry.net_value > 0 ? '+' : ''}
+            {compactUsd(entry.net_value)}
+          </Box>
+          <Box component="span" sx={{ color: 'error.main', fontWeight: 600 }}>
+            {entry.sell_count} sell{entry.sell_count === 1 ? '' : 's'}
+          </Box>
+        </Box>
+      </Box>
+    </Card>
+  )
+}
+
+function LeaderboardCardSkeleton() {
+  return (
+    <Card variant="outlined" sx={{ p: 2, borderColor: 'divider' }}>
+      <Skeleton width="45%" height={28} />
+      <Skeleton width="70%" />
+      <Skeleton width="100%" height={44} sx={{ mt: 1 }} />
+      <Skeleton width="100%" height={12} sx={{ mt: 1.5 }} />
+    </Card>
+  )
 }
 
 /** The trade action as a coloured label with a ▲/▼ glyph. */
@@ -115,6 +308,7 @@ export default function Congress() {
   )
 
   const [windowKey, setWindowKey] = useState<CongressWindow>('30d')
+  const [metricKey, setMetricKey] = useState<CongressMetric>('members')
   const [page, setPage] = useState(0)
   const [rowsPerPage, setRowsPerPage] = useState(50)
 
@@ -128,6 +322,17 @@ export default function Congress() {
   // Only a first load with nothing to show should surface the error; a refetch
   // keeps the previous page on screen (keepPreviousData).
   const showError = query.isError && !data
+
+  // The attention board shares the window selector; its own metric selector picks
+  // the ranking. Both reads ride the same weekly-refreshed DB cache.
+  const boardQuery = useCongressLeaderboard({
+    window: windowKey,
+    metric: metricKey,
+    limit: LEADERBOARD_LIMIT,
+  })
+  const board = boardQuery.data ?? null
+  const boardRows = board?.items ?? []
+  const boardShowError = boardQuery.isError && !board
 
   return (
     <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
@@ -179,8 +384,98 @@ export default function Congress() {
         </Box>
       </Box>
 
+      {/* Attention leaderboard — the stocks Congress is trading the most. */}
+      <Box sx={{ mt: 4 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 1,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+            Getting the most attention
+          </Typography>
+          <ToggleButtonGroup
+            size="small"
+            exclusive
+            value={metricKey}
+            onChange={(_, value: CongressMetric | null) => {
+              if (value) setMetricKey(value)
+            }}
+            aria-label="Rank by"
+            sx={{ flexWrap: 'wrap', rowGap: 0.5 }}
+          >
+            {CONGRESS_METRICS.map((m) => (
+              <ToggleButton key={m.key} value={m.key} sx={{ px: 1.75 }}>
+                {m.label}
+              </ToggleButton>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
+        <Typography variant="caption" color="text.secondary">
+          Ranked by {metricBlurb(metricKey)}
+          {board && board.total > 0
+            ? ` — ${board.total.toLocaleString('en-US')} stocks traded this window.`
+            : '.'}
+        </Typography>
+
+        {boardShowError && (
+          <Alert severity="error" variant="outlined" sx={{ mt: 2 }}>
+            {errorMessage(boardQuery.error, 'Could not load the attention board.')}
+          </Alert>
+        )}
+
+        <Box
+          sx={{
+            mt: 2,
+            display: 'grid',
+            gap: 1.5,
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, 1fr)',
+              md: 'repeat(3, 1fr)',
+              lg: 'repeat(4, 1fr)',
+            },
+            // Dim while a window/metric change refetches, keeping the prior ranking
+            // readable rather than flashing empty (keepPreviousData).
+            opacity: boardQuery.isFetching && !boardQuery.isLoading ? 0.6 : 1,
+            transition: 'opacity 0.15s ease',
+          }}
+        >
+          {boardQuery.isLoading &&
+            Array.from({ length: 8 }).map((_, i) => (
+              <LeaderboardCardSkeleton key={i} />
+            ))}
+          {boardRows.map((entry, i) => (
+            <LeaderboardCard
+              key={entry.ticker}
+              rank={i + 1}
+              entry={entry}
+              metric={metricKey}
+            />
+          ))}
+        </Box>
+
+        {board &&
+          boardRows.length === 0 &&
+          !boardQuery.isLoading &&
+          !boardShowError && (
+            <Typography color="text.secondary" sx={{ mt: 1 }}>
+              No stocks to rank in this window yet.
+            </Typography>
+          )}
+      </Box>
+
+      <Divider sx={{ mt: 5 }} />
+      <Typography variant="h6" sx={{ fontWeight: 800, mt: 3 }}>
+        All trades
+      </Typography>
+
       {data && (
-        <Typography color="text.secondary" sx={{ mt: 2 }}>
+        <Typography color="text.secondary" sx={{ mt: 1 }}>
           <Box component="span" sx={{ fontWeight: 700, color: 'text.primary' }}>
             {data.total.toLocaleString('en-US')}
           </Box>{' '}
