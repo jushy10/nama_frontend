@@ -23,6 +23,7 @@ import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownR
 import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
 import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
 import { useColorMode } from '@/ColorModeProvider'
+import { brand } from '@/theme'
 import Home from '@/pages/Home'
 import Screener from '@/pages/Screener'
 import EtfScreener from '@/pages/EtfScreener'
@@ -75,15 +76,15 @@ function useGroupActive(group: NavGroup) {
   )
 }
 
-// House brand accents, reused across the nav. The blue→gold line mirrors the
-// hero headline gradient; the active pill stays navy so white text keeps its
-// contrast (a gold-ended fill would wash it out).
-const BRAND_LINE =
-  'linear-gradient(90deg, transparent 0%, #4f83e6 28%, #d7a739 72%, transparent 100%)'
-const ACTIVE_PILL = 'linear-gradient(135deg, #07378e 0%, #4f83e6 100%)'
-const ACTIVE_GLOW = '0 6px 16px -5px rgba(47,99,180,0.55)'
-const LOGO_GLOW = 'drop-shadow(0 0 8px rgba(47,99,180,0.4))'
-const LOGO_GLOW_HOVER = 'drop-shadow(0 0 12px rgba(47,99,180,0.65))'
+// House brand accents, reused across the nav — all derived from the shared
+// `brand` tokens (src/theme.ts) so they can't drift from the wordmark colours.
+// The blue→gold line mirrors the hero; the active pill stays navy so white text
+// keeps its contrast (a gold-ended fill would wash it out).
+const BRAND_LINE = `linear-gradient(90deg, transparent 0%, ${brand.blue} 28%, ${brand.gold} 72%, transparent 100%)`
+const ACTIVE_PILL = `linear-gradient(135deg, ${brand.navy} 0%, ${brand.blue} 100%)`
+const ACTIVE_GLOW = `0 6px 16px -5px rgba(${brand.blueGlowRgb}, 0.55)`
+const LOGO_GLOW = `drop-shadow(0 0 8px rgba(${brand.blueGlowRgb}, 0.4))`
+const LOGO_GLOW_HOVER = `drop-shadow(0 0 12px rgba(${brand.blueGlowRgb}, 0.65))`
 
 /** `large` is for the top banner; the drawer keeps the compact size so the
  *  wordmark still fits its 260px panel. */
@@ -471,7 +472,7 @@ function App() {
         <Box
           sx={{
             height: 3,
-            background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
+            background: `linear-gradient(90deg, ${brand.blue} 0%, ${brand.gold} 100%)`,
           }}
         />
         <Box sx={{ p: 2 }}>

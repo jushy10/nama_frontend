@@ -1,4 +1,5 @@
 import type { Theme } from '@mui/material/styles'
+import { brand } from '@/theme'
 
 /**
  * The home-hero blue→gold radial wash — the "Nama Insights" accent colors
@@ -11,6 +12,6 @@ import type { Theme } from '@mui/material/styles'
  */
 export function heroWash(theme: Theme): string {
   return theme.palette.mode === 'dark'
-    ? 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.22), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.14), transparent 55%)'
-    : 'radial-gradient(1100px 380px at 15% -20%, rgba(47,99,180,0.12), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(215,167,57,0.09), transparent 55%)'
+    ? `radial-gradient(1100px 380px at 15% -20%, rgba(${brand.blueGlowRgb}, 0.22), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(${brand.goldGlowRgb}, 0.14), transparent 55%)`
+    : `radial-gradient(1100px 380px at 15% -20%, rgba(${brand.blueGlowRgb}, 0.12), transparent 60%), radial-gradient(900px 360px at 100% 0%, rgba(${brand.goldGlowRgb}, 0.09), transparent 55%)`
 }
