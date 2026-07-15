@@ -39,6 +39,7 @@ import {
   getHeatMap,
   getMarketSummary,
   getMarketSentiment,
+  getOptionsFlow,
   getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
@@ -87,6 +88,7 @@ import {
   type MarketBrief,
   type MarketSummary,
   type MarketSentiment,
+  type OptionsFlow,
   type QuarterlyEarnings,
   type Quote,
   type RsiSeries,
@@ -589,6 +591,35 @@ export function usePeHistory(
     queryFn: ({ signal }) => getPeHistory(symbol as string, signal),
     enabled: !!symbol,
     staleTime: 10 * 60 * 1000,
+  })
+}
+
+/**
+ * A stock's options-flow read for one expiration
+ * (`GET /stocks/ticker/{ticker}/options`) — the calls/puts chain, the day's flow
+ * aggregates, and the unusual-activity standouts. Like the other tab-scoped reads
+ * it's gated on the Options tab being open (a live Yahoo read, so a detail-page
+ * load doesn't fire it), and held fresh for two minutes to match the endpoint's
+ * Cache-Control. `expiration` (a listed `YYYY-MM-DD`, or null for the nearest
+ * upcoming) is part of the key, so each expiry is cached apart; `keepPreviousData`
+ * holds the current chain on screen while switching expiries so it doesn't flash
+ * empty. Idle until `symbol` is set *and* `enabled` is true.
+ */
+export function useOptionsFlow(
+  symbol: string | null | undefined,
+  enabled = true,
+  expiration?: string | null,
+): UseQueryResult<OptionsFlow> {
+  return useQuery({
+    queryKey: ['options-flow', symbol, expiration ?? null],
+    queryFn: ({ signal }) =>
+      getOptionsFlow(symbol as string, {
+        expiration: expiration ?? undefined,
+        signal,
+      }),
+    enabled: !!symbol && enabled,
+    staleTime: 2 * 60 * 1000,
+    placeholderData: keepPreviousData,
   })
 }
 

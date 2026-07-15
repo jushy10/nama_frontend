@@ -100,6 +100,79 @@ export interface OptionsMetrics {
   put_call_ratio: number | null
 }
 
+/** Which side of an options chain a contract sits on. */
+export type OptionContractType = 'call' | 'put'
+
+/**
+ * One contract's row on the options chain (`GET /stocks/ticker/{ticker}/options`).
+ * `mid` is the fair price (bid/ask midpoint, else last); `premium` is the dollars
+ * that changed hands today (`mid` × volume × 100 — a lot is 100 shares), the figure
+ * a flow screen ranks by. `implied_volatility` is a percent. `volume_oi_ratio` is
+ * today's volume over prior open interest, and `unusual` flags a contract whose
+ * volume exceeded that open interest (fresh positioning). Any figure is null when the
+ * vendor didn't quote it — an unpriced or untraded contract, not a zero.
+ */
+export interface OptionContract {
+  expiration: string
+  strike: number
+  type: OptionContractType
+  bid: number | null
+  ask: number | null
+  last_price: number | null
+  mid: number | null
+  volume: number | null
+  open_interest: number | null
+  implied_volatility: number | null
+  in_the_money: boolean | null
+  premium: number | null
+  volume_oi_ratio: number | null
+  unusual: boolean
+}
+
+/**
+ * The day's aggregate flow across the shown expiry. Per-side volume/open interest,
+ * the put/call lean (volume and open-interest ratios, null when their call
+ * denominator is 0), the dollar premium into each side, and `net_premium` — call
+ * premium minus put premium (positive = money leaning into calls).
+ */
+export interface OptionsFlowSummary {
+  call_volume: number
+  put_volume: number
+  total_volume: number
+  call_open_interest: number
+  put_open_interest: number
+  put_call_volume_ratio: number | null
+  put_call_oi_ratio: number | null
+  call_premium: number
+  put_premium: number
+  net_premium: number
+}
+
+/**
+ * A stock's options-flow read for one expiration
+ * (`GET /stocks/ticker/{ticker}/options`) — the calls and puts coming in, the
+ * volume, and the money behind them. `spot` is the underlying price for
+ * at-the-money context; `expiration` is the expiry the `calls`/`puts` are for and
+ * `expirations` the full list of listed expiries (for a client-side selector).
+ * `unusual` are the standout contracts (volume above open interest), most-money-
+ * first. A symbol with no listed options comes back with a null `expiration`/
+ * `summary` and empty lists (a 200, not a 404) — the card self-hides.
+ *
+ * Scope: Yahoo publishes cumulative day volume and prior-day open interest, not a
+ * trade-by-trade tape — so this is a "where's the volume and money going" snapshot,
+ * not print-level sweep/block flow.
+ */
+export interface OptionsFlow {
+  ticker: string
+  spot: number | null
+  expiration: string | null
+  expirations: string[]
+  summary: OptionsFlowSummary | null
+  calls: OptionContract[]
+  puts: OptionContract[]
+  unusual: OptionContract[]
+}
+
 /**
  * What kind of instrument a symbol is. `equity` is a common stock; `etf` is an
  * exchange-traded fund (present in the screened ETF universe). Drives which
@@ -969,6 +1042,29 @@ export async function getPeHistory(
   )
   if (!res.ok) throw await toApiError(res)
   return (await res.json()) as PeHistory
+}
+
+/**
+ * A stock's options-flow read for one expiration
+ * (`GET /stocks/ticker/{ticker}/options`). Pass `expiration` (a listed
+ * `YYYY-MM-DD`) to switch expiries; omit it for the nearest upcoming. Best-effort
+ * on the backend: a symbol with no listed options comes back with a null
+ * `expiration`/`summary` and empty lists (a 200, not a 404), so the card
+ * self-hides; a blocked upstream fetch is a 502.
+ */
+export async function getOptionsFlow(
+  ticker: string,
+  opts: { expiration?: string; signal?: AbortSignal } = {},
+): Promise<OptionsFlow> {
+  const qs = opts.expiration
+    ? `?expiration=${encodeURIComponent(opts.expiration)}`
+    : ''
+  const res = await fetch(
+    `${API_BASE}/stocks/ticker/${encodeURIComponent(ticker)}/options${qs}`,
+    { signal: opts.signal },
+  )
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as OptionsFlow
 }
 
 /** Fetch the day's snapshot for every tracked market sector. */

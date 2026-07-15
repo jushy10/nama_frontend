@@ -35,6 +35,7 @@ import {
   useCongressTrades,
   useInsiderTransactions,
   useInstitutionalOwnership,
+  useOptionsFlow,
   useQuarterlyEarnings,
   useRatingsAnalysis,
   useStockAnalysis,
@@ -63,6 +64,7 @@ import FundamentalsAnalysisCard from '@/components/FundamentalsAnalysisCard'
 import IndustryPeCard from '@/components/IndustryPeCard'
 import PeHistoryCard from '@/components/PeHistoryCard'
 import OptionsCard from '@/components/OptionsCard'
+import OptionsFlowCard from '@/components/OptionsFlowCard'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import RangeReturn from '@/components/RangeReturn'
@@ -164,6 +166,9 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   const [range, setRange] = useState<ChartRange>('6M')
   const [showSupport, setShowSupport] = useState(true)
   const [showEma, setShowEma] = useState(true)
+  // The options-flow expiry lives here (null = the nearest upcoming, which the
+  // backend picks) so the query refetches when the user switches expiries.
+  const [optionsExpiry, setOptionsExpiry] = useState<string | null>(null)
   // The active section lives in the URL (`?tab=`), so a deep link opens straight to
   // Fundamentals/Analysts/…, the view is shareable, and Back/Forward walks the tabs
   // you visited. Overview is the default and stays out of the URL. A `replace` write
@@ -261,6 +266,14 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // resolves). Best-effort — an uncovered/blocked symbol resolves to an empty
   // series and the card self-hides, so no loading/error UI.
   const peHistoryQuery = usePeHistory(loadedSymbol)
+  // The options-flow chain — a live Yahoo read, so gate it on the Options tab
+  // being open (like the news/insider reads) so a detail-page load doesn't fire
+  // it. Held fresh across tab switches by the hook's staleTime.
+  const optionsFlowQuery = useOptionsFlow(
+    loadedSymbol,
+    tab === 'options',
+    optionsExpiry,
+  )
 
   if (cardQuery.isLoading) {
     return (
@@ -799,30 +812,38 @@ export default function StockDetail({ symbol }: { symbol: string }) {
         </Stack>
       )}
 
-      {/* Options-market read, riding the single snapshot request. When the
-          block is null (no priceable options) the tab shows a plain empty
-          state rather than a blank panel. */}
+      {/* Options: the summary read (ATM IV / expected move / put-call, riding the
+          single snapshot request) leads, then the full flow view — the calls/puts
+          chain, the day's volume and premium, and the unusual-activity standouts —
+          a live Yahoo read gated on this tab. The flow card self-hides to an empty
+          state when the symbol lists no options, so it covers the empty case too. */}
       {tab === 'options' && (
-        <Box role="tabpanel">
-          {stock.options_metrics ? (
+        <Stack spacing={3} role="tabpanel">
+          {stock.options_metrics && (
             <OptionsCard metrics={stock.options_metrics} price={stock.price} />
-          ) : (
-            <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-              <CardContent sx={{ p: 3, textAlign: 'center' }}>
-                <Typography
-                  variant="h6"
-                  component="h2"
-                  sx={{ fontWeight: 600 }}
-                >
-                  Options
-                </Typography>
-                <Typography color="text.secondary" sx={{ mt: 1 }}>
-                  No priceable options for {stock.ticker}.
-                </Typography>
-              </CardContent>
-            </Card>
           )}
-        </Box>
+
+          {optionsFlowQuery.isLoading && (
+            <Stack sx={{ alignItems: 'center', py: 2 }}>
+              <CircularProgress size={28} />
+            </Stack>
+          )}
+          {optionsFlowQuery.isError && (
+            <Alert severity="warning" variant="outlined">
+              {errorMessage(
+                optionsFlowQuery.error,
+                'Could not load the options chain.',
+              )}
+            </Alert>
+          )}
+          {optionsFlowQuery.data && (
+            <OptionsFlowCard
+              data={optionsFlowQuery.data}
+              expiration={optionsExpiry}
+              onExpirationChange={setOptionsExpiry}
+            />
+          )}
+        </Stack>
       )}
     </Stack>
   )
