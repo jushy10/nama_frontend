@@ -209,7 +209,12 @@ function SummaryCard({ data }: { data: InsiderTransactions }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <SectionHeading
           component="h2"
           icon={<SwapVertIcon fontSize="small" />}
@@ -222,7 +227,7 @@ function SummaryCard({ data }: { data: InsiderTransactions }) {
           direction="row"
           spacing={2}
           sx={{
-            mt: 2.5,
+            mt: 1.75,
             justifyContent: 'space-between',
             alignItems: 'baseline',
           }}
@@ -381,7 +386,12 @@ function FeedCard({ transactions }: { transactions: InsiderTransaction[] }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -416,7 +426,7 @@ function FeedCard({ transactions }: { transactions: InsiderTransaction[] }) {
         </Stack>
 
         {shown.length === 0 ? (
-          <Typography color="text.secondary" sx={{ mt: 2.5 }}>
+          <Typography color="text.secondary" sx={{ mt: 2 }}>
             No open-market buys or sells here — only grants, option exercises,
             or tax withholding. Switch to All activity to see them.
           </Typography>
@@ -465,7 +475,7 @@ export default function InsiderTransactionsCard({
   if (data.transactions.length === 0) {
     return (
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 }, textAlign: 'center' }}>
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             No insider transactions
           </Typography>
@@ -477,7 +487,7 @@ export default function InsiderTransactionsCard({
     )
   }
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       <SummaryCard data={data} />
       <FeedCard transactions={data.transactions} />
     </Stack>

@@ -63,7 +63,7 @@ const edge = (v: number) => ((v - MIN) / SPAN) * 100
 function Gauge({ value, color }: { value: number; color: string }) {
   const parity = edge(1)
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Box
         role="img"
         aria-label={`Debt to equity of ${fmtMultiple(value)}`}
@@ -178,7 +178,7 @@ function LiquidityMeter({ ratio }: { ratio: number }) {
         ? 'Comfortably covers its short-term bills from liquid assets.'
         : 'Covers its short-term bills, with a modest cushion.'
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box sx={{ mt: 2 }}>
       <Stack
         direction="row"
         sx={{
@@ -306,7 +306,12 @@ export default function FinancialHealthCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -393,7 +398,11 @@ export default function FinancialHealthCard({
               </Typography>
             </Stack>
             <Gauge value={debt_to_equity} color={meta.color} />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{ mt: 1.75 }}
+            >
               {meta.blurb}
             </Typography>
           </>
@@ -408,7 +417,7 @@ export default function FinancialHealthCard({
         {current_ratio != null && <LiquidityMeter ratio={current_ratio} />}
 
         {beta != null && (
-          <Box sx={{ mt: 2.5 }}>
+          <Box sx={{ mt: 2 }}>
             <StatTile
               label="Beta (volatility vs market)"
               value={fmtRatio(beta)}

@@ -73,7 +73,7 @@ const edge = (y: number) => ((y - MIN) / SPAN) * 100
 function Gauge({ yield: y, color }: { yield: number; color: string }) {
   const breakeven = edge(0)
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Box
         role="img"
         aria-label={`Free cash flow yield of ${fmtPct(y)}`}
@@ -201,7 +201,7 @@ function ConversionBar({
   const keptPct = (kept / ocfYield) * 100
 
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box sx={{ mt: 2 }}>
       <Stack
         direction="row"
         sx={{
@@ -394,7 +394,12 @@ export default function CashGenerationCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -493,7 +498,7 @@ export default function CashGenerationCard({
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ mt: 2.5 }}
+                sx={{ mt: 1.75 }}
               >
                 {meta.blurb}
               </Typography>
@@ -515,10 +520,10 @@ export default function CashGenerationCard({
             operating-cash yield, and how free cash grew over the year. */}
         <Box
           sx={{
-            mt: 2.5,
+            mt: 2,
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 1.5,
+            gap: 1,
           }}
         >
           <StatTile label="Price / FCF" value={pfcf} />

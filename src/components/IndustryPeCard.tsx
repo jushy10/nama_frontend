@@ -163,7 +163,7 @@ function RangeBar({
     : `Peer P/E range ${fmt(p25)} to ${fmt(p75)}, median ${fmt(median)}`
 
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       {/* Marker label — only when the stock has a P/E to place. */}
       <Box sx={{ position: 'relative', height: 16 }}>
         {marked && (
@@ -344,7 +344,12 @@ export default function IndustryPeCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -429,7 +434,7 @@ export default function IndustryPeCard({
           />
         )}
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
           {comparisonLine(stockPe, median_pe, label, stance)}
         </Typography>
       </CardContent>

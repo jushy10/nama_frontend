@@ -247,7 +247,7 @@ function PriceTargets({
       : null
 
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Divider sx={{ mb: 2 }} />
       <Stack
         direction="row"
@@ -498,7 +498,7 @@ function TopFirms({
   price: number | null
 }) {
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Divider sx={{ mb: 2 }} />
       <Typography
         variant="caption"
@@ -558,7 +558,12 @@ export default function AnalystCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -618,7 +623,7 @@ export default function AnalystCard({
           <>
             {hasTrends && latest && (
               <>
-                <Typography variant="body2" sx={{ mt: 2.5 }}>
+                <Typography variant="body2" sx={{ mt: 2 }}>
                   <Box
                     component="span"
                     sx={{ fontWeight: 700, color: 'success.main' }}
@@ -648,7 +653,7 @@ export default function AnalystCard({
                     direction="row"
                     spacing={0.75}
                     sx={{
-                      mt: 2.5,
+                      mt: 2,
                       alignItems: 'center',
                       color: direction.color,
                     }}

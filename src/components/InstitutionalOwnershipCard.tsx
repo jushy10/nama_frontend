@@ -279,7 +279,12 @@ function SummaryCard({ data }: { data: InstitutionalOwnership }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <SectionHeading
           component="h2"
           icon={<AccountBalanceIcon fontSize="small" />}
@@ -289,7 +294,7 @@ function SummaryCard({ data }: { data: InstitutionalOwnership }) {
         />
 
         {data.breakdown && (
-          <Box sx={{ mt: 2.5 }}>
+          <Box sx={{ mt: 1.75 }}>
             <OwnershipMeter breakdown={data.breakdown} />
             {(count != null || floatPct != null) && (
               <Typography
@@ -316,7 +321,7 @@ function SummaryCard({ data }: { data: InstitutionalOwnership }) {
           </Box>
         )}
 
-        <Divider sx={{ my: 2.5, borderColor: 'divider' }} />
+        <Divider sx={{ my: 2, borderColor: 'divider' }} />
 
         <Typography
           variant="caption"
@@ -511,7 +516,12 @@ function HoldersCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -552,7 +562,7 @@ function HoldersCard({
         </Stack>
 
         {shown.length === 0 ? (
-          <Typography color="text.secondary" sx={{ mt: 2.5 }}>
+          <Typography color="text.secondary" sx={{ mt: 2 }}>
             {emptyLine}
           </Typography>
         ) : (
@@ -599,7 +609,7 @@ export default function InstitutionalOwnershipCard({
   if (data.holders.length === 0) {
     return (
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 }, textAlign: 'center' }}>
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             No institutional ownership
           </Typography>
@@ -619,7 +629,7 @@ export default function InstitutionalOwnershipCard({
     : data.holders
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       <SummaryCard data={data} />
       <HoldersCard holders={currentHolders} asOf={dayLabel(latest)} />
     </Stack>

@@ -263,7 +263,7 @@ function ArticleRow({
         borderRadius: 2,
         mx: -1,
         px: 1,
-        py: 1.25,
+        py: 1,
         transition: 'background-color 0.15s ease',
         cursor: hasLink ? 'pointer' : 'default',
         '&:hover': hasLink ? { bgcolor: 'action.hover' } : undefined,
@@ -459,7 +459,7 @@ export default function NewsCard({ data }: { data: StockNews }) {
   if (data.articles.length === 0) {
     return (
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 }, textAlign: 'center' }}>
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             No recent news
           </Typography>
@@ -479,7 +479,12 @@ export default function NewsCard({ data }: { data: StockNews }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <SectionHeading
           component="h2"
           icon={<NewspaperRoundedIcon fontSize="small" />}
@@ -495,7 +500,7 @@ export default function NewsCard({ data }: { data: StockNews }) {
         {/* The timeline: a single continuous rail behind the nodes, with the
             stories threaded down it newest-first. The rail is absolutely
             positioned so it reads as one line the day markers punctuate. */}
-        <Box sx={{ position: 'relative', mt: 2 }}>
+        <Box sx={{ position: 'relative', mt: 1.75 }}>
           <Box
             aria-hidden
             sx={{

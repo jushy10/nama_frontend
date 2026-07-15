@@ -309,7 +309,7 @@ export default function OptionsFlowCard({
   if (data.expirations.length === 0 || !data.summary || !data.expiration) {
     return (
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: 3, textAlign: 'center' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3 }, textAlign: 'center' }}>
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             No options chain
           </Typography>
@@ -347,11 +347,16 @@ export default function OptionsFlowCard({
   const sideContracts = side === 'call' ? data.calls : data.puts
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       {/* The flow hero: call vs put volume, the volume bar, and the put/call +
           net-premium lean — the day's directional read at a glance. */}
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <CardContent
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+          }}
+        >
           <SectionHeading
             component="h2"
             icon={<CandlestickChartIcon fontSize="small" />}
@@ -364,7 +369,7 @@ export default function OptionsFlowCard({
             direction="row"
             spacing={2}
             sx={{
-              mt: 2.5,
+              mt: 2,
               justifyContent: 'space-between',
               alignItems: 'baseline',
             }}
@@ -430,7 +435,7 @@ export default function OptionsFlowCard({
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ mt: 2, display: 'block' }}
+            sx={{ mt: 1.75, display: 'block' }}
           >
             {data.spot != null ? `Spot ${fmtPrice(data.spot)} · ` : ''}
             Expiry {fmtDate(data.expiration)}. A snapshot of today's volume and
@@ -443,7 +448,12 @@ export default function OptionsFlowCard({
           positioning), most money first. Self-hides when nothing stands out. */}
       {data.unusual.length > 0 && (
         <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-          <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+          <CardContent
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+            }}
+          >
             <Stack
               direction="row"
               spacing={1}
@@ -470,7 +480,7 @@ export default function OptionsFlowCard({
               Contracts trading above their open interest — more bought today
               than were outstanding.
             </Typography>
-            <Stack spacing={1.25} sx={{ mt: 2 }}>
+            <Stack spacing={1.25} sx={{ mt: 1.75 }}>
               {data.unusual.map((c) => (
                 <UnusualRow key={`${c.type}-${c.strike}`} c={c} />
               ))}
@@ -481,7 +491,12 @@ export default function OptionsFlowCard({
 
       {/* The chain itself: a Calls/Puts toggle over the strike ladder. */}
       <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+        <CardContent
+          sx={{
+            p: { xs: 2, sm: 2.5 },
+            '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+          }}
+        >
           <Stack
             direction="row"
             spacing={2}

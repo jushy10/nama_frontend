@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useState, type ReactElement, type ReactNode } from 'react'
 import { readEnum, useUrlState, writeEnum } from '@/lib/urlState'
 import {
   Alert,
@@ -52,6 +52,7 @@ import GroupsIcon from '@mui/icons-material/Groups'
 import SwapVertIcon from '@mui/icons-material/SwapVert'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import CandlestickChartIcon from '@mui/icons-material/CandlestickChart'
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import ScorecardCard from '@/components/ScorecardCard'
 import TrendCard from '@/components/TrendCard'
 import StockHeader from '@/components/StockHeader'
@@ -98,12 +99,14 @@ type StockDetailTab =
   | 'fundamentals'
   | 'analysts'
   | 'insiders'
+  | 'congress'
   | 'earnings'
   | 'options'
 
 // The tab strip's sections, each with a small leading glyph so the row scans as
 // icons + labels rather than a run of look-alike words — Overview, News,
-// Fundamentals, Analysts, Insiders, Earnings, Options.
+// Fundamentals, Analysts, Insiders, Congress, Earnings, Options. Congress sits
+// beside Insiders: both answer "who's been trading this?".
 const STOCK_TABS: {
   value: StockDetailTab
   label: string
@@ -114,6 +117,7 @@ const STOCK_TABS: {
   { value: 'fundamentals', label: 'Fundamentals', icon: <AssessmentIcon /> },
   { value: 'analysts', label: 'Analysts', icon: <GroupsIcon /> },
   { value: 'insiders', label: 'Insiders', icon: <SwapVertIcon /> },
+  { value: 'congress', label: 'Congress', icon: <AccountBalanceIcon /> },
   { value: 'earnings', label: 'Earnings', icon: <BarChartIcon /> },
   { value: 'options', label: 'Options', icon: <CandlestickChartIcon /> },
 ]
@@ -128,6 +132,39 @@ const STOCK_TAB_VALUES = STOCK_TABS.map((t) => t.value)
 // the same control family rather than a stray restyle.
 const ACTIVE_PILL = 'linear-gradient(135deg, #07378e 0%, #4f83e6 100%)'
 const ACTIVE_GLOW = '0 6px 16px -5px rgba(47,99,180,0.55)'
+
+// The rhythm every tab body scrolls to: cards and grid tracks share this gap so
+// the whole detail reads as one grid. Snug on a phone, a touch more air on
+// desktop where there's room to breathe.
+const PANEL_GAP = { xs: 2, md: 2.5 }
+
+/**
+ * A responsive card grid. One column on phones — so the mobile app keeps its
+ * familiar single stack — then `template`'s columns from the breakpoint it names
+ * up, so paired cards share a row on desktop and the tab scrolls far less.
+ * `alignItems: start` stops a short card from stretching to match a tall
+ * neighbour, and a null child (a self-hiding card) simply leaves no cell.
+ */
+function CardGrid({
+  children,
+  template,
+}: {
+  children: ReactNode
+  template: Record<string, string>
+}) {
+  return (
+    <Box
+      sx={{
+        display: 'grid',
+        gap: PANEL_GAP,
+        alignItems: 'start',
+        gridTemplateColumns: template,
+      }}
+    >
+      {children}
+    </Box>
+  )
+}
 
 /**
  * A quiet section label with a trailing hairline — the divider that sorts the
@@ -209,10 +246,11 @@ export default function StockDetail({ symbol }: { symbol: string }) {
   // The insider feed is a live SEC read — gate it on the Insiders tab being open
   // (like the AI reads) so a detail-page load doesn't fire it.
   const insiderQuery = useInsiderTransactions(loadedSymbol, tab === 'insiders')
-  // Congressional (STOCK Act) trades — best-effort context on the Overview tab,
-  // a cheap DB-cached read that rides the loaded ticker. The card self-hides when
-  // Congress hasn't traded the stock, so no loading/error UI is needed.
-  const congressQuery = useCongressTrades(loadedSymbol)
+  // Congressional (STOCK Act) trades now have their own tab, so the read is
+  // gated on it being open (like the news/insider reads) rather than firing on
+  // every detail-page load. A DB-cached read, held fresh across tab switches by
+  // the hook's staleTime. The tab handles its own loading / empty / error UI.
+  const congressQuery = useCongressTrades(loadedSymbol, tab === 'congress')
   // The institutional (13F) holders ride the same Insiders tab and the same
   // gating — a DB-cached read, so it's cheap, but there's no reason to fire it
   // until the tab is open.
@@ -315,7 +353,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       m.eps != null)
 
   return (
-    <Stack spacing={{ xs: 2, sm: 3 }}>
+    <Stack spacing={PANEL_GAP}>
       {/* The identity + live quote lead the page and stay put across every tab
           via the persistent header, so the ticker, name and price never scroll
           out of mind while you read Fundamentals, Analysts or Options. */}
@@ -398,153 +436,162 @@ export default function StockDetail({ symbol }: { symbol: string }) {
       </Box>
 
       {tab === 'overview' && (
-        <Stack spacing={3} role="tabpanel">
-          {/* The snapshot hero leads the tab, full width: what this is and
-              where it trades, the key stats, and the trailing-return strip —
-              all in one card (5Y fills in a beat later). */}
-          <StockCard
-            stock={stock}
-            perf={stock.performance}
-            fiveYearReturn={fiveYearReturn}
-          />
+        <Box role="tabpanel">
+          {/* A masonry split so the tall AI read no longer towers over a short
+              snapshot: the quantitative stack (snapshot, price chart, trend)
+              fills the left column while the AI synthesis rides the full height
+              of the right, leaving no dead space between them. On a phone the
+              grid collapses to a single column: snapshot, chart, trend, then the
+              AI take. */}
+          <CardGrid
+            template={{ xs: '1fr', md: 'minmax(0, 5fr) minmax(0, 7fr)' }}
+          >
+            <Stack spacing={PANEL_GAP}>
+              {/* The snapshot: what this is and where it trades, the key stats,
+                  and the trailing-return strip (5Y fills in a beat later). */}
+              <StockCard
+                stock={stock}
+                perf={stock.performance}
+                fiveYearReturn={fiveYearReturn}
+              />
 
-          {/* The AI take — a plain-language buy/hold/sell read — the headline
-              synthesis. It's fetched on its own since the model call is the
-              slowest read, so the rest of the tab paints while this card shows
-              its own spinner; a failed read (e.g. the model isn't configured)
-              degrades to a warning rather than sinking the page. */}
-          {analysisQuery.isLoading && (
-            <AnalysisLoadingCard title="AI Analysis" />
-          )}
-          {analysisQuery.isError && (
-            <Alert severity="warning" variant="outlined">
-              {errorMessage(
-                analysisQuery.error,
-                'Could not load the AI analysis.',
-              )}
-            </Alert>
-          )}
-          {analysisQuery.data && (
-            <ScorecardCard analysis={analysisQuery.data} />
-          )}
-
-          {/* The trend read pairs with the chart: which way the stock is
-              heading short- vs long-term. Best-effort context, so it just
-              appears once it lands and self-hides on a failure. */}
-          {trendQuery.data && <TrendCard trend={trendQuery.data} />}
-
-          {/* The price chart anchors the tab. */}
-          <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                sx={{
-                  justifyContent: 'space-between',
-                  alignItems: { sm: 'center' },
-                  mb: 2,
-                }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ alignItems: 'baseline' }}
-                >
-                  <ShowChartIcon
-                    fontSize="small"
-                    sx={{ color: 'primary.main', alignSelf: 'center' }}
-                  />
-                  <Typography
-                    variant="h6"
-                    component="h2"
-                    sx={{ fontWeight: 600 }}
-                  >
-                    Price chart
-                  </Typography>
-                  {candleQuery.data && (
-                    <RangeReturn candles={candleQuery.data.candles} />
-                  )}
-                </Stack>
-                <Stack
-                  direction="row"
-                  spacing={1.5}
-                  sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
-                >
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        size="small"
-                        checked={showEma}
-                        onChange={(e) => setShowEma(e.target.checked)}
-                      />
-                    }
-                    label="Moving averages"
+              {/* The price chart, under the snapshot. */}
+              <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+                <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
+                  <Stack
+                    direction={{ xs: 'column', sm: 'row' }}
+                    spacing={1.5}
                     sx={{
-                      m: 0,
-                      color: 'text.secondary',
-                      '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                      justifyContent: 'space-between',
+                      alignItems: { sm: 'center' },
+                      mb: 2,
                     }}
-                  />
-                  {(supportQuery.data?.levels.length ?? 0) > 0 && (
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          size="small"
-                          checked={showSupport}
-                          onChange={(e) => setShowSupport(e.target.checked)}
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: 'baseline' }}
+                    >
+                      <ShowChartIcon
+                        fontSize="small"
+                        sx={{ color: 'primary.main', alignSelf: 'center' }}
+                      />
+                      <Typography
+                        variant="h6"
+                        component="h2"
+                        sx={{ fontWeight: 600 }}
+                      >
+                        Price chart
+                      </Typography>
+                      {candleQuery.data && (
+                        <RangeReturn candles={candleQuery.data.candles} />
+                      )}
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1.5}
+                      sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 1 }}
+                    >
+                      <FormControlLabel
+                        control={
+                          <Switch
+                            size="small"
+                            checked={showEma}
+                            onChange={(e) => setShowEma(e.target.checked)}
+                          />
+                        }
+                        label="Moving averages"
+                        sx={{
+                          m: 0,
+                          color: 'text.secondary',
+                          '& .MuiFormControlLabel-label': {
+                            fontSize: '0.8rem',
+                          },
+                        }}
+                      />
+                      {(supportQuery.data?.levels.length ?? 0) > 0 && (
+                        <FormControlLabel
+                          control={
+                            <Switch
+                              size="small"
+                              checked={showSupport}
+                              onChange={(e) => setShowSupport(e.target.checked)}
+                            />
+                          }
+                          label="Support levels"
+                          sx={{
+                            m: 0,
+                            color: 'text.secondary',
+                            '& .MuiFormControlLabel-label': {
+                              fontSize: '0.8rem',
+                            },
+                          }}
                         />
-                      }
-                      label="Support levels"
+                      )}
+                      <ChartRangeToggle value={range} onChange={setRange} />
+                    </Stack>
+                  </Stack>
+
+                  {candleQuery.isLoading && (
+                    <Stack
                       sx={{
-                        m: 0,
-                        color: 'text.secondary',
-                        '& .MuiFormControlLabel-label': { fontSize: '0.8rem' },
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 360,
                       }}
+                    >
+                      <CircularProgress />
+                    </Stack>
+                  )}
+                  {candleQuery.isError && (
+                    <Alert severity="warning" variant="outlined">
+                      {errorMessage(
+                        candleQuery.error,
+                        'Could not load chart data.',
+                      )}
+                    </Alert>
+                  )}
+                  {candleQuery.data && (
+                    <CandleChart
+                      candles={candleQuery.data.candles}
+                      timeframe={candleQuery.data.timeframe}
+                      supportLevels={
+                        showSupport ? supportQuery.data?.levels : undefined
+                      }
+                      emaLines={showEma ? emaQuery.data?.lines : undefined}
                     />
                   )}
-                  <ChartRangeToggle value={range} onChange={setRange} />
-                </Stack>
-              </Stack>
+                </CardContent>
+              </Card>
 
-              {candleQuery.isLoading && (
-                <Stack
-                  sx={{
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    minHeight: 360,
-                  }}
-                >
-                  <CircularProgress />
-                </Stack>
+              {/* The trend read pairs with the chart above: which way the stock
+                  is heading short- vs long-term. Best-effort context, so it just
+                  appears once it lands and self-hides on a failure. */}
+              {trendQuery.data && <TrendCard trend={trendQuery.data} />}
+            </Stack>
+
+            {/* The AI take — the headline synthesis — rides the full height of
+                the right column beside the stack. Its own (slow) model call, so
+                it shows a spinner while the rest paints; a failed read (e.g. the
+                model isn't configured) degrades to a warning. */}
+            <Box>
+              {analysisQuery.isLoading && (
+                <AnalysisLoadingCard title="AI Analysis" />
               )}
-              {candleQuery.isError && (
+              {analysisQuery.isError && (
                 <Alert severity="warning" variant="outlined">
                   {errorMessage(
-                    candleQuery.error,
-                    'Could not load chart data.',
+                    analysisQuery.error,
+                    'Could not load the AI analysis.',
                   )}
                 </Alert>
               )}
-              {candleQuery.data && (
-                <CandleChart
-                  candles={candleQuery.data.candles}
-                  timeframe={candleQuery.data.timeframe}
-                  supportLevels={
-                    showSupport ? supportQuery.data?.levels : undefined
-                  }
-                  emaLines={showEma ? emaQuery.data?.lines : undefined}
-                />
+              {analysisQuery.data && (
+                <ScorecardCard analysis={analysisQuery.data} />
               )}
-            </CardContent>
-          </Card>
-
-          {/* Congressional (STOCK Act) trades — best-effort context that
-              self-hides when Congress hasn't traded the stock, so it only shows
-              up where there's a real signal and a failure just omits it. */}
-          {congressQuery.data && (
-            <CongressTradesCard data={congressQuery.data} />
-          )}
-        </Stack>
+            </Box>
+          </CardGrid>
+        </Box>
       )}
 
       {/* Recent headlines on their own tab: a chronological timeline of the
@@ -571,7 +618,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           instant) and Valuation (the peer and own-history P/E reads, each a
           best-effort query that fills in as it lands). */}
       {tab === 'fundamentals' && (
-        <Stack spacing={3} role="tabpanel">
+        <Stack spacing={PANEL_GAP} role="tabpanel">
           {/* The AI fundamentals take leads the tab — a plain-language read of
               how solid the business is and whether the shares look reasonably
               priced. Its own slow model call, gated on the tab, so it shows a
@@ -595,25 +642,37 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           )}
 
           {/* "Is it a good business?" — how much profit it keeps, how much free
-              cash it throws off, and how sound its balance sheet is. */}
+              cash it throws off, and how sound its balance sheet is. The three
+              reads sit in a grid (up to three across on a wide screen, one per
+              row on a phone) so they no longer stack into a tall scroll. */}
           {stock.metrics && (
             <Box>
               <GroupLabel label="Business quality" />
-              <Stack spacing={3} sx={{ mt: 2 }}>
-                {/* "Is it making money?" — the trailing net-margin read. */}
-                <ProfitabilityCard
-                  netMargin={stock.metrics.net_margin}
-                  grossMargin={stock.metrics.gross_margin}
-                  operatingMargin={stock.metrics.operating_margin}
-                />
-                {/* "Does it throw off cash?" — free cash flow yield, how
-                    operating cash converts after capex, and the cash multiples.
-                    Self-hides when the whole cash-flow block is uncovered. */}
-                <CashGenerationCard metrics={stock.metrics} />
-                {/* "Is the balance sheet sound?" — leverage, liquidity and how
-                    much it swings with the market. Self-hides when none is covered. */}
-                <FinancialHealthCard metrics={stock.metrics} />
-              </Stack>
+              <Box sx={{ mt: 2 }}>
+                <CardGrid
+                  template={{
+                    xs: '1fr',
+                    md: 'repeat(2, minmax(0, 1fr))',
+                    lg: 'repeat(3, minmax(0, 1fr))',
+                  }}
+                >
+                  {/* "Is it making money?" — the trailing net-margin read. */}
+                  <ProfitabilityCard
+                    netMargin={stock.metrics.net_margin}
+                    grossMargin={stock.metrics.gross_margin}
+                    operatingMargin={stock.metrics.operating_margin}
+                  />
+                  {/* "Does it throw off cash?" — free cash flow yield, how
+                      operating cash converts after capex, and the cash
+                      multiples. Self-hides when the cash-flow block is
+                      uncovered. */}
+                  <CashGenerationCard metrics={stock.metrics} />
+                  {/* "Is the balance sheet sound?" — leverage, liquidity and how
+                      much it swings with the market. Self-hides when none is
+                      covered. */}
+                  <FinancialHealthCard metrics={stock.metrics} />
+                </CardGrid>
+              </Box>
             </Box>
           )}
 
@@ -624,9 +683,21 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           {(valuationUsable || industryUsable || historyUsable) && (
             <Box>
               <GroupLabel label="Valuation" />
-              <Stack spacing={3} sx={{ mt: 2 }}>
+              <Box
+                sx={{
+                  mt: 2,
+                  display: 'grid',
+                  gap: PANEL_GAP,
+                  alignItems: 'start',
+                  gridTemplateColumns: {
+                    xs: '1fr',
+                    md: 'repeat(2, minmax(0, 1fr))',
+                  },
+                }}
+              >
                 {/* The multiples themselves — P/E and its forward re-rate, PEG,
-                    P/S, P/B, EPS. Self-hides when no valuation figure is covered. */}
+                    P/S, P/B, EPS. Self-hides when no valuation figure is
+                    covered. */}
                 {stock.metrics && <ValuationCard metrics={stock.metrics} />}
                 {/* Rich or cheap for its industry — self-hides below
                     MIN_INDUSTRY_PEERS, already gated by industryUsable. */}
@@ -637,11 +708,14 @@ export default function StockDetail({ symbol }: { symbol: string }) {
                   />
                 )}
                 {/* Rich or cheap versus its own history — the trailing P/E at
-                    each past earnings release, anchored on its own median. */}
+                    each past earnings release, anchored on its own median. The
+                    time series reads best wide, so it spans the full row. */}
                 {historyUsable && (
-                  <PeHistoryCard history={peHistoryQuery.data!} />
+                  <Box sx={{ gridColumn: { md: '1 / -1' } }}>
+                    <PeHistoryCard history={peHistoryQuery.data!} />
+                  </Box>
                 )}
-              </Stack>
+              </Box>
             </Box>
           )}
 
@@ -672,7 +746,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           firms' current stance — all riding the loaded ticker's analyst-info
           read. */}
       {tab === 'analysts' && (
-        <Stack spacing={3} role="tabpanel">
+        <Stack spacing={PANEL_GAP} role="tabpanel">
           {/* The AI ratings take leads the tab — a plain-language read of what
               the sell-side thinks. Its own slow model call, gated on the tab, so
               it shows a loading card then fills in; a failure degrades to a
@@ -720,45 +794,105 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           gated on the tab, so it shows a spinner then fills in; a failure
           degrades to a warning. */}
       {tab === 'insiders' && (
-        <Stack spacing={3} role="tabpanel">
-          {insiderQuery.isLoading && (
-            <Stack sx={{ alignItems: 'center', py: 2 }}>
-              <CircularProgress size={28} />
-            </Stack>
-          )}
-          {insiderQuery.isError && (
-            <Alert severity="warning" variant="outlined">
-              {errorMessage(
-                insiderQuery.error,
-                'Could not load insider transactions.',
-              )}
-            </Alert>
-          )}
-          {insiderQuery.data && (
-            <InsiderTransactionsCard data={insiderQuery.data} />
-          )}
+        <Box
+          role="tabpanel"
+          sx={{
+            display: 'grid',
+            gap: PANEL_GAP,
+            alignItems: 'start',
+            gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, minmax(0, 1fr))' },
+          }}
+        >
+          {/* Insider (Form 4) buys and sells: the conviction summary over the
+              filterable feed — a live SEC read gated on the tab, so it shows a
+              spinner then fills in; a failure degrades to a warning. */}
+          <Box>
+            {insiderQuery.isLoading && (
+              <Stack sx={{ alignItems: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            )}
+            {insiderQuery.isError && (
+              <Alert severity="warning" variant="outlined">
+                {errorMessage(
+                  insiderQuery.error,
+                  'Could not load insider transactions.',
+                )}
+              </Alert>
+            )}
+            {insiderQuery.data && (
+              <InsiderTransactionsCard data={insiderQuery.data} />
+            )}
+          </Box>
 
           {/* The big-money side of the ledger: the 13F institutional holders and
-              their quarterly moves, below the insider feed. Its own DB-cached
-              read; a failure degrades to a warning without disturbing the insider
-              card above. */}
-          {institutionalQuery.isLoading && (
+              their quarterly moves, beside the insider feed on a wide screen.
+              Its own DB-cached read; a failure degrades to a warning without
+              disturbing the insider card. */}
+          <Box>
+            {institutionalQuery.isLoading && (
+              <Stack sx={{ alignItems: 'center', py: 2 }}>
+                <CircularProgress size={28} />
+              </Stack>
+            )}
+            {institutionalQuery.isError && (
+              <Alert severity="warning" variant="outlined">
+                {errorMessage(
+                  institutionalQuery.error,
+                  'Could not load institutional ownership.',
+                )}
+              </Alert>
+            )}
+            {institutionalQuery.data && (
+              <InstitutionalOwnershipCard data={institutionalQuery.data} />
+            )}
+          </Box>
+        </Box>
+      )}
+
+      {/* Congressional (STOCK Act) trades on their own tab: the net
+          bought-vs-sold read over the disclosed filings, a DB-cached read gated
+          on the tab. Congress trades few names, so "nothing on record" is the
+          common case and gets a proper empty state rather than a blank panel; a
+          failure degrades to a warning. */}
+      {tab === 'congress' && (
+        <Box role="tabpanel">
+          {congressQuery.isLoading && (
             <Stack sx={{ alignItems: 'center', py: 2 }}>
               <CircularProgress size={28} />
             </Stack>
           )}
-          {institutionalQuery.isError && (
+          {congressQuery.isError && (
             <Alert severity="warning" variant="outlined">
               {errorMessage(
-                institutionalQuery.error,
-                'Could not load institutional ownership.',
+                congressQuery.error,
+                'Could not load congressional trades.',
               )}
             </Alert>
           )}
-          {institutionalQuery.data && (
-            <InstitutionalOwnershipCard data={institutionalQuery.data} />
-          )}
-        </Stack>
+          {congressQuery.data &&
+            (congressQuery.data.items.length > 0 ? (
+              <CongressTradesCard data={congressQuery.data} />
+            ) : (
+              <Card variant="outlined" sx={{ borderColor: 'divider' }}>
+                <CardContent
+                  sx={{ p: { xs: 2.5, sm: 3 }, textAlign: 'center' }}
+                >
+                  <Typography
+                    variant="h6"
+                    component="h2"
+                    sx={{ fontWeight: 600 }}
+                  >
+                    No congressional trades
+                  </Typography>
+                  <Typography color="text.secondary" sx={{ mt: 1 }}>
+                    No members of Congress have disclosed a trade in{' '}
+                    {stock.ticker} recently.
+                  </Typography>
+                </CardContent>
+              </Card>
+            ))}
+        </Box>
       )}
 
       {/* Earnings and valuation live in one card now: the plain-language beat
@@ -766,7 +900,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           single Quarterly/Annual toggle. It fills the tab's width; the panel
           just shows a spinner or an error while the query resolves. */}
       {tab === 'earnings' && (
-        <Stack spacing={3} role="tabpanel">
+        <Stack spacing={PANEL_GAP} role="tabpanel">
           {/* The AI earnings read leads the tab once it lands — a slow model
               call, so it shows its own spinner and quietly omits itself on an
               error (it's supplementary to the charts below, and the endpoint
@@ -818,7 +952,7 @@ export default function StockDetail({ symbol }: { symbol: string }) {
           a live Yahoo read gated on this tab. The flow card self-hides to an empty
           state when the symbol lists no options, so it covers the empty case too. */}
       {tab === 'options' && (
-        <Stack spacing={3} role="tabpanel">
+        <Stack spacing={PANEL_GAP} role="tabpanel">
           {stock.options_metrics && (
             <OptionsCard metrics={stock.options_metrics} price={stock.price} />
           )}

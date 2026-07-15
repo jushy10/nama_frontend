@@ -964,7 +964,7 @@ function TrailingGrowth({
     )
   }
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box sx={{ mt: 1.75 }}>
       <Typography
         variant="caption"
         color="text.secondary"
@@ -1046,7 +1046,7 @@ function EarningsSummary({ earnings }: { earnings: EarningsHistory }) {
   return (
     <Box
       sx={{
-        mt: 2.5,
+        mt: 2,
         p: 2,
         borderRadius: 1.5,
         bgcolor: 'action.hover',
@@ -1276,7 +1276,12 @@ export default function EarningsCard({
         backgroundImage: (theme) => heroWash(theme),
       }}
     >
-      <CardContent sx={{ p: { xs: 1.5, sm: 2, md: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -1379,8 +1384,8 @@ export default function EarningsCard({
           direction="row"
           spacing={2}
           sx={{
-            mt: 3,
-            pt: 3,
+            mt: 2,
+            pt: 2,
             borderTop: '1px solid',
             borderColor: 'divider',
             justifyContent: 'space-between',
@@ -1445,7 +1450,7 @@ export default function EarningsCard({
         </Stack>
 
         {activeQuarters.length === 0 ? (
-          <Typography color="text.secondary" sx={{ mt: 2 }}>
+          <Typography color="text.secondary" sx={{ mt: 1.75 }}>
             No earnings history available for this stock.
           </Typography>
         ) : (
@@ -1456,7 +1461,7 @@ export default function EarningsCard({
                 epsGrowth={epsGrowth}
               />
             )}
-            <Box sx={{ mt: 2.5 }}>
+            <Box sx={{ mt: 2 }}>
               {hasRevenue && (
                 <Typography variant="caption" sx={chartLabelSx}>
                   {/* The annual EPS the API reports is the plain (GAAP) fiscal-
@@ -1482,7 +1487,7 @@ export default function EarningsCard({
               />
             </Box>
             {hasRevenue && (
-              <Box sx={{ mt: 3 }}>
+              <Box sx={{ mt: 2 }}>
                 <Typography variant="caption" sx={chartLabelSx}>
                   Revenue
                 </Typography>

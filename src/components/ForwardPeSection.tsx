@@ -726,7 +726,7 @@ export function ForwardPeSection({
   // Only reached once a period has a walk to draw (each branch below bails to
   // null first), so the divider never rides an empty section.
   const withDivider = (children: ReactNode) => (
-    <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid', borderColor: 'divider' }}>
+    <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
       {children}
     </Box>
   )

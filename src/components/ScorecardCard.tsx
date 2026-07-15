@@ -3,7 +3,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
   Stack,
   Tooltip,
   Typography,
@@ -219,7 +218,12 @@ export default function ScorecardCard({
 }) {
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: 3 }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -249,25 +253,40 @@ export default function ScorecardCard({
         {analysis.thesis && (
           <Typography
             variant="body1"
-            sx={{ mt: 2.5, fontSize: '1.0625rem', lineHeight: 1.6 }}
+            sx={{ mt: 2, fontSize: '1.0625rem', lineHeight: 1.6 }}
           >
             {analysis.thesis}
           </Typography>
         )}
 
+        {/* The graded facets in a grid: a single column on phones and narrow
+            cards, two columns once the card is wide enough (lg), so the four
+            reads sit 2×2 instead of a tall stack — the card no longer towers
+            over the snapshot beside it on the Overview tab. */}
         {analysis.sections.length > 0 && (
-          <Stack spacing={2} divider={<Divider flexItem />} sx={{ mt: 2.5 }}>
+          <Box
+            sx={{
+              mt: 2,
+              display: 'grid',
+              gap: { xs: 2, lg: 2.5 },
+              alignItems: 'start',
+              gridTemplateColumns: {
+                xs: '1fr',
+                lg: 'repeat(2, minmax(0, 1fr))',
+              },
+            }}
+          >
             {analysis.sections.map((section) => (
               <Section key={section.key} section={section} />
             ))}
-          </Stack>
+          </Box>
         )}
 
         {analysis.disclaimer && (
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ display: 'block', mt: 2.5 }}
+            sx={{ display: 'block', mt: 2 }}
           >
             {analysis.disclaimer}
           </Typography>
