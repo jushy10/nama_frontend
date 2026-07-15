@@ -15,12 +15,16 @@ describe('App routing', () => {
     const { user } = renderWithProviders(<App />)
 
     // The screeners now live under a "Screener" dropdown: open it, then pick
-    // Stocks. (Anchored names avoid the home page's feature tiles.)
+    // Stocks. (Anchored names avoid the home page's feature tiles.) The page's
+    // h1 is its benefit headline; the "Stock screener" name still rides the hero
+    // eyebrow and the document title.
     await user.click(screen.getByRole('button', { name: /^screener$/i }))
     await user.click(await screen.findByRole('menuitem', { name: /^stocks$/i }))
 
     expect(
-      await screen.findByRole('heading', { name: /stock screener/i }),
+      await screen.findByRole('heading', {
+        name: /screen the u\.?s\.? stock market/i,
+      }),
     ).toBeInTheDocument()
   })
 
@@ -31,7 +35,9 @@ describe('App routing', () => {
     await user.click(await screen.findByRole('menuitem', { name: /^etfs$/i }))
 
     expect(
-      await screen.findByRole('heading', { name: /etf screener/i }),
+      await screen.findByRole('heading', {
+        name: /screen every major us etf/i,
+      }),
     ).toBeInTheDocument()
   })
 

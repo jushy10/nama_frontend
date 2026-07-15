@@ -5,9 +5,7 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
-  CircularProgress,
   Container,
   IconButton,
   InputAdornment,
@@ -33,9 +31,10 @@ import {
 } from '@mui/material'
 import type { SxProps, Theme } from '@mui/material/styles'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
+import ShowChartOutlined from '@mui/icons-material/ShowChartOutlined'
+import TuneOutlined from '@mui/icons-material/TuneOutlined'
 import {
   humanizeClassification,
   stockLogoUrl,
@@ -55,6 +54,8 @@ import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
 import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
+import PageHero from '@/components/PageHero'
+import AiScreenBox from '@/components/AiScreenBox'
 import {
   readBool,
   readEnum,
@@ -961,141 +962,50 @@ export default function Screener() {
   ]
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+      {/* Hero band: the plain-English screen is the primary action; the manual
+          filters below are the "or refine by hand" path. */}
+      <PageHero
+        eyebrowIcon={ShowChartOutlined}
+        eyebrow="Stock screener"
+        title="Screen the U.S. stock market"
+        subtitle="Ask in plain English, or filter 1,000+ US stocks by sector, market cap, valuation, and trailing or forward growth."
       >
-        <Box>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{ color: 'primary.light', fontWeight: 700 }}
-          >
-            Stock Screener
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 1 }}>
-            Search the $1B+ US universe by name, sector, industry and index —
-            sorted by size, valuation, or trailing and forward growth.
-          </Typography>
-        </Box>
-        <Tooltip title="Refresh">
-          <IconButton
-            onClick={() => query.refetch()}
-            aria-label="Refresh screener"
-            sx={{ color: 'text.secondary' }}
-          >
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
-      </Stack>
-
-      {/* AI screen box — ask in plain English; the model fills in the filters below,
-          which you can then tweak by hand. */}
-      <Paper
-        variant="outlined"
-        sx={{
-          mt: 4,
-          p: { xs: 1.5, sm: 2 },
-          borderRadius: 3,
-          borderColor: 'primary.dark',
-          bgcolor: 'background.paper',
-        }}
-      >
-        <Stack
-          direction="row"
-          spacing={1}
-          sx={{ alignItems: 'center', mb: 1.5 }}
-        >
-          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.light' }} />
-          <Typography sx={{ fontWeight: 700 }}>
-            Ask AI to Build a Screen
-          </Typography>
-        </Stack>
-        <Box
-          component="form"
-          onSubmit={(e) => {
-            e.preventDefault()
-            runAiScreen()
-          }}
-          sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}
-        >
-          <TextField
-            size="small"
-            value={aiInput}
-            onChange={(e) => setAiInput(e.target.value)}
-            placeholder="e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth"
-            disabled={aiScreen.isPending}
-            sx={{ flex: '1 1 320px', minWidth: { xs: '100%', sm: 320 } }}
-            slotProps={{
-              // aria-label on the native input (a label-less field) so it has an
-              // accessible name; the icon rides the input adornment.
-              htmlInput: { 'aria-label': 'Describe the stocks you want' },
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <AutoAwesomeIcon fontSize="small" />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={!aiInput.trim() || aiScreen.isPending}
-            startIcon={
-              aiScreen.isPending ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <AutoAwesomeIcon />
-              )
-            }
-            sx={{ whiteSpace: 'nowrap' }}
-          >
-            {aiScreen.isPending ? 'Screening…' : 'Screen'}
-          </Button>
-        </Box>
-        {/* One-tap example prompts. `useFlexGap` so the spacing is CSS `gap`, not
-            child margins — margins don't reset on wrap, which left the chips that
-            wrapped to a new line indented out of alignment with the first. */}
-        <Stack
-          direction="row"
-          spacing={1}
-          useFlexGap
-          sx={{ mt: 1.5, flexWrap: 'wrap' }}
-        >
-          {AI_EXAMPLES.map((ex) => (
-            <Chip
-              key={ex}
-              label={ex}
-              size="small"
-              variant="outlined"
-              onClick={() => runAiScreen(ex)}
-              disabled={aiScreen.isPending}
-              sx={{ cursor: 'pointer' }}
-            />
-          ))}
-        </Stack>
-        {aiScreen.isError && (
-          <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>
-            {errorMessage(aiScreen.error)}
-          </Alert>
-        )}
-      </Paper>
+        <AiScreenBox
+          heading="Ask AI to build a screen"
+          value={aiInput}
+          onChange={setAiInput}
+          onSubmit={() => runAiScreen()}
+          pending={aiScreen.isPending}
+          error={aiScreen.isError ? errorMessage(aiScreen.error) : null}
+          placeholder="e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth"
+          inputAriaLabel="Describe the stocks you want"
+          examples={AI_EXAMPLES}
+          onExample={(ex) => runAiScreen(ex)}
+        />
+      </PageHero>
 
       {/* Filter card */}
       <Paper
         variant="outlined"
         sx={{
-          mt: 2,
+          mt: { xs: 2.5, sm: 3 },
           p: { xs: 1.5, sm: 2 },
           borderRadius: 3,
           borderColor: 'divider',
           bgcolor: 'background.paper',
         }}
       >
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'center', mb: 1.75, color: 'text.secondary' }}
+        >
+          <TuneOutlined sx={{ fontSize: 18 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+            Refine by hand
+          </Typography>
+        </Stack>
         <Box
           sx={{
             display: 'flex',
@@ -1230,18 +1140,46 @@ export default function Screener() {
         <ActiveFilters chips={activeChips} onClearAll={clearFilters} />
       </Paper>
 
-      {/* Summary line */}
-      {data && (
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mt: 2.5 }}
-          aria-live="polite"
-        >
-          {`${data.total.toLocaleString()} ${data.total === 1 ? 'stock' : 'stocks'}`}
-          {hasFilters ? ' match your filters' : ' in the universe'}
-        </Typography>
-      )}
+      {/* Results toolbar: the live match count on the left, refresh on the right. */}
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          mt: { xs: 3, sm: 3.5 },
+          minHeight: 34,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
+        <Box aria-live="polite">
+          {data && (
+            <Typography
+              variant="body2"
+              sx={{ color: 'text.secondary', fontWeight: 500 }}
+            >
+              {/* Count + unit stay in one text node so a screen reader (and the
+                  test suite) reads "N stocks" as one phrase. */}
+              <Box
+                component="span"
+                sx={{ color: 'text.primary', fontWeight: 700 }}
+              >
+                {`${data.total.toLocaleString()} ${data.total === 1 ? 'stock' : 'stocks'}`}
+              </Box>
+              {hasFilters ? ' match your filters' : ' in the universe'}
+            </Typography>
+          )}
+        </Box>
+        <Tooltip title="Refresh">
+          <IconButton
+            onClick={() => query.refetch()}
+            aria-label="Refresh screener"
+            size="small"
+            sx={{ color: 'text.secondary' }}
+          >
+            <RefreshIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
 
       {showError && (
         <Alert severity="error" variant="outlined" sx={{ mt: 3 }}>

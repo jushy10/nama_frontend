@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material'
 import RefreshIcon from '@mui/icons-material/Refresh'
+import CategoryOutlined from '@mui/icons-material/CategoryOutlined'
 import {
   sectorReturn,
   SECTOR_WINDOWS,
@@ -22,6 +23,7 @@ import { errorMessage, useSectors } from '@/lib/queries'
 import { usePageMeta } from '@/lib/usePageMeta'
 import SectorCard from '@/components/SectorCard'
 import SectorStocksDialog from '@/components/SectorStocksDialog'
+import PageHero from '@/components/PageHero'
 
 type Window = SectorWindow
 
@@ -65,41 +67,26 @@ export default function Sectors() {
   }, [sectors])
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}
-      >
-        <Box>
-          <Typography
-            variant="h4"
-            component="h1"
-            sx={{
-              color: 'primary.light',
-              fontWeight: 700,
-              fontSize: { xs: '1.5rem', sm: '2.125rem' },
-            }}
-          >
-            Market Sectors
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 1 }}>
-            How the 11 S&amp;P sectors are moving today. Pick a timeframe, or
-            open a sector to see its top holdings.
-          </Typography>
-        </Box>
-        {sectorsQuery.isSuccess && (
-          <Tooltip title="Refresh">
-            <IconButton
-              onClick={() => sectorsQuery.refetch()}
-              aria-label="Refresh sectors"
-              sx={{ color: 'text.secondary' }}
-            >
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
-        )}
-      </Stack>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+      <PageHero
+        eyebrowIcon={CategoryOutlined}
+        eyebrow="Market sectors"
+        title="How the 11 S&P sectors are moving"
+        subtitle="Today's leaders and laggards across the S&P 500 sectors. Pick a timeframe, or open a sector to see its top holdings."
+        action={
+          sectorsQuery.isSuccess ? (
+            <Tooltip title="Refresh">
+              <IconButton
+                onClick={() => sectorsQuery.refetch()}
+                aria-label="Refresh sectors"
+                sx={{ color: 'text.secondary' }}
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          ) : undefined
+        }
+      />
 
       {sectorsQuery.isSuccess && (
         <Stack

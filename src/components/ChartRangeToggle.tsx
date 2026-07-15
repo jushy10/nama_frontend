@@ -1,5 +1,6 @@
 import { ToggleButton, ToggleButtonGroup } from '@mui/material'
 import type { ChartRange } from '@/lib/api'
+import { brand } from '@/theme'
 
 // Curated subset of the API's ranges — the ones worth a one-tap button. Every
 // price chart shares this row so they all present one mental model.
@@ -50,12 +51,21 @@ export default function ChartRangeToggle({
           key={r}
           value={r}
           // flexShrink:0 keeps each button its natural size so the row scrolls;
-          // a taller tap target on xs (the wrapped rows were only ~26px).
+          // a taller tap target on xs (the wrapped rows were only ~26px). The
+          // selected range reads in solid brand blue so the active window is
+          // unmistakable at a glance.
           sx={{
             px: 1.5,
             py: { xs: 0.75, sm: 0.25 },
             minHeight: { xs: 36, sm: 0 },
             flexShrink: 0,
+            fontWeight: 600,
+            '&.Mui-selected': {
+              color: 'primary.main',
+              fontWeight: 700,
+              bgcolor: `rgba(${brand.blueGlowRgb}, 0.14)`,
+              '&:hover': { bgcolor: `rgba(${brand.blueGlowRgb}, 0.20)` },
+            },
           }}
         >
           {r}

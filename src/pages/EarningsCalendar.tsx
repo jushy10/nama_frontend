@@ -33,6 +33,7 @@ import {
 } from '@/lib/earningsWeek'
 import { usePageMeta } from '@/lib/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
+import PageHero from '@/components/PageHero'
 
 interface SessionMeta {
   key: string
@@ -366,19 +367,14 @@ export default function EarningsCalendar() {
   const total = data?.count ?? 0
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <CalendarMonthIcon sx={{ color: 'primary.main' }} />
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-            Earnings calendar
-          </Typography>
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          Which US companies are scheduled to report earnings this week — split
-          into before the open and after the close each day. Dates are estimates
-          and can change.
-        </Typography>
+        <PageHero
+          eyebrowIcon={CalendarMonthIcon}
+          eyebrow="Earnings calendar"
+          title="Who reports this week"
+          subtitle="The US companies scheduled to report earnings this week, split into before the open and after the close each day. Dates are estimates and can change."
+        />
       </Box>
 
       {/* Week navigator: the range, prev/next, and a jump back to this week. */}

@@ -9,11 +9,13 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import TimelineOutlined from '@mui/icons-material/TimelineOutlined'
 import { curveShape, type CurveShape } from '@/lib/api'
 import { errorMessage, useYieldCurve, useYieldHistory } from '@/lib/queries'
 import { usePageMeta } from '@/lib/usePageMeta'
 import YieldCurveChart from '@/components/YieldCurveChart'
 import YieldHistoryChart from '@/components/YieldHistoryChart'
+import PageHero from '@/components/PageHero'
 
 // The dynamic reading for each shape — the "what does it mean" the page keys on
 // the live spread. Kept beside the page since it's presentation copy, not data.
@@ -106,23 +108,13 @@ export default function YieldCurve() {
         : 'success.main'
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 4, sm: 6 } }}>
-      <Typography
-        variant="h4"
-        component="h1"
-        sx={{
-          color: 'primary.light',
-          fontWeight: 700,
-          fontSize: { xs: '1.5rem', sm: '2.125rem' },
-        }}
-      >
-        Treasury Yield Curve
-      </Typography>
-      <Typography color="text.secondary" sx={{ mt: 1 }}>
-        What the US government pays to borrow across every maturity, from 1
-        month to 30 years — and the 2Y/10Y gap the market watches as a recession
-        signal.
-      </Typography>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
+      <PageHero
+        eyebrowIcon={TimelineOutlined}
+        eyebrow="Treasury yields"
+        title="The Treasury yield curve"
+        subtitle="What the US government pays to borrow across every maturity, from 1 month to 30 years, plus the 2Y/10Y gap the market watches as a recession signal."
+      />
 
       {curveQuery.isLoading && (
         <Stack sx={{ alignItems: 'center', py: 8 }}>
