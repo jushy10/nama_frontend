@@ -9,6 +9,21 @@ const fontStack = [
 ].join(',')
 
 /**
+ * Canonical "Nama Insights" brand-accent values, in one place so the nav's
+ * blue→gold line, active-pill, logo glow and hero wash can't drift from the
+ * wordmark colours. Deliberately mode-independent — these brand gradients look
+ * the same in light and dark; the mode-adaptive palette lives in createAppTheme
+ * below. The `*GlowRgb` values are bare "r, g, b" triples for use in rgba(...).
+ */
+export const brand = {
+  navy: '#07378e', // "Nama" wordmark navy (matches palette.primary.dark)
+  blue: '#4f83e6', // lifted brand blue
+  gold: '#d7a739', // "Insights" wordmark gold (matches palette.secondary.main)
+  blueGlowRgb: '47, 99, 180',
+  goldGlowRgb: '215, 167, 57',
+} as const
+
+/**
  * Builds the app-wide MUI theme for a given palette mode. Blue + gold accents
  * in both modes — the exact "Nama Insights" wordmark colors (navy #07378e,
  * gold #d7a739). Dark is the original near-black #0a0a0f canvas, light is a
