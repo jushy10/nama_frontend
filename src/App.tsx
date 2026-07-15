@@ -200,8 +200,8 @@ function Brand({ large = false }: { large?: boolean }) {
         src="/nama-icon.png"
         alt="Nama Insights logo"
         sx={{
-          height: large ? { xs: 32, md: 40 } : 36,
-          width: large ? { xs: 32, md: 40 } : 36,
+          height: large ? { xs: 36, md: 46 } : 40,
+          width: large ? { xs: 36, md: 46 } : 40,
           display: 'block',
           flexShrink: 0,
           transition: 'filter 0.25s ease',
@@ -217,8 +217,8 @@ function Brand({ large = false }: { large?: boolean }) {
           letterSpacing: '-0.015em',
           whiteSpace: 'nowrap',
           fontSize: large
-            ? { xs: '1.15rem', sm: '1.3rem', md: '1.4rem' }
-            : '1.2rem',
+            ? { xs: '1.3rem', sm: '1.45rem', md: '1.6rem' }
+            : '1.3rem',
         }}
       >
         <Box
@@ -299,7 +299,7 @@ function DesktopNavGroup({ group }: { group: NavGroup }) {
           minWidth: 0,
           borderRadius: 999,
           fontWeight: 600,
-          fontSize: '0.95rem',
+          fontSize: '1rem',
           lineHeight: 1.2,
           whiteSpace: 'nowrap',
           color: lit ? 'primary.main' : 'text.secondary',
@@ -551,7 +551,7 @@ function App() {
             disableGutters
             sx={{
               justifyContent: 'space-between',
-              minHeight: { xs: 58, md: 64 },
+              minHeight: { xs: 62, md: 70 },
             }}
           >
             <Brand large />
@@ -585,7 +585,7 @@ function App() {
                         minWidth: 0,
                         borderRadius: 999,
                         fontWeight: 600,
-                        fontSize: '0.95rem',
+                        fontSize: '1rem',
                         lineHeight: 1.2,
                         whiteSpace: 'nowrap',
                         color: 'text.secondary',
