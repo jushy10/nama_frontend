@@ -208,7 +208,12 @@ export default function OptionsCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -274,13 +279,13 @@ export default function OptionsCard({
           <>
             <Box
               sx={{
-                mt: 3,
+                mt: 2,
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: 'repeat(2, minmax(0, 1fr))',
                   sm: 'repeat(4, minmax(0, 1fr))',
                 },
-                gap: 2.5,
+                gap: 2,
               }}
             >
               <Stat
@@ -327,7 +332,7 @@ export default function OptionsCard({
                 the centre, the band runs down to the low (red) and up to the
                 high (green) the options are pricing in by the expiry. */}
             {showRange && (
-              <Box sx={{ mt: 3 }}>
+              <Box sx={{ mt: 2 }}>
                 <Stack
                   direction="row"
                   spacing={1}
@@ -421,11 +426,7 @@ export default function OptionsCard({
             )}
 
             {call && (
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ mt: 2.5 }}
-              >
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
                 {call.blurb} {DISCLAIMER}
               </Typography>
             )}

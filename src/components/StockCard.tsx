@@ -151,7 +151,12 @@ export default function StockCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <SectionHeading
           component="h2"
           icon={<QueryStatsIcon fontSize="small" />}
@@ -166,7 +171,7 @@ export default function StockCard({
           component="dl"
           sx={{
             m: 0,
-            mt: 2,
+            mt: 1.75,
             display: 'grid',
             gridTemplateColumns: {
               xs: 'repeat(2, minmax(0, 1fr))',
@@ -193,7 +198,7 @@ export default function StockCard({
             sign; only shown when the snapshot carries a performance block. */}
         {perf && (
           <>
-            <Divider sx={{ mt: 2.5, mb: 2.5 }} />
+            <Divider sx={{ my: 2 }} />
             <SectionHeading
               component="h3"
               icon={<TrendingUpIcon fontSize="small" />}
@@ -202,7 +207,7 @@ export default function StockCard({
             />
             <Box
               sx={{
-                mt: 2,
+                mt: 1.75,
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: 'repeat(3, minmax(0, 1fr))',

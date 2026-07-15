@@ -41,7 +41,12 @@ export default function AnalysisLoadingCard({
         backgroundImage: (theme) => heroWash(theme),
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -112,14 +117,14 @@ export default function AnalysisLoadingCard({
         </Stack>
 
         {/* The summary paragraph. */}
-        <Stack spacing={1} sx={{ mt: 2.5 }}>
+        <Stack spacing={1} sx={{ mt: 2 }}>
           <Skeleton animation="wave" variant="text" width="100%" height={22} />
           <Skeleton animation="wave" variant="text" width="96%" height={22} />
           <Skeleton animation="wave" variant="text" width="88%" height={22} />
         </Stack>
 
         {/* The points / highlights beneath it — a small dot and a line each. */}
-        <Stack spacing={1.5} sx={{ mt: 2.5 }}>
+        <Stack spacing={1.5} sx={{ mt: 2 }}>
           {Array.from({ length: points }).map((_, i) => (
             <Stack
               key={i}

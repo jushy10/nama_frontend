@@ -62,7 +62,7 @@ const edge = (margin: number) => ((margin - MIN) / SPAN) * 100
 function Gauge({ margin, color }: { margin: number; color: string }) {
   const breakeven = edge(0)
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Box
         role="img"
         aria-label={`Net margin of ${fmtMargin(margin)}`}
@@ -225,7 +225,12 @@ export default function ProfitabilityCard({
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -315,7 +320,7 @@ export default function ProfitabilityCard({
               <Typography
                 variant="body2"
                 color="text.secondary"
-                sx={{ mt: 2.5 }}
+                sx={{ mt: 1.75 }}
               >
                 {meta.blurb}
               </Typography>
@@ -326,10 +331,10 @@ export default function ProfitabilityCard({
                 profit picture reads at a glance, not just the net headline. */}
             <Box
               sx={{
-                mt: 2.5,
+                mt: 2,
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: 1.5,
+                gap: 1,
               }}
             >
               <MarginTile label="Gross margin" value={grossMargin} />

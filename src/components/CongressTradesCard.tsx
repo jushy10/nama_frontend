@@ -217,7 +217,12 @@ export default function CongressTradesCard({ data }: { data: CongressTrades }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <SectionHeading
           component="h2"
           icon={<AccountBalanceIcon fontSize="small" />}
@@ -227,7 +232,7 @@ export default function CongressTradesCard({ data }: { data: CongressTrades }) {
         />
 
         {total > 0 && (
-          <Box sx={{ mt: 2.5 }}>
+          <Box sx={{ mt: 2 }}>
             <FlowBar buyVal={s.buy_value} sellVal={s.sell_value} />
             <Typography
               variant="caption"
@@ -254,7 +259,7 @@ export default function CongressTradesCard({ data }: { data: CongressTrades }) {
         <Stack
           spacing={1.5}
           divider={<Divider sx={{ borderColor: 'divider' }} />}
-          sx={{ mt: 2.5 }}
+          sx={{ mt: 2 }}
         >
           {visible.map((t, i) => (
             <TradeRow

@@ -366,7 +366,12 @@ export default function PeHistoryCard({ history }: { history: PeHistory }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -437,7 +442,7 @@ export default function PeHistoryCard({ history }: { history: PeHistory }) {
 
         <PeLineChart points={points} med={med} />
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2.5 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
           {summaryLine(latest, med, lo, hi, points.length, stance)}
         </Typography>
       </CardContent>

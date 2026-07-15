@@ -73,7 +73,12 @@ export default function RatingsReviewCard({
         backgroundImage: (theme) => heroWash(theme),
       }}
     >
-      <CardContent sx={{ p: 3 }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -129,14 +134,14 @@ export default function RatingsReviewCard({
         {analysis.summary && (
           <Typography
             variant="body1"
-            sx={{ mt: 2.5, fontSize: '1.1rem', lineHeight: 1.6 }}
+            sx={{ mt: 2, fontSize: '1.1rem', lineHeight: 1.6 }}
           >
             {analysis.summary}
           </Typography>
         )}
 
         {analysis.findings.length > 0 && (
-          <Stack spacing={1.25} sx={{ mt: 2.5 }}>
+          <Stack spacing={1.25} sx={{ mt: 2 }}>
             {analysis.findings.map((finding, i) => (
               <Stack
                 key={i}
@@ -174,7 +179,7 @@ export default function RatingsReviewCard({
           <Typography
             variant="caption"
             color="text.secondary"
-            sx={{ display: 'block', mt: 2.5 }}
+            sx={{ display: 'block', mt: 2 }}
           >
             {analysis.disclaimer}
           </Typography>

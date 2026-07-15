@@ -279,7 +279,12 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={2}
@@ -331,7 +336,7 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
           </Box>
         </Stack>
 
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
           {meta.blurb}
         </Typography>
 
@@ -339,10 +344,10 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
             two slope arrows side by side make a divergence read at a glance. */}
         <Box
           sx={{
-            mt: 2.5,
+            mt: 2,
             display: 'grid',
             gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
-            gap: 1.5,
+            gap: 1,
           }}
         >
           <HorizonTile label="Long-term" leg={trend.long_term} unit={unit} />

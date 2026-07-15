@@ -96,7 +96,7 @@ function PeSlope({
   const posT = (trailing / top) * 100
   const posF = forward != null ? (forward / top) * 100 : null
   return (
-    <Box sx={{ mt: 2.5 }}>
+    <Box sx={{ mt: 2 }}>
       <Box
         role="img"
         aria-label={
@@ -194,7 +194,7 @@ function PegMeter({
 }) {
   const parity = pegEdge(1)
   return (
-    <Box sx={{ mt: 3 }}>
+    <Box sx={{ mt: 2 }}>
       <Stack
         direction="row"
         sx={{
@@ -349,7 +349,12 @@ export default function ValuationCard({ metrics }: { metrics: TickerMetrics }) {
 
   return (
     <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
           spacing={2}
@@ -447,10 +452,10 @@ export default function ValuationCard({ metrics }: { metrics: TickerMetrics }) {
 
         <Box
           sx={{
-            mt: 2.5,
+            mt: 2,
             display: 'grid',
             gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-            gap: 1.5,
+            gap: 1,
           }}
         >
           <StatTile

@@ -13,6 +13,11 @@ import {
   type TickerCard,
 } from '@/lib/api'
 import { heroWash } from '@/components/heroWash'
+import { brand } from '@/theme'
+
+// The app-bar's blue→gold ticker line, reused along the header's bottom edge so
+// the detail opens on the same house accent that heads the whole app.
+const BRAND_LINE = `linear-gradient(90deg, transparent 0%, ${brand.blue} 26%, ${brand.gold} 74%, transparent 100%)`
 
 const fmt = (n: number | null) =>
   n == null
@@ -57,13 +62,18 @@ export default function StockHeader({ stock }: { stock: TickerCard }) {
         backgroundImage: (theme) => heroWash(theme),
       }}
     >
-      <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+      <CardContent
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          '&:last-child': { pb: { xs: 2, sm: 2.5 } },
+        }}
+      >
         <Stack
           direction="row"
           spacing={{ xs: 1.5, sm: 2.5 }}
           sx={{
             justifyContent: 'space-between',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             flexWrap: 'wrap',
             rowGap: 1.5,
           }}
@@ -81,15 +91,15 @@ export default function StockHeader({ stock }: { stock: TickerCard }) {
                 img: { loading: 'lazy', style: { objectFit: 'contain' } },
               }}
               sx={{
-                width: { xs: 52, sm: 68 },
-                height: { xs: 52, sm: 68 },
+                width: { xs: 46, sm: 58 },
+                height: { xs: 46, sm: 58 },
                 flexShrink: 0,
                 bgcolor: '#fff',
                 color: '#111',
                 fontWeight: 700,
-                fontSize: { xs: '1.25rem', sm: '1.6rem' },
+                fontSize: { xs: '1.15rem', sm: '1.5rem' },
                 p: 1,
-                borderRadius: '16px',
+                borderRadius: '14px',
                 border: '1px solid',
                 borderColor: 'divider',
                 boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
@@ -214,6 +224,19 @@ export default function StockHeader({ stock }: { stock: TickerCard }) {
           </Box>
         </Stack>
       </CardContent>
+      {/* House blue→gold accent along the bottom edge, echoing the app bar's
+          ticker line so the detail reads as the same surface family. */}
+      <Box
+        aria-hidden
+        sx={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 2,
+          background: BRAND_LINE,
+        }}
+      />
     </Card>
   )
 }
