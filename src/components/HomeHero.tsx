@@ -109,7 +109,7 @@ export default function HomeHero() {
             }}
           />
 
-          {/* Two-tone headline: the accent phrase carries the brand gradient. */}
+          {/* Two-tone headline: the accent phrase in solid brand blue. */}
           <Typography
             variant="h1"
             component="h1"
@@ -127,10 +127,12 @@ export default function HomeHero() {
               component="span"
               sx={{
                 whiteSpace: 'nowrap',
-                background: 'linear-gradient(90deg, #4f83e6 0%, #d7a739 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-                backgroundClip: 'text',
+                // Solid brand blue — the "Nama" wordmark colour, adapting per
+                // mode (navy on light, lifted blue on dark). Replaces a
+                // blue→gold gradient text fill whose gold end fell below the
+                // 3:1 large-text contrast floor on the light wash and read as
+                // a generic "AI gradient" tell.
+                color: 'primary.main',
               }}
             >
               driven by AI
