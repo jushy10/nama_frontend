@@ -44,9 +44,9 @@ describe('MarketSentiment', () => {
     stubFetch(sample)
     renderWithProviders(<MarketSentiment />)
 
-    // The dial: the rounded score and its band label.
+    // The dial: the rounded score and its band label (set in caps in the well).
     expect(await screen.findByText('43')).toBeInTheDocument()
-    expect(screen.getByText('Fear')).toBeInTheDocument()
+    expect(screen.getByText('FEAR')).toBeInTheDocument()
 
     // The VIX leg: the level and its regime chip.
     expect(screen.getByText('17.16')).toBeInTheDocument()

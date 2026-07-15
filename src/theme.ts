@@ -1,11 +1,33 @@
 import { createTheme, type PaletteMode, type Theme } from '@mui/material/styles'
 
+// Geist drives the whole UI — a precise, highly legible variable grotesque
+// (self-hosted, loaded in main.tsx). A system stack is the fallback while it
+// loads or if it fails. A neutral, credible face is doing brand work here, not
+// decoration: legibility is the point.
 const fontStack = [
+  '"Geist Variable"',
   'system-ui',
-  'Avenir',
+  '-apple-system',
+  '"Segoe UI"',
+  'Roboto',
   'Helvetica',
   'Arial',
   'sans-serif',
+].join(',')
+
+/**
+ * Monospace stack for tabular figures, tickers and terminal-style labels.
+ * Exported so components can opt in via `fontFamily: fontFamilyMono` (the hero's
+ * live market-status line, coverage counts, etc.) — a run of digits reads
+ * cleaner, and more precisely, in a mono than in a proportional face.
+ */
+export const fontFamilyMono = [
+  '"Geist Mono Variable"',
+  'ui-monospace',
+  '"SF Mono"',
+  'Menlo',
+  'Consolas',
+  'monospace',
 ].join(',')
 
 /**
@@ -71,13 +93,16 @@ export function createAppTheme(mode: PaletteMode): Theme {
     shape: { borderRadius: 12 },
     typography: {
       fontFamily: fontStack,
-      h1: { fontWeight: 700, letterSpacing: '-0.02em' },
-      h2: { fontWeight: 700, letterSpacing: '-0.02em' },
-      h3: { fontWeight: 600, letterSpacing: '-0.01em' },
-      h4: { fontWeight: 600 },
-      h5: { fontWeight: 600 },
-      h6: { fontWeight: 600 },
-      button: { fontWeight: 600 },
+      // Tighter tracking + shorter line-heights at the display end — Geist has
+      // open metrics, so headlines read crisper pulled in a touch. Hierarchy is
+      // carried by weight and this scale, never by ever-larger raw sizes.
+      h1: { fontWeight: 700, letterSpacing: '-0.03em', lineHeight: 1.05 },
+      h2: { fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.12 },
+      h3: { fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 },
+      h4: { fontWeight: 600, letterSpacing: '-0.015em' },
+      h5: { fontWeight: 600, letterSpacing: '-0.01em' },
+      h6: { fontWeight: 600, letterSpacing: '-0.01em' },
+      button: { fontWeight: 600, letterSpacing: 0 },
     },
     components: {
       MuiButton: {

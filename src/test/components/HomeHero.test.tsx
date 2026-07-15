@@ -12,12 +12,10 @@ describe('HomeHero', () => {
       screen.getByRole('heading', { level: 1, name: /driven by ai/i }),
     ).toBeInTheDocument()
 
-    // The eyebrow carries the live market phase and today's spelled-out date,
-    // e.g. "Market Closed · Thursday, July 10".
+    // The eyebrow carries the live market phase and today's compact date, set
+    // in mono like a ticker, e.g. "Market Closed · Tue, Jul 10".
     expect(
-      screen.getByText(
-        /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday),/i,
-      ),
+      screen.getByText(/\b(mon|tue|wed|thu|fri|sat|sun), [a-z]{3} \d{1,2}\b/i),
     ).toBeInTheDocument()
 
     // The primary action is the universe search box itself.

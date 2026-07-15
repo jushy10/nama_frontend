@@ -21,6 +21,7 @@ import {
   useEma,
   useSupportLevels,
 } from '@/lib/queries'
+import BandHeader from '@/components/BandHeader'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import CandleChart from '@/components/CandleChart'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
@@ -82,19 +83,12 @@ export default function MarketIndices() {
 
   return (
     <Box sx={{ borderTop: 1, borderColor: 'divider' }}>
-      <Container maxWidth="xl" sx={{ py: { xs: 4, sm: 6 } }}>
-        <Box sx={{ mb: 3 }}>
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <ShowChartIcon fontSize="small" sx={{ color: 'primary.main' }} />
-            <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-              Markets today
-            </Typography>
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Major US indices tracked via liquid ETF proxies. Select one to chart
-            it below.
-          </Typography>
-        </Box>
+      <Container maxWidth="xl" sx={{ py: { xs: 5, sm: 7, md: 8 } }}>
+        <BandHeader
+          icon={<ShowChartIcon />}
+          title="Markets today"
+          subtitle="Major US indices tracked via liquid ETF proxies. Select one to chart it below."
+        />
 
         {/* Exactly three index proxies, so hold three equal columns from sm up
             (two-up on phones) — they span the full band width rather than
