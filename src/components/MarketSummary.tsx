@@ -1,51 +1,21 @@
-import {
-  Box,
-  Card,
-  CardContent,
-  Chip,
-  Divider,
-  Skeleton,
-  Stack,
-  Typography,
-} from '@mui/material'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import { Box, Divider, Skeleton, Stack, Typography } from '@mui/material'
+import AiReadHeader from '@/components/AiReadHeader'
+import { sleekCardSx } from '@/components/homeCard'
+import { fontFamilyMono } from '@/theme'
 import { useMarketSummary } from '@/lib/queries'
 import type {
   MarketIndexReturn,
   MarketPeriod,
   MarketPeriodName,
   MarketSummary as MarketSummaryData,
-  MarketTone,
 } from '@/lib/api'
 
-/** Signed percent, e.g. +1.84% / -0.64% — matching SectorPulse's formatting. */
+/** Signed percent, e.g. +1.84% / -0.64%. */
 const fmtPct = (n: number | null) =>
   n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(2)}%`
 
 const moveColor = (n: number | null) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
-
-/** How each risk posture renders: a coloured chip + a plain-language gloss. */
-const TONE: Record<
-  MarketTone,
-  { label: string; color: 'success' | 'warning' | 'default'; help: string }
-> = {
-  risk_on: {
-    label: 'Risk-On',
-    color: 'success',
-    help: 'The market is rising and growth is leading — an appetite for risk.',
-  },
-  risk_off: {
-    label: 'Risk-Off',
-    color: 'warning',
-    help: 'The market is under pressure or turning defensive — a cautious mood.',
-  },
-  mixed: {
-    label: 'Mixed',
-    color: 'default',
-    help: 'No clear lean between risk-taking and caution.',
-  },
-}
 
 /** The heading shown for each timeframe, longest-lookback first. */
 const PERIOD_LABEL: Record<MarketPeriodName, string> = {
@@ -54,16 +24,21 @@ const PERIOD_LABEL: Record<MarketPeriodName, string> = {
   week: 'Past week',
 }
 
-/** One index's move over a timeframe: its name and the coloured, real return. */
+/** One index's move over a timeframe: its name and the coloured, mono return. */
 function IndexReturn({ r }: { r: MarketIndexReturn }) {
   return (
     <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline' }}>
-      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+      <Typography
+        variant="caption"
+        sx={{ color: 'text.secondary', fontWeight: 600 }}
+      >
         {r.name}
       </Typography>
       <Typography
         sx={{
+          fontFamily: fontFamilyMono,
           fontWeight: 700,
+          fontSize: '0.95rem',
           color: moveColor(r.change_percent),
           fontVariantNumeric: 'tabular-nums',
         }}
@@ -74,8 +49,9 @@ function IndexReturn({ r }: { r: MarketIndexReturn }) {
   )
 }
 
-/** One timeframe: its label + each index's real return, then the AI's note. */
-function PeriodRow({ p }: { p: MarketPeriod }) {
+/** One timeframe: its label + each index's real return on a line, the AI's note
+ *  beneath. */
+function PeriodBlock({ p }: { p: MarketPeriod }) {
   return (
     <Box>
       <Stack
@@ -85,14 +61,16 @@ function PeriodRow({ p }: { p: MarketPeriod }) {
           alignItems: 'baseline',
           justifyContent: 'space-between',
           flexWrap: 'wrap',
+          rowGap: 0.5,
         }}
       >
         <Typography
-          variant="caption"
           sx={{
+            fontFamily: fontFamilyMono,
             fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: '0.06em',
+            letterSpacing: '0.08em',
+            fontSize: '0.68rem',
             color: 'text.secondary',
           }}
         >
@@ -100,8 +78,8 @@ function PeriodRow({ p }: { p: MarketPeriod }) {
         </Typography>
         <Stack
           direction="row"
-          spacing={{ xs: 2, sm: 3 }}
-          sx={{ flexWrap: 'wrap', flexShrink: 0 }}
+          spacing={{ xs: 2, sm: 2.5 }}
+          sx={{ flexWrap: 'wrap' }}
         >
           {p.indexes.map((r) => (
             <IndexReturn key={r.symbol} r={r} />
@@ -109,7 +87,11 @@ function PeriodRow({ p }: { p: MarketPeriod }) {
         </Stack>
       </Stack>
       {p.note && (
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ mt: 0.75, lineHeight: 1.5 }}
+        >
           {p.note}
         </Typography>
       )}
@@ -117,43 +99,27 @@ function PeriodRow({ p }: { p: MarketPeriod }) {
   )
 }
 
-/** The loaded card body: tone + summary, the period rows, then the disclaimer. */
+/** The loaded card body: the summary lede, the per-timeframe moves, then the
+ *  service disclaimer. The risk posture rides in the header as a `TonePill`. */
 function Loaded({ data }: { data: MarketSummaryData }) {
-  const tone = TONE[data.tone] ?? TONE.mixed
   return (
     <Stack spacing={2.5}>
-      <Box>
-        <Stack
-          direction={{ xs: 'column', sm: 'row' }}
-          spacing={1.5}
-          sx={{
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            justifyContent: 'space-between',
-            mb: 1,
-          }}
-        >
-          <Chip label={tone.label} color={tone.color} size="small" />
-          <Typography variant="caption" color="text.secondary">
-            {tone.help}
-          </Typography>
-        </Stack>
-        <Typography sx={{ fontSize: '1.05rem', lineHeight: 1.6 }}>
-          {data.summary}
-        </Typography>
-      </Box>
+      <Typography sx={{ fontSize: '1.02rem', lineHeight: 1.65 }}>
+        {data.summary}
+      </Typography>
 
       <Divider />
 
-      <Stack spacing={2.5}>
+      <Stack spacing={2} divider={<Divider flexItem />}>
         {data.periods.map((p) => (
-          <PeriodRow key={p.period} p={p} />
+          <PeriodBlock key={p.period} p={p} />
         ))}
       </Stack>
 
       <Typography
         variant="caption"
         color="text.secondary"
-        sx={{ display: 'block', pt: 0.5 }}
+        sx={{ display: 'block' }}
       >
         {data.disclaimer}
       </Typography>
@@ -165,14 +131,13 @@ function Loaded({ data }: { data: MarketSummaryData }) {
 function LoadingState() {
   return (
     <Stack spacing={2}>
-      <Skeleton variant="rounded" width={88} height={24} />
       <Skeleton variant="text" width="100%" />
       <Skeleton variant="text" width="85%" />
       <Divider />
       <Stack spacing={2}>
         {[0, 1, 2].map((r) => (
           <Stack key={r} spacing={0.5}>
-            <Skeleton variant="text" width={120} />
+            <Skeleton variant="text" width={140} />
             <Skeleton variant="text" width="70%" />
           </Stack>
         ))}
@@ -183,34 +148,21 @@ function LoadingState() {
 
 /**
  * Home-page "Market summary" widget: an AI read of how the US market — the
- * S&P 500 and the Nasdaq — has moved over the past year, month and week, with
- * the risk posture those moves imply. Best-effort, like the sector pulse: if the
- * model is briefly unavailable or not configured (a 502/503), the query doesn't
- * retry and the whole widget quietly hides rather than showing a broken card.
+ * S&P 500 and the Nasdaq — has moved over the past year, month and week, with the
+ * risk posture those moves imply (shown as the header's `TonePill`). Best-effort,
+ * like the sector pulse: if the model is briefly unavailable or not configured (a
+ * 502/503), the query doesn't retry and the whole widget quietly hides rather
+ * than showing a broken card.
  */
 export default function MarketSummary() {
   const { data, isLoading, isError } = useMarketSummary()
   if (isError) return null
   return (
     <Box>
-      <Box sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <AutoAwesomeIcon fontSize="small" sx={{ color: 'primary.main' }} />
-          <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-            Market summary
-          </Typography>
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-          An AI read of how the US market — the S&amp;P 500 and the Nasdaq — has
-          moved over the past year, month, and week.
-        </Typography>
+      <AiReadHeader title="Market summary" tone={data?.tone} />
+      <Box sx={(theme) => ({ ...sleekCardSx(theme), p: { xs: 2.5, sm: 3 } })}>
+        {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
       </Box>
-
-      <Card variant="outlined" sx={{ borderColor: 'divider' }}>
-        <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
-          {isLoading || !data ? <LoadingState /> : <Loaded data={data} />}
-        </CardContent>
-      </Card>
     </Box>
   )
 }

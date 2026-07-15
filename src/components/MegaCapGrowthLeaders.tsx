@@ -2,15 +2,16 @@ import { useNavigate } from 'react-router-dom'
 import {
   Avatar,
   Box,
-  Card,
-  CardContent,
   Container,
+  Divider,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch'
 import BandHeader from '@/components/BandHeader'
+import { sleekCardSx } from '@/components/homeCard'
+import { fontFamilyMono } from '@/theme'
 import { stockLogoUrl, type StockSearchResult } from '@/lib/api'
 import { useStockSearch } from '@/lib/queries'
 
@@ -84,9 +85,9 @@ function LeaderLogo({ symbol }: { symbol: string }) {
   )
 }
 
-/** One ranked name: position, logo, ticker/name, then the two growth figures.
- *  The whole row opens the stock's detail page (keyboard-reachable, like the
- *  screener's rows). */
+/** One ranked name: position, logo, ticker/name, then the two growth figures in
+ *  mono. The whole row opens the stock's detail page (keyboard-reachable, like
+ *  the screener's rows). */
 function LeaderRow({
   stock,
   rank,
@@ -115,8 +116,8 @@ function LeaderRow({
         alignItems: 'center',
         gap: 1.5,
         px: 1,
-        py: 1.15,
-        borderRadius: 1.5,
+        py: 1.1,
+        borderRadius: 2,
         cursor: 'pointer',
         transition: 'background-color 120ms ease',
         '&:hover': { bgcolor: 'action.hover' },
@@ -128,11 +129,12 @@ function LeaderRow({
       }}
     >
       <Typography
-        variant="body2"
         sx={{
           width: RANK_W,
           flexShrink: 0,
           textAlign: 'right',
+          fontFamily: fontFamilyMono,
+          fontSize: '0.85rem',
           fontWeight: 600,
           color: 'text.secondary',
           fontVariantNumeric: 'tabular-nums',
@@ -167,8 +169,9 @@ function LeaderRow({
               width: METRIC_W,
               flexShrink: 0,
               textAlign: 'right',
+              fontFamily: fontFamilyMono,
               fontWeight: 700,
-              fontSize: '1rem',
+              fontSize: '0.95rem',
               color: growthColor(v),
               fontVariantNumeric: 'tabular-nums',
             }}
@@ -186,7 +189,7 @@ function LeaderRow({
 function SkeletonRow() {
   return (
     <Box
-      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, py: 1.15 }}
+      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, py: 1.1 }}
     >
       <Skeleton variant="text" width={RANK_W - 6} sx={{ flexShrink: 0 }} />
       <Skeleton
@@ -209,9 +212,7 @@ function SkeletonRow() {
  *  metric columns. */
 function ColumnHeader({ metrics }: { metrics: [Metric, Metric] }) {
   return (
-    <Box
-      sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, pb: 0.5 }}
-    >
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, px: 1, pb: 1 }}>
       <Box sx={{ flex: 1 }} />
       {metrics.map((m) => (
         <Typography
@@ -223,7 +224,7 @@ function ColumnHeader({ metrics }: { metrics: [Metric, Metric] }) {
             textAlign: 'right',
             fontWeight: 700,
             textTransform: 'uppercase',
-            letterSpacing: '0.05em',
+            letterSpacing: '0.06em',
             color: 'text.secondary',
           }}
         >
@@ -256,56 +257,61 @@ function GrowthLeadersCard({ list }: { list: GrowthList }) {
     navigate(`/search?symbol=${encodeURIComponent(ticker)}`)
 
   return (
-    <Card variant="outlined" sx={{ borderColor: 'divider', height: '100%' }}>
-      <CardContent sx={{ p: { xs: 2, sm: 2.5 } }}>
-        <Box sx={{ mb: 1.5 }}>
-          <Typography sx={{ fontWeight: 700, fontSize: '1.05rem' }}>
-            {list.title}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {list.caption}
-          </Typography>
-        </Box>
+    <Box
+      sx={(theme) => ({
+        ...sleekCardSx(theme),
+        height: '100%',
+        p: { xs: 2, sm: 2.5 },
+      })}
+    >
+      <Box sx={{ mb: 1.5, px: 1 }}>
+        <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+          {list.title}
+        </Typography>
+        <Typography variant="caption" color="text.secondary">
+          {list.caption}
+        </Typography>
+      </Box>
 
-        <ColumnHeader metrics={list.metrics} />
+      <ColumnHeader metrics={list.metrics} />
+      <Divider sx={{ mb: 0.5 }} />
 
-        {isError && !data ? (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ py: 4, textAlign: 'center' }}
-          >
-            Couldn’t load these right now.
-          </Typography>
-        ) : isLoading ? (
-          <Stack>
-            {Array.from({ length: TOP_N }).map((_, i) => (
-              <SkeletonRow key={i} />
-            ))}
-          </Stack>
-        ) : rows.length === 0 ? (
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{ py: 4, textAlign: 'center' }}
-          >
-            No mega-cap data available.
-          </Typography>
-        ) : (
-          <Stack>
-            {rows.map((stock, i) => (
-              <LeaderRow
-                key={stock.ticker}
-                stock={stock}
-                rank={i + 1}
-                metrics={list.metrics}
-                onSelect={openStock}
-              />
-            ))}
-          </Stack>
-        )}
-      </CardContent>
-    </Card>
+      {isError && !data ? (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ py: 4, textAlign: 'center' }}
+        >
+          Couldn’t load these right now.
+        </Typography>
+      ) : isLoading ? (
+        <Stack>
+          {Array.from({ length: TOP_N }).map((_, i) => (
+            <SkeletonRow key={i} />
+          ))}
+        </Stack>
+      ) : rows.length === 0 ? (
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ py: 4, textAlign: 'center' }}
+        >
+          No mega-cap data available.
+        </Typography>
+      ) : (
+        <Stack>
+          {rows.map((stock, i) => (
+            <LeaderRow
+              key={stock.ticker}
+              stock={stock}
+              rank={i + 1}
+              metrics={list.metrics}
+              onSelect={openStock}
+            />
+          ))}
+        </Stack>
+      )}
+    </Box>
   )
 }
 
@@ -313,9 +319,9 @@ function GrowthLeadersCard({ list }: { list: GrowthList }) {
  * Home-page "Mega-cap growth leaders" band: the largest US companies (≥ $200B)
  * growing the fastest, in two side-by-side lists — one on trailing results, one
  * on forward analyst expectations. Each list ranks the mega-cap slice by an
- * equal-weight revenue + EPS blend server-side and shows the top ten with both
- * component figures; a row opens that stock's detail page. The lists stack on
- * narrow screens.
+ * equal-weight revenue + EPS blend server-side and shows the top eight with both
+ * component figures in mono; a row opens that stock's detail page. The lists
+ * stack on narrow screens.
  */
 export default function MegaCapGrowthLeaders() {
   return (
