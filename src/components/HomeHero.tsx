@@ -1,6 +1,10 @@
 import { Link as RouterLink } from 'react-router-dom'
-import { Box, Button, Chip, Container, Stack, Typography } from '@mui/material'
+import { Box, Button, Container, Stack, Typography } from '@mui/material'
+import type { SvgIconComponent } from '@mui/icons-material'
+import ShowChartIcon from '@mui/icons-material/ShowChart'
+import UpdateIcon from '@mui/icons-material/Update'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import LockOpenIcon from '@mui/icons-material/LockOpen'
 import TableRowsIcon from '@mui/icons-material/TableRows'
 import BoltIcon from '@mui/icons-material/Bolt'
 import { heroWash } from '@/components/heroWash'
@@ -8,31 +12,28 @@ import HomeSearchBar from '@/components/HomeSearchBar'
 import MarketStatusDot from '@/components/MarketStatusDot'
 import { getMarketStatus, marketLabel } from '@/lib/market'
 
-/** Today, spelled out (e.g. "Thursday, July 10") for the hero eyebrow. */
+/** Today, compact (e.g. "Jul 10") for the live market-status pill. */
 function todayLabel(now: Date): string {
-  return now.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
+  return now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
-/** The three trust markers under the search bar — what the engine covers. */
-const TRUST = [
-  '1,000+ US stocks & ETFs',
-  'Refreshed daily',
-  'Powered by Claude',
+/** Coverage markers under the search bar — what the engine spans, each a quiet
+ *  icon + label rather than a run of middle-dots. */
+const MARKERS: { icon: SvgIconComponent; label: string }[] = [
+  { icon: ShowChartIcon, label: '1,000+ US stocks & ETFs' },
+  { icon: UpdateIcon, label: 'Refreshed daily' },
+  { icon: AutoAwesomeIcon, label: 'Powered by Claude' },
+  { icon: LockOpenIcon, label: 'No login, no paywall' },
 ]
 
 /**
- * Home-page hero: the app's front door, built around what it is — an AI-driven
- * stock screener. A live market-status eyebrow, a two-tone headline that states
- * the pitch, a one-line description of the coverage, and — as the primary call
- * to action — the universe search itself, so a visitor's first move is to look
- * something up rather than read about it. A "Powered by Claude" badge and a few
- * coverage chips underline the AI angle; a secondary button opens the full
- * screener. The blue→gold wash (shared with the stock-detail hero cards) plus a
- * faint grid gives the band depth; everything stacks and scales on phones.
+ * Home-page hero: the app's front door, built around its one job — search a
+ * name, get an AI read. A live market-status pill, a confident two-tone
+ * headline, one line of value, and the universe search itself as the primary
+ * action; four quiet coverage markers and two secondary routes sit beneath. The
+ * blue→gold wash (shared with the stock-detail hero cards) plus a soft radial
+ * lift gives the band depth without competing with the copy. Everything stacks
+ * and scales on phones.
  */
 export default function HomeHero() {
   const now = new Date()
@@ -40,126 +41,139 @@ export default function HomeHero() {
 
   return (
     <Box
+      component="section"
       sx={{
         position: 'relative',
         overflow: 'hidden',
-        // The blue→gold wash, shared with the stock-detail hero cards.
         background: (theme) => heroWash(theme),
+        borderBottom: 1,
+        borderColor: 'divider',
       }}
     >
-      {/* A faint grid, masked to fade out toward the edges — texture behind the
-          copy without competing with it. */}
+      {/* Soft radial lift at top-left — depth behind the copy, faded out before
+          it reaches the text so nothing competes with it. */}
       <Box
         aria-hidden
         sx={{
           position: 'absolute',
           inset: 0,
           pointerEvents: 'none',
-          backgroundImage: (theme) =>
-            `linear-gradient(${theme.palette.divider} 1px, transparent 1px), linear-gradient(90deg, ${theme.palette.divider} 1px, transparent 1px)`,
-          backgroundSize: '44px 44px',
-          maskImage:
-            'radial-gradient(circle at 30% 0%, rgba(0,0,0,0.5), transparent 70%)',
-          WebkitMaskImage:
-            'radial-gradient(circle at 30% 0%, rgba(0,0,0,0.5), transparent 70%)',
+          background: (theme) =>
+            theme.palette.mode === 'dark'
+              ? 'radial-gradient(60% 80% at 8% -10%, rgba(79,131,230,0.16), transparent 70%)'
+              : 'radial-gradient(60% 80% at 8% -10%, rgba(79,131,230,0.10), transparent 70%)',
         }}
       />
 
       <Container
         maxWidth="xl"
-        sx={{ position: 'relative', py: { xs: 5, sm: 8 } }}
+        sx={{ position: 'relative', py: { xs: 6, sm: 9, md: 11 } }}
       >
-        <Stack
-          spacing={{ xs: 2, sm: 2.5 }}
-          sx={{ maxWidth: { xs: '100%', md: 940 } }}
-        >
-          {/* Eyebrow: live market phase + today's date, reading the same phase
-              as the app-bar status dot. */}
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', color: 'text.primary' }}
+        <Stack spacing={{ xs: 3, sm: 3.5 }} sx={{ maxWidth: 780 }}>
+          {/* Live market-status pill — a real signal, not decoration. */}
+          <Box
+            sx={{
+              alignSelf: 'flex-start',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              pl: 1.25,
+              pr: 1.75,
+              py: 0.6,
+              borderRadius: 999,
+              border: 1,
+              borderColor: 'divider',
+              bgcolor: 'background.paper',
+            }}
           >
             <MarketStatusDot phase={phase} />
             <Typography
               variant="caption"
               sx={{
                 fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.08em',
+                letterSpacing: '0.03em',
+                color: 'text.primary',
               }}
             >
               {marketLabel(now)} · {todayLabel(now)}
             </Typography>
-          </Stack>
+          </Box>
 
-          {/* Powered-by-Claude badge — the AI angle, stated plainly. */}
-          <Chip
-            icon={<AutoAwesomeIcon />}
-            label="AI stock screener · Powered by Claude"
-            size="small"
-            sx={{
-              alignSelf: 'flex-start',
-              fontWeight: 600,
-              color: 'text.primary',
-              bgcolor: 'background.paper',
-              border: 1,
-              borderColor: 'divider',
-              '& .MuiChip-icon': { color: 'secondary.main' },
-            }}
-          />
-
-          {/* Two-tone headline: the accent phrase in solid brand blue. */}
+          {/* Headline — confident, on a fluid scale, with the accent in solid
+              brand blue. */}
           <Typography
             variant="h1"
             component="h1"
             sx={{
-              fontWeight: 700,
-              letterSpacing: '-0.02em',
-              lineHeight: 1.08,
-              fontSize: { xs: '2.1rem', sm: '3rem', md: '3.5rem' },
+              fontWeight: 800,
+              letterSpacing: '-0.03em',
+              lineHeight: 1.03,
+              fontSize: 'clamp(2.5rem, 6vw, 4.25rem)',
+              textWrap: 'balance',
             }}
           >
             The stock screener,{' '}
-            {/* Keep the accent phrase "driven by AI" on one line so it never
-                breaks mid-phrase (or clips "AI"). */}
             <Box
               component="span"
-              sx={{
-                whiteSpace: 'nowrap',
-                // Solid brand blue — the "Nama" wordmark colour, adapting per
-                // mode (navy on light, lifted blue on dark). Replaces a
-                // blue→gold gradient text fill whose gold end fell below the
-                // 3:1 large-text contrast floor on the light wash and read as
-                // a generic "AI gradient" tell.
-                color: 'primary.main',
-              }}
+              sx={{ color: 'primary.main', whiteSpace: 'nowrap' }}
             >
               driven by AI
             </Box>
           </Typography>
 
+          {/* One line of value. */}
           <Typography
             sx={{
               color: 'text.secondary',
-              fontSize: { xs: '1rem', sm: '1.15rem' },
+              fontSize: { xs: '1.05rem', sm: '1.2rem' },
               lineHeight: 1.6,
-              maxWidth: 720,
+              maxWidth: 600,
+              textWrap: 'pretty',
             }}
           >
-            Screen 1,000+ US stocks and ETFs, then let AI read each one for you
-            — fundamentals, earnings, analyst coverage and options, in plain
-            English. Start with any name below.
+            Screen 1,000+ US stocks and ETFs, then let AI read any one in plain
+            English — fundamentals, earnings, analyst coverage and options, in
+            seconds.
           </Typography>
 
           {/* Primary action: the universe search itself. */}
-          <Box sx={{ pt: 0.5 }}>
+          <Box sx={{ width: '100%' }}>
             <HomeSearchBar />
           </Box>
 
+          {/* Coverage markers — quiet proof of what the engine spans. */}
+          <Stack
+            direction="row"
+            useFlexGap
+            sx={{ flexWrap: 'wrap', columnGap: 2.5, rowGap: 1 }}
+          >
+            {MARKERS.map(({ icon: Icon, label }) => (
+              <Stack
+                key={label}
+                direction="row"
+                spacing={0.75}
+                sx={{ alignItems: 'center' }}
+              >
+                <Icon sx={{ fontSize: 17, color: 'primary.main' }} />
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: 'text.secondary',
+                    fontWeight: 600,
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  {label}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+
+          {/* Secondary routes into the product — one primary-weighted, one quiet,
+              so the hierarchy under the search is clear. */}
           <Stack
             direction={{ xs: 'column', sm: 'row' }}
-            spacing={1.5}
+            spacing={{ xs: 1, sm: 1.5 }}
             sx={{ pt: 0.5, width: { xs: '100%', sm: 'auto' } }}
           >
             <Button
@@ -168,46 +182,27 @@ export default function HomeHero() {
               variant="outlined"
               size="large"
               startIcon={<TableRowsIcon />}
-              sx={{ borderColor: 'divider', color: 'text.primary' }}
+              sx={{
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                '&:hover': {
+                  borderColor: 'primary.main',
+                  bgcolor: 'action.hover',
+                },
+              }}
             >
               Open the Screener
             </Button>
             <Button
               component={RouterLink}
               to="/heatmap"
-              variant="outlined"
+              variant="text"
               size="large"
               startIcon={<BoltIcon />}
-              sx={{ borderColor: 'divider', color: 'text.primary' }}
+              sx={{ color: 'text.primary' }}
             >
               Market heat map
             </Button>
-          </Stack>
-
-          {/* Coverage chips — quiet proof of what the engine spans. */}
-          <Stack
-            direction="row"
-            spacing={0}
-            useFlexGap
-            sx={{ pt: 1, flexWrap: 'wrap' }}
-          >
-            {TRUST.map((t) => (
-              <Typography
-                key={t}
-                variant="caption"
-                sx={{
-                  color: 'text.secondary',
-                  fontWeight: 600,
-                  '&:not(:last-of-type):after': {
-                    content: '"·"',
-                    px: 1.25,
-                    opacity: 0.5,
-                  },
-                }}
-              >
-                {t}
-              </Typography>
-            ))}
           </Stack>
         </Stack>
       </Container>
