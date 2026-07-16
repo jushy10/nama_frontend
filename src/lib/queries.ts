@@ -810,6 +810,9 @@ export interface StockSearchParams {
   order: SortOrder
   limit: number
   offset: number
+  /** Scope to one listing market (`us`/`ca`); omit for every market. Part of the
+   *  query key, so switching markets fetches (and caches) a distinct page. */
+  country?: string | null
   /** Skip the request while false — e.g. a typeahead with an empty box, so no
    *  default page loads to fall back on. Defaults to on. */
   enabled?: boolean
@@ -835,6 +838,7 @@ export function useStockSearch(
         inSp500: params.inSp500 || null,
         inNasdaq100: params.inNasdaq100 || null,
         marketCaps: params.marketCaps,
+        country: params.country ?? null,
         // No sort → send neither param, so the backend uses its default order.
         sort: params.sort ?? undefined,
         order: params.sort ? params.order : undefined,

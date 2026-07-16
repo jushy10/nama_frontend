@@ -573,4 +573,63 @@ describe('Screener', () => {
     await user.click(screen.getByTestId('CancelIcon'))
     await waitFor(() => expect(locSearch()).not.toMatch(/q=/))
   })
+
+  it('scopes to the US market by default (country=us)', async () => {
+    const calls = stubApi()
+    renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+
+    // The US and Canadian universes share one anchor, so the search always sends a
+    // market so a "US screener" can't return Canadian names; US is the default.
+    expect(lastSearchUrl(calls)).toMatch(/[?&]country=us(&|$)/)
+  })
+
+  it('switches to the Canadian market — country=ca, market in the URL, US-index controls hidden', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(
+      <>
+        <Screener />
+        <LocationProbe />
+      </>,
+    )
+    await screen.findByText('NVDA')
+    // The S&P 500 index filter is a US-only control, shown on the US screen.
+    expect(screen.getByRole('button', { name: 'S&P 500' })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Canada' }))
+
+    await waitFor(() =>
+      expect(lastSearchUrl(calls)).toMatch(/[?&]country=ca(&|$)/),
+    )
+    // The market rides the shareable URL…
+    expect(locSearch()).toMatch(/market=ca/)
+    // …and the US-index membership control is gone (meaningless for Canada).
+    expect(
+      screen.queryByRole('button', { name: 'S&P 500' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('drops the US-only index filter when switching to Canada', async () => {
+    const calls = stubApi()
+    const { user } = renderWithProviders(
+      <>
+        <Screener />
+        <LocationProbe />
+      </>,
+      { initialEntries: ['/?sp500=1'] },
+    )
+    await screen.findByText('NVDA')
+    // The deep-linked S&P 500 filter applies on the US screen.
+    expect(lastSearchUrl(calls)).toMatch(/in_sp500=true/)
+
+    await user.click(screen.getByRole('button', { name: 'Canada' }))
+
+    await waitFor(() => {
+      const url = lastSearchUrl(calls)
+      expect(url).toMatch(/[?&]country=ca(&|$)/)
+      expect(url).not.toMatch(/in_sp500/)
+    })
+    // The stale sp500 param leaves the browser URL too.
+    expect(locSearch()).not.toMatch(/sp500/)
+  })
 })

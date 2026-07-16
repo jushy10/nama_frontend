@@ -225,16 +225,26 @@ const SORT_PARAM_VALUES: (StockSearchSort | typeof NO_SORT)[] = [
 const ORDER_VALUES: SortOrder[] = ['asc', 'desc']
 const CAP_VALUES = MARKET_CAP_TIERS.map((t) => t.value)
 
-// A few plain-English prompts, shown under the AI box as one-tap starters.
-const AI_EXAMPLES = [
+// The listing market the screener scopes to — the US and Canadian universes live
+// in one anchor, so without this axis a search returns both mixed together. Default
+// is the US; `?market=ca` switches to the Canadian (TSX/TSXV) screen. Drives the
+// search's `country` filter (and, on the Canadian side, hides the CDR duplicates of
+// US companies the API flags).
+type Market = 'us' | 'ca'
+const MARKET_VALUES: Market[] = ['us', 'ca']
+
+// A few plain-English prompts, shown under the AI box as one-tap starters — one set
+// per market, since the US-index examples (S&P 500) are meaningless for Canada.
+const AI_EXAMPLES_US: readonly string[] = [
   'Mega-cap technology stocks',
   'Top S&P 500 names by revenue growth',
   'Cheap large-cap semiconductor companies',
-] as const
-
-// Total number of columns, for the empty/skeleton rows' colSpan: symbol, sector,
-// industry, indices, + the metric columns.
-const COLSPAN = 4 + METRIC_COLUMNS.length
+]
+const AI_EXAMPLES_CA: readonly string[] = [
+  'Large-cap Canadian bank stocks',
+  'Canadian energy companies by revenue growth',
+  'Cheap Canadian mining stocks',
+]
 
 // Cap the free-text classification columns so a long sector/industry name
 // ellipsizes instead of blowing the table width out — keeping every metric column
@@ -353,10 +363,12 @@ function StockRow({
   stock,
   onSelect,
   sort,
+  showIndex,
 }: {
   stock: StockSearchResult
   onSelect: (ticker: string) => void
   sort: StockSearchSort | null
+  showIndex: boolean
 }) {
   const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
   const industryLabel = stock.industry
@@ -431,9 +443,11 @@ function StockRow({
       >
         {industryLabel ?? '—'}
       </TableCell>
-      <TableCell sx={HIDE_SM}>
-        <IndexChips stock={stock} />
-      </TableCell>
+      {showIndex && (
+        <TableCell sx={HIDE_SM}>
+          <IndexChips stock={stock} />
+        </TableCell>
+      )}
       {METRIC_COLUMNS.map((col) => {
         const value = col.value(stock)
         return (
@@ -457,7 +471,13 @@ function StockRow({
 
 /** Placeholder row shown per expected result while the first page loads. Takes
  *  `sort` so its metric cells hide/reveal in lockstep with the header. */
-function SkeletonRow({ sort }: { sort: StockSearchSort | null }) {
+function SkeletonRow({
+  sort,
+  showIndex,
+}: {
+  sort: StockSearchSort | null
+  showIndex: boolean
+}) {
   return (
     <TableRow>
       <TableCell>
@@ -475,9 +495,11 @@ function SkeletonRow({ sort }: { sort: StockSearchSort | null }) {
       <TableCell sx={HIDE_LG}>
         <Skeleton width={110} />
       </TableCell>
-      <TableCell sx={HIDE_SM}>
-        <Skeleton width={64} />
-      </TableCell>
+      {showIndex && (
+        <TableCell sx={HIDE_SM}>
+          <Skeleton width={64} />
+        </TableCell>
+      )}
       {METRIC_COLUMNS.map((col) => (
         <TableCell
           key={col.key}
@@ -676,17 +698,26 @@ function SkeletonCard() {
  * query; clicking a row opens that stock's live detail page.
  */
 export default function Screener() {
-  usePageMeta(
-    'Stock Screener — Filter US Stocks by Valuation, FCF Yield & Growth | Nama Insights',
-    'Screen US stocks by market cap, sector, valuation, free-cash-flow yield and growth — or describe what you want in plain English and let AI build the filters.',
-  )
-
   // The committed filters live in the URL (`/screener?sectors=…&sort=…&order=…`),
   // so a filtered view is shareable, bookmarkable, and restored on refresh and
   // Back/Forward. Each control reads its value straight from the query string and
   // writes back through `update`; defaults are omitted so a pristine screen keeps a
   // clean `/screener`.
   const { searchParams, update } = useUrlState()
+  // The listing market (US default, or Canada via `?market=ca`) — the top-level
+  // scope switch. `isUs` gates the US-only chrome (the S&P/Nasdaq index controls).
+  const market = readEnum<Market>(searchParams, 'market', MARKET_VALUES, 'us')
+  const isUs = market === 'us'
+
+  usePageMeta(
+    isUs
+      ? 'Stock Screener — Filter US Stocks by Valuation, FCF Yield & Growth | Nama Insights'
+      : 'Canadian Stock Screener — Filter TSX & TSXV Stocks by Valuation & Growth | Nama Insights',
+    isUs
+      ? 'Screen US stocks by market cap, sector, valuation, free-cash-flow yield and growth — or describe what you want in plain English and let AI build the filters.'
+      : 'Screen Canadian (TSX/TSXV) stocks by market cap, sector, valuation and growth — or describe what you want in plain English and let AI build the filters.',
+  )
+
   const urlQuery = readString(searchParams, 'q')
   const sectors = readList(searchParams, 'sectors')
   const industries = readList(searchParams, 'industries')
@@ -744,6 +775,17 @@ export default function Screener() {
       params.delete('page')
     })
 
+  // Switching market is a fresh scope: write `market` (US omitted as the default) and,
+  // when leaving for Canada, drop the US-only index filters so they can't silently zero
+  // the Canadian result set. Sector/industry/cap/search carry over — they're market-agnostic.
+  const setMarket = (next: Market) =>
+    setFilter((p) => {
+      writeEnum(p, 'market', next, 'us')
+      if (next !== 'us') {
+        p.delete('sp500')
+        p.delete('nasdaq100')
+      }
+    })
   const setSectors = (next: string[]) =>
     setFilter((p) => writeList(p, 'sectors', next))
   const setIndustries = (next: string[]) =>
@@ -840,6 +882,7 @@ export default function Screener() {
     inSp500: sp500,
     inNasdaq100: nasdaq100,
     marketCaps,
+    country: market,
     sort,
     order,
     limit: rowsPerPage,
@@ -865,6 +908,9 @@ export default function Screener() {
 
   const data = query.data ?? null
   const rows = data?.results ?? []
+  // Empty/skeleton colSpan: symbol + sector + industry (3), the Index column only on
+  // the US screen, then every metric column.
+  const colSpan = 3 + (isUs ? 1 : 0) + METRIC_COLUMNS.length
   // Only the very first load (nothing on screen yet) surfaces an error.
   const showError = query.isError && !data
   const hasFilters =
@@ -967,9 +1013,17 @@ export default function Screener() {
           filters below are the "or refine by hand" path. */}
       <PageHero
         eyebrowIcon={ShowChartOutlined}
-        eyebrow="Stock screener"
-        title="Screen the U.S. stock market"
-        subtitle="Ask in plain English, or filter 1,000+ US stocks by sector, market cap, valuation, and trailing or forward growth."
+        eyebrow={isUs ? 'Stock screener' : 'Canadian stock screener'}
+        title={
+          isUs
+            ? 'Screen the U.S. stock market'
+            : 'Screen the Canadian stock market'
+        }
+        subtitle={
+          isUs
+            ? 'Ask in plain English, or filter 1,000+ US stocks by sector, market cap, valuation, and trailing or forward growth.'
+            : 'Ask in plain English, or filter Canadian (TSX/TSXV) stocks by sector, market cap, valuation, and growth. Figures are in CAD.'
+        }
       >
         <AiScreenBox
           heading="Ask AI to build a screen"
@@ -978,9 +1032,13 @@ export default function Screener() {
           onSubmit={() => runAiScreen()}
           pending={aiScreen.isPending}
           error={aiScreen.isError ? errorMessage(aiScreen.error) : null}
-          placeholder="e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth"
+          placeholder={
+            isUs
+              ? 'e.g. Mega-cap technology stocks, or Top S&P 500 names by revenue growth'
+              : 'e.g. Large-cap Canadian bank stocks, or Canadian energy by revenue growth'
+          }
           inputAriaLabel="Describe the stocks you want"
-          examples={AI_EXAMPLES}
+          examples={isUs ? AI_EXAMPLES_US : AI_EXAMPLES_CA}
           onExample={(ex) => runAiScreen(ex)}
         />
       </PageHero>
@@ -999,12 +1057,43 @@ export default function Screener() {
         <Stack
           direction="row"
           spacing={1}
-          sx={{ alignItems: 'center', mb: 1.75, color: 'text.secondary' }}
+          sx={{
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            rowGap: 1,
+            mb: 1.75,
+          }}
         >
-          <TuneOutlined sx={{ fontSize: 18 }} />
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-            Refine by hand
-          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'center', color: 'text.secondary' }}
+          >
+            <TuneOutlined sx={{ fontSize: 18 }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              Refine by hand
+            </Typography>
+          </Stack>
+          {/* Market scope: the US and Canadian universes share one anchor, so this
+              is what keeps a "US screener" from mixing in Canadian names (and vice
+              versa). The Canadian screen hides the CDR duplicates of US companies. */}
+          <ToggleButtonGroup
+            exclusive
+            size="small"
+            value={market}
+            onChange={(_, next: Market | null) => {
+              if (next) setMarket(next)
+            }}
+            aria-label="Market"
+          >
+            <ToggleButton value="us" sx={{ px: 2, py: 0.5, fontWeight: 700 }}>
+              United States
+            </ToggleButton>
+            <ToggleButton value="ca" sx={{ px: 2, py: 0.5, fontWeight: 700 }}>
+              Canada
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Stack>
         <Box
           sx={{
@@ -1056,35 +1145,39 @@ export default function Screener() {
             minWidth={{ xs: '100%', md: 170 }}
           />
 
-          <ToggleButtonGroup
-            size="small"
-            value={membership}
-            onChange={(_, values: string[]) =>
-              // Both toggles land in one URL write (two separate `update` calls in a
-              // tick wouldn't compose — each reads the same base params).
-              setFilter((p) => {
-                writeBool(p, 'sp500', values.includes('sp500'))
-                writeBool(p, 'nasdaq100', values.includes('nasdaq100'))
-              })
-            }
-            aria-label="Index membership"
-            // Full width on phones so it lines up with the stacked fields above;
-            // its natural width from `md` up where it sits inline.
-            sx={{ width: { xs: '100%', md: 'auto' } }}
-          >
-            <ToggleButton
-              value="sp500"
-              sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
+          {/* S&P 500 / Nasdaq 100 are US indices, so the membership filter only makes
+              sense on the US screen — hidden (and its params cleared on switch) for Canada. */}
+          {isUs && (
+            <ToggleButtonGroup
+              size="small"
+              value={membership}
+              onChange={(_, values: string[]) =>
+                // Both toggles land in one URL write (two separate `update` calls in a
+                // tick wouldn't compose — each reads the same base params).
+                setFilter((p) => {
+                  writeBool(p, 'sp500', values.includes('sp500'))
+                  writeBool(p, 'nasdaq100', values.includes('nasdaq100'))
+                })
+              }
+              aria-label="Index membership"
+              // Full width on phones so it lines up with the stacked fields above;
+              // its natural width from `md` up where it sits inline.
+              sx={{ width: { xs: '100%', md: 'auto' } }}
             >
-              S&amp;P 500
-            </ToggleButton>
-            <ToggleButton
-              value="nasdaq100"
-              sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
-            >
-              Nasdaq 100
-            </ToggleButton>
-          </ToggleButtonGroup>
+              <ToggleButton
+                value="sp500"
+                sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
+              >
+                S&amp;P 500
+              </ToggleButton>
+              <ToggleButton
+                value="nasdaq100"
+                sx={{ px: 2, py: 0.5, flex: { xs: 1, md: 'none' } }}
+              >
+                Nasdaq 100
+              </ToggleButton>
+            </ToggleButtonGroup>
+          )}
 
           {/* Explicit sort control: the column-header sort labels are hidden on the
               narrowest screens, so this keeps every metric sortable on mobile. */}
@@ -1296,7 +1389,7 @@ export default function Screener() {
                     <TableCell>Symbol</TableCell>
                     <TableCell sx={HIDE_MD}>Sector</TableCell>
                     <TableCell sx={HIDE_LG}>Industry</TableCell>
-                    <TableCell sx={HIDE_SM}>Index</TableCell>
+                    {isUs && <TableCell sx={HIDE_SM}>Index</TableCell>}
                     {METRIC_COLUMNS.map((col) => {
                       const active = sort === col.key
                       return (
@@ -1327,12 +1420,14 @@ export default function Screener() {
                 <TableBody>
                   {query.isLoading &&
                     Array.from({ length: Math.min(rowsPerPage, 10) }).map(
-                      (_, i) => <SkeletonRow key={i} sort={sort} />,
+                      (_, i) => (
+                        <SkeletonRow key={i} sort={sort} showIndex={isUs} />
+                      ),
                     )}
                   {data && rows.length === 0 && (
                     <TableRow>
                       <TableCell
-                        colSpan={COLSPAN}
+                        colSpan={colSpan}
                         sx={{
                           py: 5,
                           textAlign: 'center',
@@ -1349,6 +1444,7 @@ export default function Screener() {
                       stock={stock}
                       onSelect={openStock}
                       sort={sort}
+                      showIndex={isUs}
                     />
                   ))}
                 </TableBody>
