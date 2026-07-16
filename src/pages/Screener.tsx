@@ -29,7 +29,8 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material'
-import type { SxProps, Theme } from '@mui/material/styles'
+import { alpha, type SxProps, type Theme } from '@mui/material/styles'
+import { fontFamilyMono } from '@/theme'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -56,6 +57,12 @@ import MultiSelectFilter, {
 import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
 import PageHero from '@/components/PageHero'
 import AiScreenBox from '@/components/AiScreenBox'
+import { GrowthBar, MagnitudeBar } from '@/components/ScreenerBars'
+import {
+  divergingFraction,
+  magnitudeFraction,
+  pageMax,
+} from '@/lib/screenerScale'
 import {
   readBool,
   readEnum,
@@ -276,17 +283,51 @@ const fmtMultiple = (n: number | null) => (n == null ? '—' : n.toFixed(2))
 const growthColor = (n: number | null) =>
   n == null ? 'text.secondary' : n >= 0 ? 'success.main' : 'error.main'
 
+/** Page-relative bar denominators, keyed by metric column — the max the column's
+ *  magnitude bars scale against. Computed once per page of rows, since the list is
+ *  server-paginated. Only the money columns appear here; the growth columns scale
+ *  against a fixed reference instead, so their bars mean the same thing on every
+ *  page (see `screenerScale`). */
+type BarScales = Partial<Record<StockSearchSort, number>>
+
+/** Figures ride the mono face with tabular figures: in a column of numbers, equal
+ *  digit widths let the eye compare magnitudes by column position alone, and a
+ *  proportional face's ragged digits defeat that. */
+const NUMERIC = {
+  fontFamily: fontFamilyMono,
+  fontVariantNumeric: 'tabular-nums',
+} as const
+
 /** Structural sx shared by a metric column's header, body and skeleton cells: its
  *  responsive-hide rule — dropped when the column is the active sort, so you never
  *  hide the metric you're sorting by — plus the left divider that groups the
- *  forward block apart from the trailing one. */
+ *  forward block apart from the trailing one, and a faint wash on the active-sort
+ *  column so the metric ordering the page is legible as a band down the table. */
 const metricColumnSx = (
   col: MetricColumn,
   active: boolean,
 ): SxProps<Theme> => ({
   ...(col.hide && !active ? col.hide : null),
   ...(col.groupStart ? { borderLeft: 1, borderLeftColor: 'divider' } : null),
+  ...(active
+    ? {
+        bgcolor: (t: Theme) => alpha(t.palette.primary.main, 0.04),
+      }
+    : null),
 })
+
+/** A clickable row: the whole line is one target, so it gets the pointer, a hover
+ *  tint, and — the part MUI's `hover` prop doesn't cover — a visible keyboard
+ *  focus ring. The rows carry `tabIndex`/`role="link"`, so without this a keyboard
+ *  user tabbing the list has no idea where they are. */
+const clickableRowSx: SxProps<Theme> = {
+  cursor: 'pointer',
+  '&:last-child td': { border: 0 },
+  '&:focus-visible': {
+    outline: (t: Theme) => `2px solid ${t.palette.primary.main}`,
+    outlineOffset: '-2px',
+  },
+}
 
 /** A metric value rendered for its column's variant: a compact money magnitude (in
  *  ``moneySymbol`` — $ on the US screen, C$ on the Canadian), a bare multiple, or a signed
@@ -368,16 +409,20 @@ function IndexChips({ stock }: { stock: StockSearchResult }) {
  *  column reveals itself when it's the one being sorted on. */
 function StockRow({
   stock,
+  rank,
   onSelect,
   sort,
   showIndex,
   moneySymbol,
+  scales,
 }: {
   stock: StockSearchResult
+  rank: number
   onSelect: (ticker: string) => void
   sort: StockSearchSort | null
   showIndex: boolean
   moneySymbol: string
+  scales: BarScales
 }) {
   const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
   const industryLabel = stock.industry
@@ -396,7 +441,7 @@ function StockRow({
       tabIndex={0}
       role="link"
       aria-label={`View ${stock.ticker} details`}
-      sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}
+      sx={clickableRowSx}
     >
       <TableCell>
         <Stack
@@ -404,6 +449,25 @@ function StockRow({
           spacing={{ xs: 0, sm: 1.5 }}
           sx={{ alignItems: 'center', minWidth: 0 }}
         >
+          {/* Standing in the current sort. It rides inside the identity cell rather
+              than a column of its own so it stays pinned with the ticker when the
+              metrics scroll sideways, and so the fixed width that keeps the ranks
+              right-aligned doesn't have to survive the table's auto layout. Carries
+              the page offset, so page 2 starts at 26, not 1. */}
+          <Box
+            aria-hidden
+            sx={{
+              ...NUMERIC,
+              display: { xs: 'none', sm: 'block' },
+              flexShrink: 0,
+              width: 22,
+              textAlign: 'right',
+              color: 'text.disabled',
+              fontSize: '0.72rem',
+            }}
+          >
+            {rank}
+          </Box>
           {/* Logo hidden on phones to keep ticker + metrics on one screen. */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' } }}>
             <StockLogo symbol={stock.ticker} />
@@ -459,6 +523,7 @@ function StockRow({
       )}
       {METRIC_COLUMNS.map((col) => {
         const value = col.value(stock)
+        const scale = scales[col.key] ?? 0
         return (
           <TableCell
             key={col.key}
@@ -467,10 +532,20 @@ function StockRow({
               ...metricColumnSx(col, sort === col.key),
               color: metricValueColor(col.variant, value),
               fontWeight: 600,
-              fontVariantNumeric: 'tabular-nums',
+              ...NUMERIC,
             }}
           >
             {fmtMetric(col.variant, value, moneySymbol)}
+            {/* The bar restates the figure above it as a length: a size metric as a
+                log-scaled magnitude, a growth metric as a diverging spine off zero.
+                A multiple gets none — a P/E has no meaningful zero to anchor to, and
+                "long bar" would imply expensive is good. */}
+            {col.variant === 'money' && (
+              <MagnitudeBar fraction={magnitudeFraction(value, scale)} />
+            )}
+            {col.variant === 'growth' && (
+              <GrowthBar fraction={divergingFraction(value)} />
+            )}
           </TableCell>
         )
       })}
@@ -491,6 +566,7 @@ function SkeletonRow({
     <TableRow>
       <TableCell>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Skeleton width={14} sx={{ flexShrink: 0 }} />
           <Skeleton variant="rounded" width={32} height={32} />
           <Box sx={{ flex: 1 }}>
             <Skeleton width={56} />
@@ -519,6 +595,11 @@ function SkeletonRow({
             width={col.variant === 'money' ? 56 : 44}
             sx={{ ml: 'auto' }}
           />
+          {/* Matches the loaded row's bar, so the list doesn't jump height when
+              the real figures land. */}
+          {col.variant !== 'multiple' && (
+            <Skeleton width={52} height={3} sx={{ ml: 'auto', mt: 0.5 }} />
+          )}
         </TableCell>
       ))}
     </TableRow>
@@ -535,10 +616,12 @@ function StockListCard({
   stock,
   onSelect,
   moneySymbol,
+  scales,
 }: {
   stock: StockSearchResult
   onSelect: (ticker: string) => void
   moneySymbol: string
+  scales: BarScales
 }) {
   const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
   const industryLabel = stock.industry
@@ -566,8 +649,14 @@ function StockListCard({
         borderColor: 'divider',
         transition: 'background-color 120ms ease',
         '&:last-of-type': { borderBottom: 0 },
-        '&:hover, &:focus-visible': { bgcolor: 'action.hover' },
-        outline: 'none',
+        '&:hover': { bgcolor: 'action.hover' },
+        // A visible ring, not just a tint: the card is a `role="link"` tab stop, and
+        // the tint alone is too faint to locate a focused card by.
+        '&:focus-visible': {
+          bgcolor: 'action.hover',
+          outline: (t) => `2px solid ${t.palette.primary.main}`,
+          outlineOffset: '-2px',
+        },
       }}
     >
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
@@ -629,6 +718,7 @@ function StockListCard({
       >
         {METRIC_COLUMNS.map((col) => {
           const value = col.value(stock)
+          const scale = scales[col.key] ?? 0
           return (
             <Box key={col.key} sx={{ minWidth: 0 }}>
               <Typography
@@ -647,12 +737,23 @@ function StockListCard({
                 sx={{
                   fontSize: '0.82rem',
                   fontWeight: 600,
-                  fontVariantNumeric: 'tabular-nums',
+                  ...NUMERIC,
                   color: metricValueColor(col.variant, value),
                 }}
               >
                 {fmtMetric(col.variant, value, moneySymbol)}
               </Typography>
+              {/* The same encoding the table draws, left-anchored here: a card's
+                  metrics read as a left-aligned grid, not a right-aligned column. */}
+              {col.variant === 'money' && (
+                <MagnitudeBar
+                  fraction={magnitudeFraction(value, scale)}
+                  align="left"
+                />
+              )}
+              {col.variant === 'growth' && (
+                <GrowthBar fraction={divergingFraction(value)} align="left" />
+              )}
             </Box>
           )
         })}
@@ -918,10 +1019,24 @@ export default function Screener() {
   )
 
   const data = query.data ?? null
-  const rows = data?.results ?? []
+  // Memoised so the empty-result fallback isn't a fresh array on every render —
+  // that identity is what `barScales` below keys off.
+  const rows = useMemo(() => data?.results ?? [], [data])
   // Empty/skeleton colSpan: symbol + sector + industry (3), the Index column only on
   // the US screen, then every metric column.
   const colSpan = 3 + (isUs ? 1 : 0) + METRIC_COLUMNS.length
+
+  // The micro-bars' denominators: the biggest figure each metric carries on this
+  // page. Page-scoped because the list is server-paginated — a bar can only honestly
+  // say "biggest here", and recomputing per page keeps the shape readable as you
+  // move down a sorted list into smaller names.
+  const barScales = useMemo<BarScales>(() => {
+    const scales: BarScales = {}
+    for (const col of METRIC_COLUMNS) {
+      if (col.variant === 'money') scales[col.key] = pageMax(rows, col.value)
+    }
+    return scales
+  }, [rows])
   // Money is shown in each market's own currency — the stored market caps are native (USD on
   // the US screen, CAD on the Canadian), so the Canadian screen labels them C$, not $.
   const moneySymbol = isUs ? '$' : 'C$'
@@ -1327,6 +1442,7 @@ export default function Screener() {
                   stock={stock}
                   onSelect={openStock}
                   moneySymbol={moneySymbol}
+                  scales={barScales}
                 />
               ))}
             </Box>
@@ -1362,10 +1478,10 @@ export default function Screener() {
                   // A hovered row lifts on a subtle tint so the whole line reads as
                   // one clickable target.
                   '& tbody tr:hover': { bgcolor: 'action.hover' },
-                  // Pin the first column (ticker/name) so a row keeps its identity
-                  // while the metric columns scroll horizontally on a narrow screen.
-                  // The header corner (z-3) sits above both the sticky header row
-                  // (z-2) and the pinned body cells (z-1); the pinned body cell
+                  // Pin the first column (rank + ticker/name) so a row keeps its
+                  // identity while the metric columns scroll horizontally on a narrow
+                  // screen. The header corner (z-3) sits above both the sticky header
+                  // row (z-2) and the pinned body cells (z-1); the pinned body cell
                   // carries an opaque background — matched to the row-hover tint —
                   // so scrolled metrics never show through it.
                   '& thead th:first-of-type': {
@@ -1453,14 +1569,16 @@ export default function Screener() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {rows.map((stock) => (
+                  {rows.map((stock, i) => (
                     <StockRow
                       key={stock.ticker}
                       stock={stock}
+                      rank={page * rowsPerPage + i + 1}
                       onSelect={openStock}
                       sort={sort}
                       showIndex={isUs}
                       moneySymbol={moneySymbol}
+                      scales={barScales}
                     />
                   ))}
                 </TableBody>
