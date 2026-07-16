@@ -26,7 +26,8 @@ import {
   useMediaQuery,
   useTheme,
 } from '@mui/material'
-import type { SxProps, Theme } from '@mui/material/styles'
+import { alpha, type SxProps, type Theme } from '@mui/material/styles'
+import { fontFamilyMono } from '@/theme'
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
 import RefreshIcon from '@mui/icons-material/Refresh'
 import SearchIcon from '@mui/icons-material/Search'
@@ -52,6 +53,8 @@ import MultiSelectFilter, {
 import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
 import PageHero from '@/components/PageHero'
 import AiScreenBox from '@/components/AiScreenBox'
+import { MagnitudeBar, type BarTone } from '@/components/ScreenerBars'
+import { linearFraction, magnitudeFraction, pageMax } from '@/lib/screenerScale'
 import {
   readEnum,
   readInt,
@@ -99,12 +102,22 @@ const fmtPercent = (n: number | null) => (n == null ? '—' : `${n.toFixed(2)}%`
 // explains the header, and `hide` is an optional responsive-hide rule (dropped
 // when the column is the active sort, so the metric you're sorting by is never
 // hidden). Every header doubles as a sort toggle (see `onSort`).
+// `bar` picks how the column's micro-bar scales its figure, and in which accent:
+// `log` for AUM (it spans three decades, so a linear bar would leave everything
+// under the biggest fund invisible), `linear` for the percent columns (they live
+// inside one order of magnitude, where log would flatten the very spread the column
+// exists to show). The expense ratio draws in the gold `secondary` tone because a
+// long bar there means expensive — the blue "more is better" reading would be
+// exactly backwards on a fee.
+type EtfBar = { scale: 'log' | 'linear'; tone: BarTone }
+
 type EtfMetricColumn = {
   key: EtfSearchSort
   label: string
   tip: string
   value: (e: EtfSearchResult) => number | null
   format: (n: number | null) => string
+  bar: EtfBar
   hide?: ResponsiveHide
 }
 
@@ -118,6 +131,7 @@ const METRIC_COLUMNS: EtfMetricColumn[] = [
     tip: 'Assets under management (AUM)',
     value: (e) => e.net_assets,
     format: fmtMoney,
+    bar: { scale: 'log', tone: 'primary' },
   },
   {
     key: 'expense_ratio',
@@ -125,6 +139,7 @@ const METRIC_COLUMNS: EtfMetricColumn[] = [
     tip: 'Annual fee as a percent of assets — lower is cheaper',
     value: (e) => e.expense_ratio,
     format: fmtPercent,
+    bar: { scale: 'linear', tone: 'secondary' },
   },
   {
     key: 'dividend_yield',
@@ -132,9 +147,20 @@ const METRIC_COLUMNS: EtfMetricColumn[] = [
     tip: 'Trailing 12-month distribution yield',
     value: (e) => e.dividend_yield,
     format: fmtPercent,
+    bar: { scale: 'linear', tone: 'primary' },
     hide: HIDE_SM,
   },
 ]
+
+/** The fraction a column's bar draws, per its scale. */
+const barFraction = (
+  col: EtfMetricColumn,
+  value: number | null,
+  max: number,
+) =>
+  col.bar.scale === 'log'
+    ? magnitudeFraction(value, max)
+    : linearFraction(value, max)
 
 // The always-available "Sort by" menu — one entry per metric column, so every
 // sort is reachable on phones where the header labels are hidden.
@@ -167,12 +193,43 @@ const AI_EXAMPLES = [
 // category, exchange, + the metric columns.
 const COLSPAN = 3 + METRIC_COLUMNS.length
 
+/** Page-relative bar denominators, keyed by metric column — the max the column's
+ *  micro-bars scale against, recomputed per page of rows (see `screenerScale`). */
+type BarScales = Partial<Record<EtfSearchSort, number>>
+
+/** Figures ride the mono face with tabular figures: in a column of numbers, equal
+ *  digit widths let the eye compare magnitudes by column position alone, and a
+ *  proportional face's ragged digits defeat that. */
+const NUMERIC = {
+  fontFamily: fontFamilyMono,
+  fontVariantNumeric: 'tabular-nums',
+} as const
+
 /** A metric column's structural sx: its responsive-hide rule, dropped when the
- *  column is the active sort so you never hide the metric you're sorting by. */
+ *  column is the active sort so you never hide the metric you're sorting by, plus
+ *  a faint wash on that active column so the metric ordering the page is legible
+ *  as a band down the table. */
 const metricColumnSx = (
   col: EtfMetricColumn,
   active: boolean,
-): SxProps<Theme> => (col.hide && !active ? col.hide : {})
+): SxProps<Theme> => ({
+  ...(col.hide && !active ? col.hide : null),
+  ...(active
+    ? { bgcolor: (t: Theme) => alpha(t.palette.primary.main, 0.04) }
+    : null),
+})
+
+/** A clickable row: the whole line is one target, so it gets the pointer, a hover
+ *  tint, and — the part MUI's `hover` prop doesn't cover — a visible keyboard focus
+ *  ring, since the rows carry `tabIndex`/`role="link"`. */
+const clickableRowSx: SxProps<Theme> = {
+  cursor: 'pointer',
+  '&:last-child td': { border: 0 },
+  '&:focus-visible': {
+    outline: (t: Theme) => `2px solid ${t.palette.primary.main}`,
+    outlineOffset: '-2px',
+  },
+}
 
 /** Debounce a fast-changing value (the search box) so effects downstream settle. */
 function useDebounced<T>(value: T, delayMs: number): T {
@@ -205,12 +262,16 @@ function EtfLogo({ symbol, size = 32 }: { symbol: string; size?: number }) {
  *  itself when it's the one being sorted on. */
 function EtfRow({
   etf,
+  rank,
   onSelect,
   sort,
+  scales,
 }: {
   etf: EtfSearchResult
+  rank: number
   onSelect: (ticker: string) => void
   sort: EtfSearchSort
+  scales: BarScales
 }) {
   return (
     <TableRow
@@ -225,7 +286,7 @@ function EtfRow({
       tabIndex={0}
       role="link"
       aria-label={`View ${etf.ticker} details`}
-      sx={{ cursor: 'pointer', '&:last-child td': { border: 0 } }}
+      sx={clickableRowSx}
     >
       <TableCell>
         <Stack
@@ -233,6 +294,24 @@ function EtfRow({
           spacing={{ xs: 0, sm: 1.5 }}
           sx={{ alignItems: 'center', minWidth: 0 }}
         >
+          {/* Standing in the current sort. It rides inside the identity cell rather
+              than a column of its own so it stays pinned with the ticker when the
+              metrics scroll sideways. Carries the page offset, so page 2 starts at
+              26, not 1. */}
+          <Box
+            aria-hidden
+            sx={{
+              ...NUMERIC,
+              display: { xs: 'none', sm: 'block' },
+              flexShrink: 0,
+              width: 22,
+              textAlign: 'right',
+              color: 'text.disabled',
+              fontSize: '0.72rem',
+            }}
+          >
+            {rank}
+          </Box>
           {/* Logo hidden on phones to keep ticker + metrics on one screen. */}
           <Box sx={{ display: { xs: 'none', sm: 'flex' } }}>
             <EtfLogo symbol={etf.ticker} />
@@ -275,10 +354,16 @@ function EtfRow({
               ...metricColumnSx(col, sort === col.key),
               color: value == null ? 'text.secondary' : 'text.primary',
               fontWeight: 600,
-              fontVariantNumeric: 'tabular-nums',
+              ...NUMERIC,
             }}
           >
             {col.format(value)}
+            {/* The bar restates the figure above it as a length, so a page of funds
+                reads as a shape rather than a column of near-identical percents. */}
+            <MagnitudeBar
+              fraction={barFraction(col, value, scales[col.key] ?? 0)}
+              tone={col.bar.tone}
+            />
           </TableCell>
         )
       })}
@@ -293,6 +378,7 @@ function SkeletonRow({ sort }: { sort: EtfSearchSort }) {
     <TableRow>
       <TableCell>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+          <Skeleton width={14} sx={{ flexShrink: 0 }} />
           <Skeleton variant="rounded" width={32} height={32} />
           <Box sx={{ flex: 1 }}>
             <Skeleton width={56} />
@@ -313,6 +399,9 @@ function SkeletonRow({ sort }: { sort: EtfSearchSort }) {
           sx={metricColumnSx(col, sort === col.key)}
         >
           <Skeleton width={56} sx={{ ml: 'auto' }} />
+          {/* Matches the loaded row's bar, so the list doesn't jump height when the
+              real figures land. */}
+          <Skeleton width={52} height={3} sx={{ ml: 'auto', mt: 0.5 }} />
         </TableCell>
       ))}
     </TableRow>
@@ -327,9 +416,11 @@ function SkeletonRow({ sort }: { sort: EtfSearchSort }) {
 function EtfListCard({
   etf,
   onSelect,
+  scales,
 }: {
   etf: EtfSearchResult
   onSelect: (ticker: string) => void
+  scales: BarScales
 }) {
   const categoryLabel = etf.category
     ? humanizeClassification(etf.category)
@@ -355,8 +446,14 @@ function EtfListCard({
         borderColor: 'divider',
         transition: 'background-color 120ms ease',
         '&:last-of-type': { borderBottom: 0 },
-        '&:hover, &:focus-visible': { bgcolor: 'action.hover' },
-        outline: 'none',
+        '&:hover': { bgcolor: 'action.hover' },
+        // A visible ring, not just a tint: the card is a `role="link"` tab stop, and
+        // the tint alone is too faint to locate a focused card by.
+        '&:focus-visible': {
+          bgcolor: 'action.hover',
+          outline: (t) => `2px solid ${t.palette.primary.main}`,
+          outlineOffset: '-2px',
+        },
       }}
     >
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
@@ -429,12 +526,19 @@ function EtfListCard({
                 sx={{
                   fontSize: '0.82rem',
                   fontWeight: 600,
-                  fontVariantNumeric: 'tabular-nums',
+                  ...NUMERIC,
                   color: value == null ? 'text.secondary' : 'text.primary',
                 }}
               >
                 {col.format(value)}
               </Typography>
+              {/* The same encoding the table draws, left-anchored here: a card's
+                  metrics read as a left-aligned grid, not a right-aligned column. */}
+              <MagnitudeBar
+                fraction={barFraction(col, value, scales[col.key] ?? 0)}
+                tone={col.bar.tone}
+                align="left"
+              />
             </Box>
           )
         })}
@@ -636,7 +740,19 @@ export default function EtfScreener() {
   )
 
   const data = query.data ?? null
-  const rows = data?.results ?? []
+  // Memoised so the empty-result fallback isn't a fresh array on every render —
+  // that identity is what `barScales` below keys off.
+  const rows = useMemo(() => data?.results ?? [], [data])
+
+  // The micro-bars' denominators: the biggest figure each metric carries on this
+  // page. Page-scoped because the list is server-paginated — a bar can only honestly
+  // say "biggest here", and recomputing per page keeps the shape readable as you
+  // move down a sorted list into smaller funds.
+  const barScales = useMemo<BarScales>(() => {
+    const scales: BarScales = {}
+    for (const col of METRIC_COLUMNS) scales[col.key] = pageMax(rows, col.value)
+    return scales
+  }, [rows])
   // Only the very first load (nothing on screen yet) surfaces an error.
   const showError = query.isError && !data
   const hasFilters = !!urlQuery || categories.length > 0
@@ -886,7 +1002,12 @@ export default function EtfScreener() {
                 </Box>
               )}
               {rows.map((etf) => (
-                <EtfListCard key={etf.ticker} etf={etf} onSelect={openEtf} />
+                <EtfListCard
+                  key={etf.ticker}
+                  etf={etf}
+                  onSelect={openEtf}
+                  scales={barScales}
+                />
               ))}
             </Box>
           )}
@@ -1004,12 +1125,14 @@ export default function EtfScreener() {
                       </TableCell>
                     </TableRow>
                   )}
-                  {rows.map((etf) => (
+                  {rows.map((etf, i) => (
                     <EtfRow
                       key={etf.ticker}
                       etf={etf}
+                      rank={page * rowsPerPage + i + 1}
                       onSelect={openEtf}
                       sort={sort}
+                      scales={barScales}
                     />
                   ))}
                 </TableBody>
