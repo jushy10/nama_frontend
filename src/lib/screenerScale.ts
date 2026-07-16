@@ -78,7 +78,10 @@ export function divergingFraction(
  * The largest finite positive value a page carries for one metric, or 0 when the
  * page has none — the denominator `magnitudeFraction` scales against.
  */
-export function pageMax<T>(rows: readonly T[], pick: (row: T) => number | null) {
+export function pageMax<T>(
+  rows: readonly T[],
+  pick: (row: T) => number | null,
+) {
   return rows.reduce((max, row) => {
     const value = pick(row)
     return value != null && Number.isFinite(value) && value > max ? value : max

@@ -54,11 +54,7 @@ import ActiveFilters, { type ActiveChip } from '@/components/ActiveFilters'
 import PageHero from '@/components/PageHero'
 import AiScreenBox from '@/components/AiScreenBox'
 import { MagnitudeBar, type BarTone } from '@/components/ScreenerBars'
-import {
-  linearFraction,
-  magnitudeFraction,
-  pageMax,
-} from '@/lib/screenerScale'
+import { linearFraction, magnitudeFraction, pageMax } from '@/lib/screenerScale'
 import {
   readEnum,
   readInt,
@@ -157,7 +153,11 @@ const METRIC_COLUMNS: EtfMetricColumn[] = [
 ]
 
 /** The fraction a column's bar draws, per its scale. */
-const barFraction = (col: EtfMetricColumn, value: number | null, max: number) =>
+const barFraction = (
+  col: EtfMetricColumn,
+  value: number | null,
+  max: number,
+) =>
   col.bar.scale === 'log'
     ? magnitudeFraction(value, max)
     : linearFraction(value, max)
