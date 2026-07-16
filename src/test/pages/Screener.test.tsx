@@ -632,4 +632,19 @@ describe('Screener', () => {
     // The stale sp500 param leaves the browser URL too.
     expect(locSearch()).not.toMatch(/sp500/)
   })
+
+  it('labels market caps in the market currency ($ for US, C$ for Canada)', async () => {
+    stubApi()
+    const { user } = renderWithProviders(<Screener />)
+    await screen.findByText('NVDA')
+    // US screen: market cap in US dollars.
+    expect(screen.getByText('$3.2T')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Canada' }))
+
+    // Canadian screen: the same magnitude reads in Canadian dollars (the stored caps are
+    // native — CAD on the Canadian screen — so it's a label, not a conversion).
+    expect(await screen.findByText('C$3.2T')).toBeInTheDocument()
+    expect(screen.queryByText('$3.2T')).not.toBeInTheDocument()
+  })
 })

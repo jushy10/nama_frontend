@@ -253,11 +253,13 @@ const CLIP = { overflow: 'hidden', textOverflow: 'ellipsis' } as const
 const SECTOR_MAX = 150
 const INDUSTRY_MAX = 168
 
-/** Compact dollar magnitude, e.g. $3.21T / $845B / $12.4M. */
-const fmtMoney = (n: number | null) =>
+/** Compact money magnitude, e.g. $3.21T / C$845B / $12.4M. The market caps are stored in
+ *  each listing's native currency (USD on the US screen, CAD on the Canadian one), so the
+ *  caller passes the matching symbol — this is display only, never a conversion. */
+const fmtMoney = (n: number | null, symbol = '$') =>
   n == null
     ? '—'
-    : '$' +
+    : symbol +
       n.toLocaleString('en-US', {
         notation: 'compact',
         maximumFractionDigits: 2,
@@ -286,11 +288,16 @@ const metricColumnSx = (
   ...(col.groupStart ? { borderLeft: 1, borderLeftColor: 'divider' } : null),
 })
 
-/** A metric value rendered for its column's variant: a compact dollar magnitude,
- *  a bare multiple, or a signed percent. */
-const fmtMetric = (variant: MetricColumn['variant'], n: number | null) =>
+/** A metric value rendered for its column's variant: a compact money magnitude (in
+ *  ``moneySymbol`` — $ on the US screen, C$ on the Canadian), a bare multiple, or a signed
+ *  percent. */
+const fmtMetric = (
+  variant: MetricColumn['variant'],
+  n: number | null,
+  moneySymbol: string,
+) =>
   variant === 'money'
-    ? fmtMoney(n)
+    ? fmtMoney(n, moneySymbol)
     : variant === 'multiple'
       ? fmtMultiple(n)
       : fmtPct(n)
@@ -364,11 +371,13 @@ function StockRow({
   onSelect,
   sort,
   showIndex,
+  moneySymbol,
 }: {
   stock: StockSearchResult
   onSelect: (ticker: string) => void
   sort: StockSearchSort | null
   showIndex: boolean
+  moneySymbol: string
 }) {
   const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
   const industryLabel = stock.industry
@@ -461,7 +470,7 @@ function StockRow({
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {fmtMetric(col.variant, value)}
+            {fmtMetric(col.variant, value, moneySymbol)}
           </TableCell>
         )
       })}
@@ -525,9 +534,11 @@ function SkeletonRow({
 function StockListCard({
   stock,
   onSelect,
+  moneySymbol,
 }: {
   stock: StockSearchResult
   onSelect: (ticker: string) => void
+  moneySymbol: string
 }) {
   const sectorLabel = stock.sector ? humanizeClassification(stock.sector) : null
   const industryLabel = stock.industry
@@ -640,7 +651,7 @@ function StockListCard({
                   color: metricValueColor(col.variant, value),
                 }}
               >
-                {fmtMetric(col.variant, value)}
+                {fmtMetric(col.variant, value, moneySymbol)}
               </Typography>
             </Box>
           )
@@ -911,6 +922,9 @@ export default function Screener() {
   // Empty/skeleton colSpan: symbol + sector + industry (3), the Index column only on
   // the US screen, then every metric column.
   const colSpan = 3 + (isUs ? 1 : 0) + METRIC_COLUMNS.length
+  // Money is shown in each market's own currency — the stored market caps are native (USD on
+  // the US screen, CAD on the Canadian), so the Canadian screen labels them C$, not $.
+  const moneySymbol = isUs ? '$' : 'C$'
   // Only the very first load (nothing on screen yet) surfaces an error.
   const showError = query.isError && !data
   const hasFilters =
@@ -1312,6 +1326,7 @@ export default function Screener() {
                   key={stock.ticker}
                   stock={stock}
                   onSelect={openStock}
+                  moneySymbol={moneySymbol}
                 />
               ))}
             </Box>
@@ -1445,6 +1460,7 @@ export default function Screener() {
                       onSelect={openStock}
                       sort={sort}
                       showIndex={isUs}
+                      moneySymbol={moneySymbol}
                     />
                   ))}
                 </TableBody>
