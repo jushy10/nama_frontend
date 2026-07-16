@@ -1545,17 +1545,20 @@ export interface StockSearchResponse {
 }
 
 /**
- * Search/filter/sort the screened ≥$1B US universe (`GET /stocks/ticker`). `q`
+ * Search/filter/sort the screened ≥$1B universe (`GET /stocks/ticker`). `q`
  * matches (case-insensitive substring) the company name OR ticker, so "NV"
  * surfaces Nvidia and NVDA; `sectors`/`industries` each take one or more
  * classification slugs (or raw labels — the API slugifies them) and match ANY of
  * them (an OR set), while the two axes AND together; `inSp500`/`inNasdaq100`
  * narrow to index members; `marketCaps` narrows to the union of one or more cap
- * tiers (mega/large/mid/small). `sort` (default market cap, a trailing or forward
- * growth metric, or a `growth`/`forward_growth` blend) and `order` (default desc)
- * order the page; `limit`/`offset` window it. Each filter is sent as a repeated
- * query param (`?sector=a&sector=b`). Only screened stocks are returned, so every
- * row carries a market cap.
+ * tiers (mega/large/mid/small). `country` scopes to one listing market
+ * (`us`/`ca`) — omit for every market; a value keeps a market-cap sort within one
+ * currency (US in USD, Canada in CAD) and, on the Canadian side, hides the CDR /
+ * dual-listing duplicates of US companies the API already flags. `sort` (default
+ * market cap, a trailing or forward growth metric, or a `growth`/`forward_growth`
+ * blend) and `order` (default desc) order the page; `limit`/`offset` window it.
+ * Each filter is sent as a repeated query param (`?sector=a&sector=b`). Only
+ * screened stocks are returned, so every row carries a market cap.
  */
 export async function searchStocks(
   opts: {
@@ -1565,6 +1568,7 @@ export async function searchStocks(
     inSp500?: boolean | null
     inNasdaq100?: boolean | null
     marketCaps?: MarketCapTier[] | null
+    country?: string | null
     sort?: StockSearchSort
     order?: SortOrder
     limit?: number
@@ -1579,6 +1583,7 @@ export async function searchStocks(
   if (opts.inSp500) qs.set('in_sp500', 'true')
   if (opts.inNasdaq100) qs.set('in_nasdaq100', 'true')
   for (const t of opts.marketCaps ?? []) qs.append('market_cap', t)
+  if (opts.country) qs.set('country', opts.country)
   if (opts.sort) qs.set('sort', opts.sort)
   if (opts.order) qs.set('order', opts.order)
   if (opts.limit != null) qs.set('limit', String(opts.limit))
