@@ -24,7 +24,8 @@ function trend(overrides: Partial<StockTrend> = {}): StockTrend {
     timeframe: '1Day',
     reference_price: 214.3,
     reading: 'uptrend',
-    long_term: leg('up'),
+    long_term: leg('up', { period: 200 }),
+    medium_term: leg('up', { period: 50 }),
     short_term: leg('up', { period: 20 }),
     ...overrides,
   }
@@ -35,30 +36,37 @@ describe('TrendCard', () => {
     renderWithProviders(
       <TrendCard
         trend={trend({
-          reading: 'uptrend_pullback',
-          long_term: leg('up'),
+          reading: 'uptrend_weakening',
+          long_term: leg('up', { period: 200 }),
+          medium_term: leg('down', { period: 50 }),
           short_term: leg('down', { period: 20 }),
         })}
       />,
     )
-    expect(screen.getByText('Uptrend · pulling back')).toBeInTheDocument()
-    expect(screen.getByText(/pullback within an uptrend/i)).toBeInTheDocument()
+    expect(screen.getByText('Uptrend · weakening')).toBeInTheDocument()
+    expect(
+      screen.getByText(/intermediate trend has rolled over/i),
+    ).toBeInTheDocument()
   })
 
-  it('renders both horizons with their direction word and EMA', () => {
+  it('renders all three horizons with their direction word and EMA', () => {
     renderWithProviders(
       <TrendCard
         trend={trend({
           reading: 'uptrend_pullback',
-          long_term: leg('up'),
+          long_term: leg('up', { period: 200 }),
+          medium_term: leg('sideways', { period: 50 }),
           short_term: leg('down', { period: 20 }),
         })}
       />,
     )
     expect(screen.getByText('Long-term')).toBeInTheDocument()
+    expect(screen.getByText('Medium-term')).toBeInTheDocument()
     expect(screen.getByText('Short-term')).toBeInTheDocument()
     expect(screen.getByText('Rising')).toBeInTheDocument()
+    expect(screen.getByText('Flat')).toBeInTheDocument()
     expect(screen.getByText('Falling')).toBeInTheDocument()
+    expect(screen.getByText('200-day EMA')).toBeInTheDocument()
     expect(screen.getByText('50-day EMA')).toBeInTheDocument()
     expect(screen.getByText('20-day EMA')).toBeInTheDocument()
     // The EMA move renders as a signed percent.
@@ -71,34 +79,36 @@ describe('TrendCard', () => {
     expect(screen.getByText(/at \$214\.30/)).toBeInTheDocument()
   })
 
-  it('reads "Flat" for a sideways horizon', () => {
+  it('reads "Flat" for every sideways horizon', () => {
     renderWithProviders(
       <TrendCard
         trend={trend({
           reading: 'range_bound',
-          long_term: leg('sideways'),
+          long_term: leg('sideways', { period: 200 }),
+          medium_term: leg('sideways', { period: 50 }),
           short_term: leg('sideways', { period: 20 }),
         })}
       />,
     )
     expect(screen.getByText('Range-bound')).toBeInTheDocument()
-    expect(screen.getAllByText('Flat')).toHaveLength(2)
+    expect(screen.getAllByText('Flat')).toHaveLength(3)
   })
 
-  it('handles an unknown reading and a missing horizon gracefully', () => {
+  it('handles an unknown reading and missing horizons gracefully', () => {
     renderWithProviders(
       <TrendCard
         trend={trend({
           reading: 'unknown',
           long_term: null,
+          medium_term: null,
           short_term: leg('up', { period: 20 }),
         })}
       />,
     )
-    // The pill AND the missing long-horizon tile both read "Not enough history".
+    // The pill AND each missing horizon tile read "Not enough history".
     expect(
       screen.getAllByText('Not enough history').length,
-    ).toBeGreaterThanOrEqual(2)
+    ).toBeGreaterThanOrEqual(3)
     // The present short horizon still renders.
     expect(screen.getByText('Rising')).toBeInTheDocument()
   })

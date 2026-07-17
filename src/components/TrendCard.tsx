@@ -29,18 +29,27 @@ const DIRECTION: Record<
 }
 
 // The combined reading: its label, the colour it carries (the *long-term* trend
-// sets the primary hue — an uptrend stays green even while pulling back), and a
-// plain-language line explaining what the two horizons together mean.
+// sets the primary hue — an uptrend stays green even while weakening), and a
+// plain-language line explaining what the three horizons together mean. The long
+// horizon sets the primary trend, the medium horizon qualifies it (the early
+// warning), and the short horizon confirms strength (all aligned = strong_*).
 const READING: Record<
   TrendReading,
   { label: string; color: string; blurb: string }
 > = {
+  strong_uptrend: {
+    label: 'Strong uptrend',
+    color: 'success.main',
+    blurb:
+      'All three horizons are rising — near-term, intermediate and long-term ' +
+      'momentum all agree.',
+  },
   uptrend: {
     label: 'Uptrend',
     color: 'success.main',
     blurb:
-      'Both the short- and long-term trend are rising — near-term momentum ' +
-      'and the bigger picture agree.',
+      'The long-term trend is up, with the faster horizons leaning the same ' +
+      'way.',
   },
   uptrend_pullback: {
     label: 'Uptrend · pulling back',
@@ -49,19 +58,26 @@ const READING: Record<
       'The long-term trend is up, but price has turned down in the short ' +
       'term — a pullback within an uptrend, not a reversal (yet).',
   },
-  uptrend_consolidating: {
-    label: 'Uptrend · consolidating',
+  uptrend_weakening: {
+    label: 'Uptrend · weakening',
     color: 'success.main',
     blurb:
-      'The long-term trend is up while the short term has gone flat — the ' +
-      'stock is pausing, not turning over.',
+      'The long-term trend is still up, but the intermediate trend has rolled ' +
+      'over — an early warning the uptrend may be tiring.',
+  },
+  strong_downtrend: {
+    label: 'Strong downtrend',
+    color: 'error.main',
+    blurb:
+      'All three horizons are falling — near-term, intermediate and long-term ' +
+      'weakness all aligned.',
   },
   downtrend: {
     label: 'Downtrend',
     color: 'error.main',
     blurb:
-      'Both horizons are falling — near-term weakness in line with the ' +
-      'bigger trend.',
+      'The long-term trend is down, with the faster horizons leaning the same ' +
+      'way.',
   },
   downtrend_bounce: {
     label: 'Downtrend · bouncing',
@@ -70,36 +86,52 @@ const READING: Record<
       'The long-term trend is down, but price has ticked up short term — a ' +
       'bounce within a downtrend.',
   },
-  downtrend_stalling: {
-    label: 'Downtrend · stalling',
+  downtrend_recovering: {
+    label: 'Downtrend · recovering',
     color: 'error.main',
     blurb:
-      'The long-term trend is down while the short term has flattened — the ' +
-      'decline is losing momentum.',
+      'The long-term trend is still down, but the intermediate trend has ' +
+      'turned up — an early sign the decline may be easing.',
   },
   range_bound: {
     label: 'Range-bound',
     color: NEUTRAL,
-    blurb: 'Neither horizon is trending — the stock is drifting sideways.',
+    blurb:
+      'None of the three horizons is trending — the stock is drifting sideways.',
+  },
+  range_breaking_up: {
+    label: 'Range-bound · breaking up',
+    color: NEUTRAL,
+    blurb:
+      'The long-term trend is flat, but both faster horizons have turned up — ' +
+      'the range may be breaking upward.',
+  },
+  range_breaking_down: {
+    label: 'Range-bound · breaking down',
+    color: NEUTRAL,
+    blurb:
+      'The long-term trend is flat, but both faster horizons have turned ' +
+      'down — the range may be breaking downward.',
   },
   range_turning_up: {
     label: 'Range-bound · turning up',
     color: NEUTRAL,
     blurb:
-      'The long-term trend is flat, but the short term has started to rise.',
+      'The long-term trend is flat, but the faster horizons are tilting up.',
   },
   range_turning_down: {
     label: 'Range-bound · turning down',
     color: NEUTRAL,
     blurb:
-      'The long-term trend is flat, but the short term has started to fall.',
+      'The long-term trend is flat, but the faster horizons are tilting down.',
   },
   unknown: {
     label: 'Not enough history',
     color: 'text.secondary',
     blurb:
-      'There isn’t enough price history to read the trend at both horizons ' +
-      'yet — it fills in as more candles print.',
+      'There isn’t enough price history to read the trend at all three ' +
+      'horizons yet — the long-term read needs about 200 bars, and it fills ' +
+      'in as more candles print.',
   },
 }
 
@@ -267,10 +299,11 @@ function HorizonTile({
 }
 
 /**
- * The trend card: a stock's direction at a long and a short horizon, read from
- * the slope of two EMAs, plus the one-line reading that combines them (e.g.
- * "Uptrend · pulling back"). Long-term leads — it's the primary trend and sets
- * the reading's colour; the short term qualifies it.
+ * The trend card: a stock's direction at three horizons (long / medium / short),
+ * read from the slope of three EMAs, plus the one-line reading that combines them
+ * (e.g. "Uptrend · weakening"). Long-term leads — it's the primary trend and sets
+ * the reading's colour; the medium term qualifies it (the early warning) and the
+ * short term confirms strength.
  */
 export default function TrendCard({ trend }: { trend: StockTrend }) {
   const meta = READING[trend.reading] ?? READING.unknown
@@ -295,10 +328,10 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
               <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
                 Trend
               </Typography>
-              <InfoHint title="Read from the slope of a short and a long moving average (EMA) off the daily candles. It describes direction — not a price target — and isn’t investment advice." />
+              <InfoHint title="Read from the slope of three moving averages (EMA) — short, medium and long — off the daily candles. It describes direction — not a price target — and isn’t investment advice." />
             </Stack>
             <Typography variant="caption" color="text.secondary">
-              Short vs long-term direction
+              Short, medium &amp; long-term direction
               {hasPrice ? ` · at $${trend.reference_price.toFixed(2)}` : ''}
             </Typography>
           </Box>
@@ -340,17 +373,23 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
           {meta.blurb}
         </Typography>
 
-        {/* Long-term leads (the primary trend); short-term qualifies it. The
-            two slope arrows side by side make a divergence read at a glance. */}
+        {/* Long-term leads (the primary trend); medium qualifies it (the early
+            warning) and short confirms strength. The three slope arrows side by
+            side make a divergence read at a glance. */}
         <Box
           sx={{
             mt: 2,
             display: 'grid',
-            gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' },
+            gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' },
             gap: 1,
           }}
         >
           <HorizonTile label="Long-term" leg={trend.long_term} unit={unit} />
+          <HorizonTile
+            label="Medium-term"
+            leg={trend.medium_term}
+            unit={unit}
+          />
           <HorizonTile label="Short-term" leg={trend.short_term} unit={unit} />
         </Box>
       </CardContent>
