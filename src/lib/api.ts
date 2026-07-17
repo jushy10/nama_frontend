@@ -480,7 +480,7 @@ export interface EmaLine {
 
 /**
  * The EMA overlay for a ticker — one line per requested period (e.g. the
- * 9/21/50 set), drawn on the candle chart's price axis. `lines` is in the
+ * 9/20/50 set), drawn on the candle chart's price axis. `lines` is in the
  * order the periods were requested.
  */
 export interface EmaSeries {
@@ -2208,11 +2208,13 @@ export async function getStockTrend(
 }
 
 /**
- * The default EMA overlay: the 9 / 21 / 50 fast/intermediate moving averages plus
- * the 200-period long-term line (drawn as the neutral trend baseline). The backend
- * warms the 200 from history before the visible window, so it appears on any range.
+ * The default EMA overlay: the 9 / 20 / 50 fast/intermediate moving averages plus
+ * the 200-period long-term line (drawn as the neutral trend baseline). The 20 / 50 /
+ * 200 match the trend card's short/medium/long horizons, so every horizon it reports
+ * sits exactly on this chart. The backend warms the 200 from history before the
+ * visible window, so it appears on any range.
  */
-export const DEFAULT_EMA_PERIODS = [9, 21, 50, 200] as const
+export const DEFAULT_EMA_PERIODS = [9, 20, 50, 200] as const
 
 /**
  * Fetch the EMA overlay for a ticker. Mirrors `getCandles`' window handling
