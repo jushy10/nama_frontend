@@ -2198,8 +2198,12 @@ export async function getStockTrend(
   return data
 }
 
-/** The default EMA overlay: the 9 / 21 / 50-period moving averages. */
-export const DEFAULT_EMA_PERIODS = [9, 21, 50] as const
+/**
+ * The default EMA overlay: the 9 / 21 / 50 fast/intermediate moving averages plus
+ * the 200-period long-term line (drawn as the neutral trend baseline). The backend
+ * warms the 200 from history before the visible window, so it appears on any range.
+ */
+export const DEFAULT_EMA_PERIODS = [9, 21, 50, 200] as const
 
 /**
  * Fetch the EMA overlay for a ticker. Mirrors `getCandles`' window handling
