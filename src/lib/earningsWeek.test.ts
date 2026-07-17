@@ -1,10 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
   addDays,
+  buildForwardWeeks,
   buildWeek,
   dayOfWeek,
+  dayRelativeLabel,
+  firstForwardMonday,
+  forwardWindow,
   longDate,
   mondayOf,
+  spanLabel,
   todayIso,
   weekRangeLabel,
   weekdays,
@@ -150,5 +155,135 @@ describe('buildWeek — grouping the API days onto Mon–Fri slots', () => {
     ])
     expect(slots).toHaveLength(5)
     expect(slots.every((s) => s.items.length === 0)).toBe(true)
+  })
+})
+
+describe('spanLabel', () => {
+  it('collapses a single day to one date', () => {
+    expect(spanLabel('2026-07-17', '2026-07-17')).toBe('Jul 17, 2026')
+  })
+
+  it('collapses a same-month span', () => {
+    expect(spanLabel('2026-07-20', '2026-07-24')).toBe('Jul 20 – 24, 2026')
+  })
+
+  it('spells both months across a month boundary', () => {
+    expect(spanLabel('2026-06-29', '2026-07-03')).toBe('Jun 29 – Jul 3, 2026')
+  })
+
+  it('spells both years across New Year', () => {
+    expect(spanLabel('2026-12-28', '2027-01-01')).toBe(
+      'Dec 28, 2026 – Jan 1, 2027',
+    )
+  })
+})
+
+describe('firstForwardMonday', () => {
+  it("is this week's Monday on a weekday", () => {
+    expect(firstForwardMonday('2026-07-13')).toBe('2026-07-13') // Monday
+    expect(firstForwardMonday('2026-07-17')).toBe('2026-07-13') // Friday
+  })
+
+  it('rolls to next Monday on a weekend (no trading days left)', () => {
+    expect(firstForwardMonday('2026-07-18')).toBe('2026-07-20') // Saturday
+    expect(firstForwardMonday('2026-07-19')).toBe('2026-07-20') // Sunday
+  })
+})
+
+describe('forwardWindow', () => {
+  it('spans from today through the Friday of the last shown week', () => {
+    expect(forwardWindow('2026-07-17', 2)).toEqual({
+      from: '2026-07-17',
+      to: '2026-07-24', // Friday of next week
+    })
+  })
+
+  it('counts weeks from next week when today is a weekend', () => {
+    expect(forwardWindow('2026-07-18', 2)).toEqual({
+      from: '2026-07-18', // Saturday
+      to: '2026-07-31', // last Friday of the two forward weeks (07-20, 07-27)
+    })
+  })
+
+  it('opens a paged-forward window on its own Monday, never before today', () => {
+    // Friday 07-17, two weeks paged two weeks ahead → weeks of 07-27 and 08-03.
+    expect(forwardWindow('2026-07-17', 2, 2)).toEqual({
+      from: '2026-07-27',
+      to: '2026-08-07',
+    })
+  })
+})
+
+describe('dayRelativeLabel', () => {
+  it('names today and tomorrow, nothing else', () => {
+    expect(dayRelativeLabel('2026-07-17', '2026-07-17')).toBe('Today')
+    expect(dayRelativeLabel('2026-07-18', '2026-07-17')).toBe('Tomorrow')
+    expect(dayRelativeLabel('2026-07-20', '2026-07-17')).toBeNull()
+  })
+})
+
+describe('buildForwardWeeks — forward-only week sections from today', () => {
+  it("shows only the current week's remaining days, then full weeks ahead", () => {
+    const today = '2026-07-17' // Friday
+    const groups = buildForwardWeeks(today, 2, [
+      day('2026-07-17', [item('AAPL', '2026-07-17')]),
+      day('2026-07-21', [
+        item('MSFT', '2026-07-21'),
+        item('NVDA', '2026-07-21'),
+      ]),
+    ])
+
+    expect(groups).toHaveLength(2)
+
+    expect(groups[0].heading).toBe('This week')
+    expect(groups[0].rangeLabel).toBe('Jul 17, 2026')
+    expect(groups[0].slots.map((s) => s.date)).toEqual(['2026-07-17'])
+    expect(groups[0].count).toBe(1)
+
+    expect(groups[1].heading).toBe('Next week')
+    expect(groups[1].slots.map((s) => s.date)).toEqual([
+      '2026-07-20',
+      '2026-07-21',
+      '2026-07-22',
+      '2026-07-23',
+      '2026-07-24',
+    ])
+    expect(groups[1].slots[1].items.map((i) => i.ticker)).toEqual([
+      'MSFT',
+      'NVDA',
+    ])
+    expect(groups[1].count).toBe(2)
+  })
+
+  it('never carries a day before today', () => {
+    const today = '2026-07-17' // Friday; Mon–Thu are already past
+    const groups = buildForwardWeeks(today, 1, [
+      day('2026-07-15', [item('PAST', '2026-07-15')]), // Wednesday — passed
+      day('2026-07-17', [item('NOW', '2026-07-17')]),
+    ])
+    const dates = groups.flatMap((g) => g.slots.map((s) => s.date))
+    expect(dates.every((d) => d >= today)).toBe(true)
+    expect(dates).not.toContain('2026-07-15')
+  })
+
+  it('labels the first shown week "Next week" when viewed on a weekend', () => {
+    const groups = buildForwardWeeks('2026-07-18', 2, []) // Saturday
+    expect(groups[0].heading).toBe('Next week')
+    expect(groups[0].monday).toBe('2026-07-20')
+  })
+
+  it('pages forward by the offset, showing only future full weeks', () => {
+    const today = '2026-07-17' // Friday
+    const groups = buildForwardWeeks(
+      today,
+      2,
+      [day('2026-07-28', [item('AAPL', '2026-07-28')])],
+      2, // skip this week + next week
+    )
+    expect(groups.map((g) => g.monday)).toEqual(['2026-07-27', '2026-08-03'])
+    // A paged-ahead week is neither "this" nor "next", so it's labelled by range only.
+    expect(groups[0].heading).toBe('')
+    expect(groups[0].slots).toHaveLength(5)
+    expect(groups[0].count).toBe(1)
   })
 })

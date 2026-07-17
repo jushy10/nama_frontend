@@ -3510,13 +3510,16 @@ export async function getMarketBrief(
 /** One company scheduled to report on a calendar date. `when` is the scheduled
  *  report date; `session` is when in the trading day it's expected — `bmo` before
  *  open, `amc` after close, `during` intraday, `unknown` when no time is published.
- *  Optional so a stale backend (pre-`report_session`) still parses. */
+ *  `market_cap` (whole units of the listing's currency, off the screened anchor) drives
+ *  the large/mega-cap highlight. Both optional so a stale backend (pre-`report_session`,
+ *  pre-`market_cap`) still parses — an absent cap just means no highlight. */
 export interface EarningsCalendarItem {
   ticker: string
   name: string | null
   sector: string | null
   when: string
   session?: string | null
+  market_cap?: number | null
 }
 
 /** The reports scheduled for one calendar date, alphabetical by ticker. */
