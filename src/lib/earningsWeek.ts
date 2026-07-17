@@ -140,20 +140,31 @@ export function longDate(iso: IsoDate): string {
 }
 
 /**
- * A compact label for the Mon–Fri span, e.g. `Jul 14 – 18, 2026` — collapsing the
- * shared month/year, and widening to `Jun 29 – Jul 3, 2026` when the week straddles
- * a month (or a year) boundary.
+ * A compact label for an inclusive `[from, to]` date span. A single date collapses to
+ * `Jul 17, 2026`; a same-month span to `Jul 20 – 24, 2026`; a month straddle widens to
+ * `Jun 29 – Jul 3, 2026`; a year straddle spells both years. Used for the week-section
+ * ranges (where the current week starts *today*, not Monday), with `weekRangeLabel`
+ * delegating here for the fixed Mon–Fri case.
  */
-export function weekRangeLabel(monday: IsoDate): string {
-  const friday = addDays(monday, 4)
-  const a = parseIso(monday)
-  const b = parseIso(friday)
+export function spanLabel(fromIso: IsoDate, toIso: IsoDate): string {
+  const a = parseIso(fromIso)
+  const b = parseIso(toIso)
   const start = `${MONTHS_SHORT[a.m - 1]} ${a.d}`
+  if (fromIso === toIso) return `${start}, ${a.y}`
   if (a.y !== b.y) {
     return `${start}, ${a.y} – ${MONTHS_SHORT[b.m - 1]} ${b.d}, ${b.y}`
   }
   const end = a.m === b.m ? `${b.d}` : `${MONTHS_SHORT[b.m - 1]} ${b.d}`
   return `${start} – ${end}, ${b.y}`
+}
+
+/**
+ * A compact label for the Mon–Fri span, e.g. `Jul 14 – 18, 2026` — collapsing the
+ * shared month/year, and widening to `Jun 29 – Jul 3, 2026` when the week straddles
+ * a month (or a year) boundary.
+ */
+export function weekRangeLabel(monday: IsoDate): string {
+  return spanLabel(monday, addDays(monday, 4))
 }
 
 /** One day column of the week grid: its date and the reports scheduled that day. */
@@ -185,4 +196,105 @@ export function buildWeek(
     monthShort: monthShort(date),
     items: itemsByDate.get(date) ?? [],
   }))
+}
+
+/** Whether an ISO date is a weekend day (Sat/Sun) — no US company reports then. */
+function isWeekend(iso: IsoDate): boolean {
+  const dow = dayOfWeek(iso)
+  return dow === 0 || dow === 6
+}
+
+/**
+ * The Monday of the first week the *forward* calendar shows: this week's Monday on a
+ * weekday (so today's remaining days lead the view), or next week's Monday on a weekend
+ * (this week has no trading days left to show).
+ */
+export function firstForwardMonday(today: IsoDate): IsoDate {
+  const thisMonday = mondayOf(today)
+  return isWeekend(today) ? addDays(thisMonday, 7) : thisMonday
+}
+
+/**
+ * The inclusive `[from, to]` window the forward calendar fetches: from **today** through
+ * the Friday of the last shown week (`weeks` counted from the first forward week). This
+ * is what bounds the API read — starting at today means the response never carries a
+ * report that has already happened.
+ */
+export function forwardWindow(
+  today: IsoDate,
+  weeks: number,
+): { from: IsoDate; to: IsoDate } {
+  const firstMonday = firstForwardMonday(today)
+  const lastFriday = addDays(firstMonday, (Math.max(1, weeks) - 1) * 7 + 4)
+  return { from: today, to: lastFriday }
+}
+
+/** How a shown week relates to now — drives its `This week` / `Next week` heading. */
+export type WeekRelation = 'this' | 'next' | 'later'
+
+const RELATION_HEADING: Record<WeekRelation, string> = {
+  this: 'This week',
+  next: 'Next week',
+  later: '',
+}
+
+function weekRelation(monday: IsoDate, today: IsoDate): WeekRelation {
+  const thisMonday = mondayOf(today)
+  if (monday === thisMonday) return 'this'
+  if (monday === addDays(thisMonday, 7)) return 'next'
+  return 'later'
+}
+
+/** One week section of the forward calendar: its heading, the date span actually shown
+ *  (the current week starts today, so it can be a single day), the forward day slots,
+ *  and the total reports across them. */
+export interface WeekGroup {
+  monday: IsoDate
+  relation: WeekRelation
+  /** `This week`, `Next week`, or `''` for weeks further out (labelled by range only). */
+  heading: string
+  /** The span actually shown, e.g. `Jul 17, 2026` (a lone Friday) or `Jul 20 – 24, 2026`. */
+  rangeLabel: string
+  slots: DaySlot[]
+  count: number
+}
+
+/**
+ * Build the forward calendar as a list of week sections starting today, dropping every
+ * day already past. `weeks` sections are produced from the first forward week onward;
+ * each carries only its today-or-later weekday slots — so the current week shows just its
+ * remaining days (on a Friday, only Friday). A week with no forward weekday is omitted
+ * (e.g. the fully-past current week when viewed on a weekend). ISO date strings compare
+ * lexicographically, so `date >= today` is a correct "not in the past" test.
+ */
+export function buildForwardWeeks(
+  today: IsoDate,
+  weeks: number,
+  days: EarningsCalendarDay[],
+): WeekGroup[] {
+  const firstMonday = firstForwardMonday(today)
+  const groups: WeekGroup[] = []
+  for (let i = 0; i < Math.max(1, weeks); i++) {
+    const monday = addDays(firstMonday, i * 7)
+    const slots = buildWeek(monday, days).filter((s) => s.date >= today)
+    if (slots.length === 0) continue
+    const relation = weekRelation(monday, today)
+    groups.push({
+      monday,
+      relation,
+      heading: RELATION_HEADING[relation],
+      rangeLabel: spanLabel(slots[0].date, slots[slots.length - 1].date),
+      slots,
+      count: slots.reduce((n, s) => n + s.items.length, 0),
+    })
+  }
+  return groups
+}
+
+/** A friendly relative label for a day header — `Today`, `Tomorrow`, or `null` for any
+ *  other day (which shows its weekday/date instead). */
+export function dayRelativeLabel(iso: IsoDate, today: IsoDate): string | null {
+  if (iso === today) return 'Today'
+  if (iso === addDays(today, 1)) return 'Tomorrow'
+  return null
 }

@@ -4,18 +4,17 @@ import {
   Alert,
   Avatar,
   Box,
+  Button,
   Chip,
   Container,
-  IconButton,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import type { SvgIconProps } from '@mui/material'
-import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
-import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
-import TodayIcon from '@mui/icons-material/Today'
+import EventBusyIcon from '@mui/icons-material/EventBusy'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import WbTwilightIcon from '@mui/icons-material/WbTwilight'
 import NightsStayIcon from '@mui/icons-material/NightsStay'
 import WbSunnyIcon from '@mui/icons-material/WbSunny'
@@ -24,16 +23,23 @@ import { Link as RouterLink } from 'react-router-dom'
 import { humanizeClassification, stockLogoUrl } from '@/lib/api'
 import { errorMessage, useEarningsCalendar } from '@/lib/queries'
 import {
-  addDays,
-  buildWeek,
-  mondayOf,
+  buildForwardWeeks,
+  dayRelativeLabel,
+  forwardWindow,
   todayIso,
-  weekRangeLabel,
   type DaySlot,
+  type WeekGroup,
 } from '@/lib/earningsWeek'
 import { usePageMeta } from '@/lib/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
 import PageHero from '@/components/PageHero'
+
+// The forward view opens on two weeks (today's remaining days + next week — the API's
+// own default look-ahead), and "Show more" extends it a fortnight at a time up to a
+// six-week ceiling that stays well inside the backend's 92-day window clamp.
+const INITIAL_WEEKS = 2
+const WEEK_STEP = 2
+const MAX_WEEKS = 6
 
 interface SessionMeta {
   key: string
@@ -212,13 +218,26 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
   )
 }
 
-/** One weekday column: its date header (today highlighted) and the day's reports. */
-function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
+/**
+ * One day card: its date header (today and tomorrow called out by name, today ringed in
+ * the primary accent) and the day's reports grouped by session, or a muted "No reports"
+ * when the day is quiet.
+ */
+function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
+  const isToday = slot.date === today
+  const relative = dayRelativeLabel(slot.date, today)
+
   return (
     <Box
       sx={{
+        flex: '1 1 190px',
+        maxWidth: { xs: '100%', sm: 300, lg: 236 },
+        minWidth: 0,
         border: 1,
         borderColor: isToday ? 'primary.main' : 'divider',
+        boxShadow: isToday
+          ? (theme) => `0 0 0 1px ${theme.palette.primary.main}`
+          : 0,
         borderRadius: 2,
         overflow: 'hidden',
         display: 'flex',
@@ -240,7 +259,11 @@ function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
           spacing={1}
           sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
         >
-          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'baseline' }}>
+          <Stack
+            direction="row"
+            spacing={0.75}
+            sx={{ alignItems: 'baseline', minWidth: 0 }}
+          >
             <Typography
               variant="caption"
               sx={{
@@ -250,7 +273,7 @@ function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
                 color: isToday ? 'primary.main' : 'text.secondary',
               }}
             >
-              {slot.weekday}
+              {relative ?? slot.weekday}
             </Typography>
             <Typography sx={{ fontWeight: 700 }}>{slot.dayOfMonth}</Typography>
             <Typography variant="caption" color="text.secondary">
@@ -261,6 +284,7 @@ function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
             <Chip
               label={slot.items.length}
               size="small"
+              color={isToday ? 'primary' : 'default'}
               sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
             />
           )}
@@ -295,162 +319,250 @@ function DayColumn({ slot, isToday }: { slot: DaySlot; isToday: boolean }) {
   )
 }
 
-/** The five day columns laid out as a week — a grid on desktop, stacked on phones. */
-function WeekGrid({ slots, today }: { slots: DaySlot[]; today: string }) {
+/**
+ * One week section: a heading (This week / Next week / a bare date range further out)
+ * with the week's report count, then that week's forward day cards — or a single muted
+ * line when the whole week is quiet, so an off-season stretch stays compact instead of a
+ * wall of empty columns.
+ */
+function WeekSection({
+  group,
+  today,
+  index,
+}: {
+  group: WeekGroup
+  today: string
+  index: number
+}) {
   return (
     <Box
+      component="section"
       sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          sm: 'repeat(2, 1fr)',
-          lg: 'repeat(5, 1fr)',
+        '@keyframes weekIn': {
+          from: { opacity: 0, transform: 'translateY(10px)' },
+          to: { opacity: 1, transform: 'none' },
         },
-        gap: 1.5,
-        alignItems: 'stretch',
+        animation: `weekIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both`,
+        animationDelay: `${Math.min(index, 4) * 60}ms`,
+        '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
       }}
     >
-      {slots.map((slot) => (
-        <DayColumn key={slot.date} slot={slot} isToday={slot.date === today} />
-      ))}
+      <Stack
+        direction="row"
+        spacing={1.5}
+        sx={{ alignItems: 'baseline', mb: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}
+      >
+        {group.heading && (
+          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+            {group.heading}
+          </Typography>
+        )}
+        <Typography
+          variant="body2"
+          color="text.secondary"
+          sx={{ fontWeight: group.heading ? 400 : 700 }}
+        >
+          {group.rangeLabel}
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <Typography variant="caption" color="text.secondary">
+          {group.count} {group.count === 1 ? 'report' : 'reports'}
+        </Typography>
+      </Stack>
+
+      {group.count === 0 ? (
+        <Box
+          sx={{
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 2,
+            px: 2,
+            py: 1.5,
+            bgcolor: 'background.paper',
+          }}
+        >
+          <Typography variant="body2" color="text.disabled">
+            No earnings scheduled this week.
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            alignItems: 'stretch',
+          }}
+        >
+          {group.slots.map((slot) => (
+            <DayCard key={slot.date} slot={slot} today={today} />
+          ))}
+        </Box>
+      )}
     </Box>
   )
 }
 
-/** Skeleton week while the first read lands. */
-function LoadingGrid() {
+/** Skeleton while the first read lands: two placeholder week sections. */
+function LoadingState() {
+  return (
+    <Stack spacing={4}>
+      {[0, 1].map((section) => (
+        <Box key={section}>
+          <Skeleton variant="text" width={220} height={32} sx={{ mb: 1.5 }} />
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Skeleton
+                key={i}
+                variant="rounded"
+                height={200}
+                sx={{ flex: '1 1 190px', maxWidth: { lg: 236 } }}
+              />
+            ))}
+          </Box>
+        </Box>
+      ))}
+    </Stack>
+  )
+}
+
+/** Shown when the whole forward window carries no scheduled reports — off-season, or
+ *  before the sweep has populated the dates. */
+function EmptyState({
+  weeks,
+  onExtend,
+  canExtend,
+}: {
+  weeks: number
+  onExtend: () => void
+  canExtend: boolean
+}) {
   return (
     <Box
       sx={{
-        display: 'grid',
-        gridTemplateColumns: {
-          xs: '1fr',
-          sm: 'repeat(2, 1fr)',
-          lg: 'repeat(5, 1fr)',
-        },
-        gap: 1.5,
+        border: 1,
+        borderColor: 'divider',
+        borderRadius: 3,
+        bgcolor: 'background.paper',
+        px: 3,
+        py: 6,
+        textAlign: 'center',
       }}
     >
-      {[0, 1, 2, 3, 4].map((i) => (
-        <Skeleton key={i} variant="rounded" height={220} />
-      ))}
+      <EventBusyIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} />
+      <Typography sx={{ fontWeight: 700, mb: 0.5 }}>
+        No earnings scheduled
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ maxWidth: 420, mx: 'auto', mb: canExtend ? 2.5 : 0 }}
+      >
+        Nothing is on the calendar for the next {weeks} weeks. This is normal
+        between earnings seasons — check back closer to the next one.
+      </Typography>
+      {canExtend && (
+        <Button
+          variant="outlined"
+          size="small"
+          endIcon={<ExpandMoreIcon />}
+          onClick={onExtend}
+        >
+          Look further ahead
+        </Button>
+      )}
     </Box>
   )
 }
 
 /**
- * Earnings calendar (`/earnings-calendar`): a Monday–Friday agenda of which US
- * companies are scheduled to report earnings each day, pulled from the scheduled
- * dates the app already tracks across the ≥$1B universe. Navigate week to week;
- * each company links to its stock page. Best-effort — a quiet day (or a whole
- * quiet week) simply shows "No reports".
+ * Earnings calendar (`/earnings-calendar`): a forward-only agenda of which US companies
+ * are scheduled to report earnings, starting **today** and running week by week — the
+ * calendar never looks back, so a passed report drops off and the current week shows only
+ * its remaining days. Companies are grouped per day into before-open / after-close
+ * sessions, each linking to its stock page; "Show more" extends the horizon. Best-effort —
+ * a quiet week collapses to a single line, a fully quiet window to an empty state.
  */
 export default function EarningsCalendar() {
   usePageMeta(
     'Earnings Calendar — Upcoming US Earnings by Day | Nama Insights',
-    'A weekly calendar of upcoming US company earnings reports, grouped by day. See which S&P 500 and Nasdaq companies report and when.',
+    'A forward calendar of upcoming US company earnings reports, grouped by week and day. See which S&P 500 and Nasdaq companies report next and when.',
   )
 
-  const thisMonday = useMemo(() => mondayOf(todayIso()), [])
-  const [monday, setMonday] = useState(thisMonday)
-  const friday = addDays(monday, 4)
-  const today = todayIso()
+  const today = useMemo(() => todayIso(), [])
+  const [weeks, setWeeks] = useState(INITIAL_WEEKS)
+  const window = useMemo(() => forwardWindow(today, weeks), [today, weeks])
 
-  const { data, isLoading, isError, error } = useEarningsCalendar(
-    monday,
-    friday,
+  const { data, isLoading, isFetching, isError, error } = useEarningsCalendar(
+    window.from,
+    window.to,
   )
-  const slots = useMemo(
-    () => buildWeek(monday, data?.days ?? []),
-    [monday, data],
+  const groups = useMemo(
+    () => buildForwardWeeks(today, weeks, data?.days ?? []),
+    [today, weeks, data],
   )
   const total = data?.count ?? 0
+  const canExtend = weeks < MAX_WEEKS
+  const extend = () => setWeeks((w) => Math.min(MAX_WEEKS, w + WEEK_STEP))
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
       <Box sx={{ mb: 3 }}>
         <PageHero
           eyebrowIcon={CalendarMonthIcon}
           eyebrow="Earnings calendar"
-          title="Who reports this week"
-          subtitle="The US companies scheduled to report earnings this week, split into before the open and after the close each day. Dates are estimates and can change."
+          title="Who reports next"
+          subtitle="The US companies scheduled to report earnings from today onward, grouped by week and split into before the open and after the close each day. Dates are estimates and can change."
         />
       </Box>
 
-      {/* Week navigator: the range, prev/next, and a jump back to this week. */}
-      <Stack
-        direction="row"
-        spacing={1}
-        sx={{
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          mb: 2,
-          flexWrap: 'wrap',
-          rowGap: 1,
-        }}
-      >
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-          <IconButton
-            aria-label="Previous week"
-            onClick={() => setMonday((m) => addDays(m, -7))}
-            size="small"
-            sx={{ border: 1, borderColor: 'divider' }}
-          >
-            <ChevronLeftIcon />
-          </IconButton>
-          <IconButton
-            aria-label="Next week"
-            onClick={() => setMonday((m) => addDays(m, 7))}
-            size="small"
-            sx={{ border: 1, borderColor: 'divider' }}
-          >
-            <ChevronRightIcon />
-          </IconButton>
-          <Typography
-            sx={{
-              fontWeight: 700,
-              fontSize: '1.05rem',
-              ml: 1,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {weekRangeLabel(monday)}
-          </Typography>
-        </Stack>
-
-        <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          {!isLoading && (
-            <Typography variant="body2" color="text.secondary">
-              {total} {total === 1 ? 'report' : 'reports'}
-            </Typography>
-          )}
-          <Chip
-            icon={<TodayIcon />}
-            label="This week"
-            variant="outlined"
-            size="small"
-            onClick={() => setMonday(thisMonday)}
-            disabled={monday === thisMonday}
-            clickable={monday !== thisMonday}
-          />
-        </Stack>
-      </Stack>
+      {!isLoading && total > 0 && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          {total} upcoming {total === 1 ? 'report' : 'reports'}
+        </Typography>
+      )}
 
       {isError ? (
         <Alert severity="error" variant="outlined">
           {errorMessage(error, 'Could not load the earnings calendar.')}
         </Alert>
       ) : isLoading && !data ? (
-        <LoadingGrid />
+        <LoadingState />
+      ) : total === 0 ? (
+        <EmptyState weeks={weeks} onExtend={extend} canExtend={canExtend} />
       ) : (
-        <WeekGrid slots={slots} today={today} />
+        <>
+          <Stack spacing={4}>
+            {groups.map((group, i) => (
+              <WeekSection
+                key={group.monday}
+                group={group}
+                today={today}
+                index={i}
+              />
+            ))}
+          </Stack>
+
+          {canExtend && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+              <Button
+                variant="outlined"
+                endIcon={<ExpandMoreIcon />}
+                onClick={extend}
+                disabled={isFetching}
+              >
+                Show more weeks
+              </Button>
+            </Box>
+          )}
+        </>
       )}
 
       {data?.disclaimer && (
         <Typography
           variant="caption"
           color="text.secondary"
-          sx={{ display: 'block', mt: 2 }}
+          sx={{ display: 'block', mt: 3 }}
         >
           {data.disclaimer}
         </Typography>
