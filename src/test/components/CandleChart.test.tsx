@@ -76,6 +76,23 @@ describe('CandleChart EMA overlay', () => {
     expect(screen.queryByText('EMA 200')).not.toBeInTheDocument()
   })
 
+  it('draws the 200-EMA as a heavier neutral anchor, not a coloured line', () => {
+    const { container } = renderWithProviders(
+      <CandleChart
+        candles={CANDLES}
+        timeframe="1Day"
+        emaLines={[emaLine(200, [1, 2, 3])]}
+      />,
+    )
+    expect(screen.getByText('EMA 200')).toBeInTheDocument()
+    // The long-term line is the pale-slate anchor (the test theme is dark) at the
+    // heavier weight, and never one of the fast-line hues.
+    const anchor = container.querySelector('path[stroke="#cbd5e1"]')
+    expect(anchor).not.toBeNull()
+    expect(anchor?.getAttribute('stroke-width')).toBe('2')
+    expect(container.querySelector('path[stroke="#2dd4bf"]')).toBeNull()
+  })
+
   it('draws no EMA legend when none are supplied', () => {
     renderWithProviders(<CandleChart candles={CANDLES} timeframe="1Day" />)
     expect(screen.queryByText(/^EMA /)).not.toBeInTheDocument()
