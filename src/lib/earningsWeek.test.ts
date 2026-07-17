@@ -204,6 +204,14 @@ describe('forwardWindow', () => {
       to: '2026-07-31', // last Friday of the two forward weeks (07-20, 07-27)
     })
   })
+
+  it('opens a paged-forward window on its own Monday, never before today', () => {
+    // Friday 07-17, two weeks paged two weeks ahead → weeks of 07-27 and 08-03.
+    expect(forwardWindow('2026-07-17', 2, 2)).toEqual({
+      from: '2026-07-27',
+      to: '2026-08-07',
+    })
+  })
 })
 
 describe('dayRelativeLabel', () => {
@@ -262,5 +270,20 @@ describe('buildForwardWeeks — forward-only week sections from today', () => {
     const groups = buildForwardWeeks('2026-07-18', 2, []) // Saturday
     expect(groups[0].heading).toBe('Next week')
     expect(groups[0].monday).toBe('2026-07-20')
+  })
+
+  it('pages forward by the offset, showing only future full weeks', () => {
+    const today = '2026-07-17' // Friday
+    const groups = buildForwardWeeks(
+      today,
+      2,
+      [day('2026-07-28', [item('AAPL', '2026-07-28')])],
+      2, // skip this week + next week
+    )
+    expect(groups.map((g) => g.monday)).toEqual(['2026-07-27', '2026-08-03'])
+    // A paged-ahead week is neither "this" nor "next", so it's labelled by range only.
+    expect(groups[0].heading).toBe('')
+    expect(groups[0].slots).toHaveLength(5)
+    expect(groups[0].count).toBe(1)
   })
 })

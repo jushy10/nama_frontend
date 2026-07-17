@@ -4,17 +4,20 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   Container,
+  IconButton,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material'
 import type { SvgIconProps } from '@mui/material'
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth'
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
+import TodayIcon from '@mui/icons-material/Today'
 import EventBusyIcon from '@mui/icons-material/EventBusy'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import StarIcon from '@mui/icons-material/Star'
 import WbTwilightIcon from '@mui/icons-material/WbTwilight'
 import NightsStayIcon from '@mui/icons-material/NightsStay'
 import WbSunnyIcon from '@mui/icons-material/WbSunny'
@@ -26,6 +29,7 @@ import {
   buildForwardWeeks,
   dayRelativeLabel,
   forwardWindow,
+  spanLabel,
   todayIso,
   type DaySlot,
   type WeekGroup,
@@ -34,27 +38,53 @@ import { usePageMeta } from '@/lib/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
 import PageHero from '@/components/PageHero'
 
-// The forward view opens on two weeks (today's remaining days + next week — the API's
-// own default look-ahead), and "Show more" extends it a fortnight at a time up to a
-// six-week ceiling that stays well inside the backend's 92-day window clamp.
-const INITIAL_WEEKS = 2
+// The view shows a two-week window and pages a fortnight at a time. `offset` counts weeks
+// past the first forward week; it never goes below 0 (so the calendar can't page into the
+// past) and is capped so the furthest window stays inside the backend's 92-day clamp.
+const VISIBLE_WEEKS = 2
 const WEEK_STEP = 2
-const MAX_WEEKS = 6
+const MAX_OFFSET = 10
+
+// Market-cap tiers for the "important names" highlight. Large-cap and above get emphasised;
+// mega-cap additionally earns a star. Thresholds are nominal (the anchor's cap is in the
+// listing's own currency), which is plenty precise for a visual cue.
+const LARGE_CAP = 10e9 // $10B
+const MEGA_CAP = 200e9 // $200B
+
+type CapTier = 'mega' | 'large' | null
+
+/** The highlight tier for a market cap, or `null` for sub-large-cap / unknown (no highlight,
+ *  which is also what a backend that doesn't yet send `market_cap` yields). */
+function capTier(marketCap?: number | null): CapTier {
+  if (marketCap == null) return null
+  if (marketCap >= MEGA_CAP) return 'mega'
+  if (marketCap >= LARGE_CAP) return 'large'
+  return null
+}
+
+/** A compact market-cap label, e.g. `$3.1T`, `$45B`, `$920M`. */
+function formatMarketCap(n: number): string {
+  if (n >= 1e12) return `$${(n / 1e12).toFixed(n >= 1e13 ? 0 : 1)}T`
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(n >= 1e11 ? 0 : 1)}B`
+  if (n >= 1e6) return `$${Math.round(n / 1e6)}M`
+  return `$${Math.round(n)}`
+}
 
 interface SessionMeta {
   key: string
   label: string
   Icon: ComponentType<SvgIconProps>
   color: string
+  order: number
 }
 
 /**
- * How each reporting session reads at a glance, and the order the day's reports are
- * grouped in — chronologically through the trading day: before open, intraday, after
- * close, then time-not-set. On brand: a gold sunrise for before-open (morning), a navy
- * moon for after-close (night) — the app's two accent colours doubling as a time-of-day
- * cue. `during` is the rare intraday case; `unknown` (or a stale backend that omits
- * `session`) collects under a muted "Time TBD".
+ * How each reporting session reads at a glance, and the order reports sort within a day
+ * (chronologically through the trading day: before open, intraday, after close, then
+ * time-not-set). On brand: a gold sunrise for before-open (morning), a navy moon for
+ * after-close (night) — the app's two accent colours doubling as a time-of-day cue, now
+ * shown as a small per-row marker rather than a group header. `unknown` (or a stale backend
+ * that omits `session`) reads as a muted "Time TBD".
  */
 const SESSION_GROUPS: readonly SessionMeta[] = [
   {
@@ -62,24 +92,28 @@ const SESSION_GROUPS: readonly SessionMeta[] = [
     label: 'Before open',
     Icon: WbTwilightIcon,
     color: 'secondary.main',
+    order: 0,
   },
   {
     key: 'during',
     label: 'During hours',
     Icon: WbSunnyIcon,
     color: 'text.secondary',
+    order: 1,
   },
   {
     key: 'amc',
     label: 'After close',
     Icon: NightsStayIcon,
     color: 'primary.main',
+    order: 2,
   },
   {
     key: 'unknown',
     label: 'Time TBD',
     Icon: ScheduleIcon,
     color: 'text.disabled',
+    order: 3,
   },
 ]
 
@@ -87,21 +121,31 @@ const SESSION_BY_KEY: Record<string, SessionMeta> = Object.fromEntries(
   SESSION_GROUPS.map((g) => [g.key, g]),
 )
 
-/** The session an item belongs to for grouping — anything unrecognized (or an absent
- *  session from a stale backend) falls into `unknown` so no report is ever dropped. */
-function sessionKey(item: EarningsCalendarItem): string {
-  return item.session && SESSION_BY_KEY[item.session] ? item.session : 'unknown'
+/** The session meta an item reads under — anything unrecognized (or an absent session from a
+ *  stale backend) falls back to `unknown` so no report is ever mis-marked or dropped. */
+function sessionOf(item: EarningsCalendarItem): SessionMeta {
+  return (
+    (item.session && SESSION_BY_KEY[item.session]) || SESSION_BY_KEY.unknown
+  )
 }
 
-/** Split a day's reports into the session groups that actually have reports, in
- *  chronological session order (before open → after close → time TBD). */
-function groupBySession(
-  items: EarningsCalendarItem[],
-): { meta: SessionMeta; items: EarningsCalendarItem[] }[] {
-  return SESSION_GROUPS.map((meta) => ({
-    meta,
-    items: items.filter((it) => sessionKey(it) === meta.key),
-  })).filter((g) => g.items.length > 0)
+/** Rank for the cap-tier sort — mega first, then large, then the rest. */
+function capRank(item: EarningsCalendarItem): number {
+  const tier = capTier(item.market_cap)
+  return tier === 'mega' ? 0 : tier === 'large' ? 1 : 2
+}
+
+/** Order a day's reports for the ungrouped list: the biggest names first (so the important
+ *  ones lead), then by session through the trading day, then alphabetical. */
+function compareItems(
+  a: EarningsCalendarItem,
+  b: EarningsCalendarItem,
+): number {
+  return (
+    capRank(a) - capRank(b) ||
+    sessionOf(a).order - sessionOf(b).order ||
+    a.ticker.localeCompare(b.ticker)
+  )
 }
 
 /** Company logo in a white rounded tile, falling back to the ticker's initial — the
@@ -129,37 +173,19 @@ function StockLogo({ symbol }: { symbol: string }) {
   )
 }
 
-/** The header for one session group within a day: its icon, label, and how many report. */
-function SessionHeader({ meta, count }: { meta: SessionMeta; count: number }) {
-  const { label, Icon, color } = meta
-  return (
-    <Stack
-      direction="row"
-      spacing={0.75}
-      sx={{ alignItems: 'center', px: 1, py: 0.5 }}
-    >
-      <Icon sx={{ fontSize: 15, color }} />
-      <Typography
-        variant="caption"
-        sx={{
-          fontWeight: 700,
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          color: 'text.secondary',
-        }}
-      >
-        {label}
-      </Typography>
-      <Typography variant="caption" color="text.disabled">
-        {count}
-      </Typography>
-    </Stack>
-  )
-}
-
-/** One company row: logo, ticker over its company name, sector as a right-aligned
- *  caption — the whole row links to the stock. */
+/**
+ * One company row: a session marker (gold sunrise before open, navy moon after close), the
+ * logo, ticker over company name, and sector. A large-cap-or-bigger name is highlighted — a
+ * gold left rule and tint, plus a star and its market-cap label for mega-caps — so the
+ * important reports stand out in the flat, ungrouped day list. The whole row links to the
+ * stock.
+ */
 function ReportRow({ item }: { item: EarningsCalendarItem }) {
+  const tier = capTier(item.market_cap)
+  const notable = tier !== null
+  const session = sessionOf(item)
+  const SessionIcon = session.Icon
+
   return (
     <Box
       component={RouterLink}
@@ -169,10 +195,13 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
         textDecoration: 'none',
         color: 'inherit',
         borderRadius: 1.5,
+        borderLeft: '2px solid',
+        borderLeftColor: notable ? 'secondary.main' : 'transparent',
+        bgcolor: notable ? 'action.hover' : 'transparent',
         px: 1,
         py: 0.75,
         transition: 'background-color 120ms ease',
-        '&:hover': { bgcolor: 'action.hover' },
+        '&:hover': { bgcolor: 'action.selected' },
         '&:focus-visible': {
           outline: 2,
           outlineColor: 'primary.main',
@@ -180,7 +209,11 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
         },
       }}
     >
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+      <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+        <SessionIcon
+          titleAccess={session.label}
+          sx={{ fontSize: 14, color: session.color, flexShrink: 0 }}
+        />
         <StockLogo symbol={item.ticker} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Stack
@@ -188,9 +221,18 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
             spacing={1}
             sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
           >
-            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
-              {item.ticker}
-            </Typography>
+            <Stack
+              direction="row"
+              spacing={0.4}
+              sx={{ alignItems: 'center', minWidth: 0 }}
+            >
+              <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+                {item.ticker}
+              </Typography>
+              {tier === 'mega' && (
+                <StarIcon sx={{ fontSize: 12, color: 'secondary.main' }} />
+              )}
+            </Stack>
             {item.sector && (
               <Typography
                 variant="caption"
@@ -202,16 +244,36 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
               </Typography>
             )}
           </Stack>
-          {item.name && (
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              noWrap
-              sx={{ display: 'block' }}
-            >
-              {item.name}
-            </Typography>
-          )}
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
+          >
+            {item.name ? (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                noWrap
+                sx={{ minWidth: 0 }}
+              >
+                {item.name}
+              </Typography>
+            ) : (
+              <span />
+            )}
+            {notable && item.market_cap != null && (
+              <Typography
+                variant="caption"
+                sx={{
+                  color: 'secondary.main',
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+              >
+                {formatMarketCap(item.market_cap)}
+              </Typography>
+            )}
+          </Stack>
         </Box>
       </Stack>
     </Box>
@@ -219,13 +281,15 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
 }
 
 /**
- * One day card: its date header (today and tomorrow called out by name, today ringed in
- * the primary accent) and the day's reports grouped by session, or a muted "No reports"
+ * One day card: its date header (today and tomorrow called out by name, today ringed in the
+ * primary accent) and the day's reports as a single, ungrouped list — largest companies
+ * first, each row carrying its own before-open / after-close marker — or a muted "No reports"
  * when the day is quiet.
  */
 function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
   const isToday = slot.date === today
   const relative = dayRelativeLabel(slot.date, today)
+  const items = useMemo(() => [...slot.items].sort(compareItems), [slot.items])
 
   return (
     <Box
@@ -280,9 +344,9 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
               {slot.monthShort}
             </Typography>
           </Stack>
-          {slot.items.length > 0 && (
+          {items.length > 0 && (
             <Chip
-              label={slot.items.length}
+              label={items.length}
               size="small"
               color={isToday ? 'primary' : 'default'}
               sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
@@ -292,7 +356,7 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
       </Box>
 
       <Box sx={{ p: 0.75, flex: 1 }}>
-        {slot.items.length === 0 ? (
+        {items.length === 0 ? (
           <Typography
             variant="caption"
             color="text.disabled"
@@ -301,16 +365,9 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
             No reports
           </Typography>
         ) : (
-          <Stack spacing={1}>
-            {groupBySession(slot.items).map((group) => (
-              <Box key={group.meta.key}>
-                <SessionHeader meta={group.meta} count={group.items.length} />
-                <Stack spacing={0.25}>
-                  {group.items.map((item) => (
-                    <ReportRow key={item.ticker} item={item} />
-                  ))}
-                </Stack>
-              </Box>
+          <Stack spacing={0.25}>
+            {items.map((item) => (
+              <ReportRow key={item.ticker} item={item} />
             ))}
           </Stack>
         )}
@@ -320,10 +377,10 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
 }
 
 /**
- * One week section: a heading (This week / Next week / a bare date range further out)
- * with the week's report count, then that week's forward day cards — or a single muted
- * line when the whole week is quiet, so an off-season stretch stays compact instead of a
- * wall of empty columns.
+ * One week section: a heading (This week / Next week / a bare date range further out) with
+ * the week's report count, then that week's forward day cards — or a single muted line when
+ * the whole week is quiet, so an off-season stretch stays compact instead of a wall of empty
+ * columns.
  */
 function WeekSection({
   group,
@@ -403,6 +460,95 @@ function WeekSection({
   )
 }
 
+/**
+ * The forward week navigator: page earlier / later a fortnight at a time (earlier is disabled
+ * at the current week, so the calendar never looks back), the visible date range, the window's
+ * report count, and a jump back to this week.
+ */
+function WeekNav({
+  rangeLabel,
+  total,
+  showCount,
+  canPrev,
+  canNext,
+  atStart,
+  onPrev,
+  onNext,
+  onReset,
+}: {
+  rangeLabel: string
+  total: number
+  showCount: boolean
+  canPrev: boolean
+  canNext: boolean
+  atStart: boolean
+  onPrev: () => void
+  onNext: () => void
+  onReset: () => void
+}) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      sx={{
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        mb: 2.5,
+        flexWrap: 'wrap',
+        rowGap: 1,
+      }}
+    >
+      <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+        <IconButton
+          aria-label="Earlier weeks"
+          onClick={onPrev}
+          disabled={!canPrev}
+          size="small"
+          sx={{ border: 1, borderColor: 'divider' }}
+        >
+          <ChevronLeftIcon />
+        </IconButton>
+        <IconButton
+          aria-label="Later weeks"
+          onClick={onNext}
+          disabled={!canNext}
+          size="small"
+          sx={{ border: 1, borderColor: 'divider' }}
+        >
+          <ChevronRightIcon />
+        </IconButton>
+        <Typography
+          sx={{
+            fontWeight: 700,
+            fontSize: '1.05rem',
+            ml: 1,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {rangeLabel}
+        </Typography>
+      </Stack>
+
+      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+        {showCount && (
+          <Typography variant="body2" color="text.secondary">
+            {total} {total === 1 ? 'report' : 'reports'}
+          </Typography>
+        )}
+        <Chip
+          icon={<TodayIcon />}
+          label="This week"
+          variant="outlined"
+          size="small"
+          onClick={onReset}
+          disabled={atStart}
+          clickable={!atStart}
+        />
+      </Stack>
+    </Stack>
+  )
+}
+
 /** Skeleton while the first read lands: two placeholder week sections. */
 function LoadingState() {
   return (
@@ -426,17 +572,10 @@ function LoadingState() {
   )
 }
 
-/** Shown when the whole forward window carries no scheduled reports — off-season, or
- *  before the sweep has populated the dates. */
-function EmptyState({
-  weeks,
-  onExtend,
-  canExtend,
-}: {
-  weeks: number
-  onExtend: () => void
-  canExtend: boolean
-}) {
+/** Shown when the visible window carries no scheduled reports — off-season, a paged-ahead
+ *  quiet stretch, or before the sweep has populated the dates. The navigator above handles
+ *  moving on. */
+function EmptyState() {
   return (
     <Box
       sx={{
@@ -456,54 +595,48 @@ function EmptyState({
       <Typography
         variant="body2"
         color="text.secondary"
-        sx={{ maxWidth: 420, mx: 'auto', mb: canExtend ? 2.5 : 0 }}
+        sx={{ maxWidth: 420, mx: 'auto' }}
       >
-        Nothing is on the calendar for the next {weeks} weeks. This is normal
-        between earnings seasons — check back closer to the next one.
+        Nothing is on the calendar for these weeks. Use the arrows to look
+        further ahead, or check back closer to earnings season.
       </Typography>
-      {canExtend && (
-        <Button
-          variant="outlined"
-          size="small"
-          endIcon={<ExpandMoreIcon />}
-          onClick={onExtend}
-        >
-          Look further ahead
-        </Button>
-      )}
     </Box>
   )
 }
 
 /**
- * Earnings calendar (`/earnings-calendar`): a forward-only agenda of which US companies
- * are scheduled to report earnings, starting **today** and running week by week — the
- * calendar never looks back, so a passed report drops off and the current week shows only
- * its remaining days. Companies are grouped per day into before-open / after-close
- * sessions, each linking to its stock page; "Show more" extends the horizon. Best-effort —
- * a quiet week collapses to a single line, a fully quiet window to an empty state.
+ * Earnings calendar (`/earnings-calendar`): a forward-only agenda of which US companies are
+ * scheduled to report earnings, starting **today** and paged forward a fortnight at a time —
+ * the calendar never looks back, so a passed report drops off and the current week shows only
+ * its remaining days. Each day is an ungrouped list ordered largest-company-first, with
+ * before-open / after-close marked per row and large/mega-caps highlighted; every row links
+ * to its stock. Best-effort — a quiet week collapses to a line, a quiet window to an empty
+ * state.
  */
 export default function EarningsCalendar() {
   usePageMeta(
     'Earnings Calendar — Upcoming US Earnings by Day | Nama Insights',
-    'A forward calendar of upcoming US company earnings reports, grouped by week and day. See which S&P 500 and Nasdaq companies report next and when.',
+    'A forward calendar of upcoming US company earnings reports, grouped by week and day, biggest names first. See which S&P 500 and Nasdaq companies report next and when.',
   )
 
   const today = useMemo(() => todayIso(), [])
-  const [weeks, setWeeks] = useState(INITIAL_WEEKS)
-  const window = useMemo(() => forwardWindow(today, weeks), [today, weeks])
+  const [offset, setOffset] = useState(0)
+  const window = useMemo(
+    () => forwardWindow(today, VISIBLE_WEEKS, offset),
+    [today, offset],
+  )
 
-  const { data, isLoading, isFetching, isError, error } = useEarningsCalendar(
+  const { data, isLoading, isError, error } = useEarningsCalendar(
     window.from,
     window.to,
   )
   const groups = useMemo(
-    () => buildForwardWeeks(today, weeks, data?.days ?? []),
-    [today, weeks, data],
+    () => buildForwardWeeks(today, VISIBLE_WEEKS, data?.days ?? [], offset),
+    [today, offset, data],
   )
   const total = data?.count ?? 0
-  const canExtend = weeks < MAX_WEEKS
-  const extend = () => setWeeks((w) => Math.min(MAX_WEEKS, w + WEEK_STEP))
+  const atStart = offset === 0
+  const rangeLabel = useMemo(() => spanLabel(window.from, window.to), [window])
 
   return (
     <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
@@ -512,15 +645,21 @@ export default function EarningsCalendar() {
           eyebrowIcon={CalendarMonthIcon}
           eyebrow="Earnings calendar"
           title="Who reports next"
-          subtitle="The US companies scheduled to report earnings from today onward, grouped by week and split into before the open and after the close each day. Dates are estimates and can change."
+          subtitle="Upcoming US earnings from today onward, biggest names first — page ahead week by week to see who reports and when. Dates are estimates and can change."
         />
       </Box>
 
-      {!isLoading && total > 0 && (
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
-          {total} upcoming {total === 1 ? 'report' : 'reports'}
-        </Typography>
-      )}
+      <WeekNav
+        rangeLabel={rangeLabel}
+        total={total}
+        showCount={!isLoading && total > 0}
+        canPrev={offset > 0}
+        canNext={offset < MAX_OFFSET}
+        atStart={atStart}
+        onPrev={() => setOffset((o) => Math.max(0, o - WEEK_STEP))}
+        onNext={() => setOffset((o) => Math.min(MAX_OFFSET, o + WEEK_STEP))}
+        onReset={() => setOffset(0)}
+      />
 
       {isError ? (
         <Alert severity="error" variant="outlined">
@@ -529,33 +668,18 @@ export default function EarningsCalendar() {
       ) : isLoading && !data ? (
         <LoadingState />
       ) : total === 0 ? (
-        <EmptyState weeks={weeks} onExtend={extend} canExtend={canExtend} />
+        <EmptyState />
       ) : (
-        <>
-          <Stack spacing={4}>
-            {groups.map((group, i) => (
-              <WeekSection
-                key={group.monday}
-                group={group}
-                today={today}
-                index={i}
-              />
-            ))}
-          </Stack>
-
-          {canExtend && (
-            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-              <Button
-                variant="outlined"
-                endIcon={<ExpandMoreIcon />}
-                onClick={extend}
-                disabled={isFetching}
-              >
-                Show more weeks
-              </Button>
-            </Box>
-          )}
-        </>
+        <Stack spacing={4}>
+          {groups.map((group, i) => (
+            <WeekSection
+              key={group.monday}
+              group={group}
+              today={today}
+              index={i}
+            />
+          ))}
+        </Stack>
       )}
 
       {data?.disclaimer && (

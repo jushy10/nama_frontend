@@ -215,18 +215,24 @@ export function firstForwardMonday(today: IsoDate): IsoDate {
 }
 
 /**
- * The inclusive `[from, to]` window the forward calendar fetches: from **today** through
- * the Friday of the last shown week (`weeks` counted from the first forward week). This
- * is what bounds the API read — starting at today means the response never carries a
- * report that has already happened.
+ * The inclusive `[from, to]` window the forward calendar fetches: `weeks` weeks starting
+ * `offset` weeks past the first forward week. This is what bounds the API read — because
+ * `offset` never goes negative, the window can never start before today (at `offset` 0 it
+ * starts exactly today), so a paged-forward view still never asks for a past report.
  */
 export function forwardWindow(
   today: IsoDate,
   weeks: number,
+  offset = 0,
 ): { from: IsoDate; to: IsoDate } {
   const firstMonday = firstForwardMonday(today)
-  const lastFriday = addDays(firstMonday, (Math.max(1, weeks) - 1) * 7 + 4)
-  return { from: today, to: lastFriday }
+  const w = Math.max(1, weeks)
+  const o = Math.max(0, offset)
+  // At the first page (offset 0) the window opens on today's partial week; a later page
+  // opens on that page's Monday.
+  const from = o === 0 ? today : addDays(firstMonday, o * 7)
+  const to = addDays(firstMonday, (o + w - 1) * 7 + 4)
+  return { from, to }
 }
 
 /** How a shown week relates to now — drives its `This week` / `Next week` heading. */
@@ -260,21 +266,24 @@ export interface WeekGroup {
 }
 
 /**
- * Build the forward calendar as a list of week sections starting today, dropping every
- * day already past. `weeks` sections are produced from the first forward week onward;
- * each carries only its today-or-later weekday slots — so the current week shows just its
- * remaining days (on a Friday, only Friday). A week with no forward weekday is omitted
- * (e.g. the fully-past current week when viewed on a weekend). ISO date strings compare
- * lexicographically, so `date >= today` is a correct "not in the past" test.
+ * Build the forward calendar as a list of week sections, dropping every day already past.
+ * `weeks` sections are produced starting `offset` weeks past the first forward week; each
+ * carries only its today-or-later weekday slots — so the *current* week (offset 0) shows
+ * just its remaining days (on a Friday, only Friday), while a paged-forward week shows in
+ * full. A week with no forward weekday is omitted (e.g. the fully-past current week when
+ * viewed on a weekend). ISO date strings compare lexicographically, so `date >= today` is
+ * a correct "not in the past" test.
  */
 export function buildForwardWeeks(
   today: IsoDate,
   weeks: number,
   days: EarningsCalendarDay[],
+  offset = 0,
 ): WeekGroup[] {
   const firstMonday = firstForwardMonday(today)
+  const o = Math.max(0, offset)
   const groups: WeekGroup[] = []
-  for (let i = 0; i < Math.max(1, weeks); i++) {
+  for (let i = o; i < o + Math.max(1, weeks); i++) {
     const monday = addDays(firstMonday, i * 7)
     const slots = buildWeek(monday, days).filter((s) => s.date >= today)
     if (slots.length === 0) continue
