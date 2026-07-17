@@ -444,7 +444,13 @@ export default function StockDetail({ symbol }: { symbol: string }) {
               grid collapses to a single column: snapshot, chart, trend, then the
               AI take. */}
           <CardGrid
-            template={{ xs: '1fr', md: 'minmax(0, 5fr) minmax(0, 7fr)' }}
+            template={{
+              // minmax(0, 1fr) — not a bare 1fr — so the single mobile column
+              // can't be stretched past the viewport by a child's min-content
+              // (the AI overview card), which pushed the page ~78px wide.
+              xs: 'minmax(0, 1fr)',
+              md: 'minmax(0, 5fr) minmax(0, 7fr)',
+            }}
           >
             <Stack spacing={PANEL_GAP}>
               {/* The snapshot: what this is and where it trades, the key stats,
