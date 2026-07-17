@@ -657,14 +657,14 @@ describe('getStockTrend', () => {
 describe('getEma', () => {
   afterEach(() => vi.unstubAllGlobals())
 
-  it('requests the default 9/21/50/200 periods over the chart range', async () => {
+  it('requests the default 9/20/50/200 periods over the chart range', async () => {
     let requestedUrl = ''
     const body = {
       symbol: 'AAPL',
       timeframe: '1Day',
       lines: [
         { period: 9, count: 1, latest: 201.1, points: [] },
-        { period: 21, count: 1, latest: 195.4, points: [] },
+        { period: 20, count: 1, latest: 195.4, points: [] },
         { period: 50, count: 1, latest: 190.2, points: [] },
         { period: 200, count: 1, latest: 180.7, points: [] },
       ],
@@ -689,10 +689,10 @@ describe('getEma', () => {
     expect(requestedUrl).toContain('range=6M')
     // One repeated `period` param per requested line.
     expect(requestedUrl).toContain('period=9')
-    expect(requestedUrl).toContain('period=21')
+    expect(requestedUrl).toContain('period=20')
     expect(requestedUrl).toContain('period=50')
     expect(requestedUrl).toContain('period=200')
-    expect(result.lines.map((l) => l.period)).toEqual([9, 21, 50, 200])
+    expect(result.lines.map((l) => l.period)).toEqual([9, 20, 50, 200])
   })
 
   it('throws an ApiError carrying the server detail on a non-2xx', async () => {

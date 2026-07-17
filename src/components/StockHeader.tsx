@@ -7,9 +7,12 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
+import BedtimeOutlinedIcon from '@mui/icons-material/BedtimeOutlined'
+import WbTwilightOutlinedIcon from '@mui/icons-material/WbTwilightOutlined'
 import {
   humanizeClassification,
   stockLogoUrl,
+  type ExtendedHours,
   type TickerCard,
 } from '@/lib/api'
 import { heroWash } from '@/components/heroWash'
@@ -19,6 +22,26 @@ import { brand } from '@/theme'
 // the detail opens on the same house accent that heads the whole app.
 const BRAND_LINE = `linear-gradient(90deg, transparent 0%, ${brand.blue} 26%, ${brand.gold} 74%, transparent 100%)`
 
+// The two extended-hours sessions, each with its at-a-glance mark. Colours match
+// MarketStatusDot's phase palette (amber pre-market, blue after-hours) so the two
+// reads of "where the market is" stay in sync; the moon/sunrise icons carry the
+// meaning without a coloured status dot the header doesn't need.
+const SESSION_META: Record<
+  ExtendedHours['session'],
+  { label: string; color: string; Icon: typeof WbTwilightOutlinedIcon }
+> = {
+  pre_market: {
+    label: 'Pre-Market',
+    color: '#fbbf24',
+    Icon: WbTwilightOutlinedIcon,
+  },
+  after_hours: {
+    label: 'After Hours',
+    color: '#7aa5f2',
+    Icon: BedtimeOutlinedIcon,
+  },
+}
+
 const fmt = (n: number | null) =>
   n == null
     ? '—'
@@ -26,6 +49,16 @@ const fmt = (n: number | null) =>
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })
+
+// One reusable ET wall-clock, so the extended print's timestamp reads in market
+// time ("4:33 PM ET") no matter the viewer's zone — the honest "as of" for a
+// snapshot the card fetches once, not a live tick.
+const ET_CLOCK = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  hour: 'numeric',
+  minute: '2-digit',
+})
+const etClock = (iso: string) => `${ET_CLOCK.format(new Date(iso))} ET`
 
 /** The "Sector · Industry" summary line, skipping whichever side is absent. */
 const classificationLine = (
@@ -39,6 +72,98 @@ const classificationLine = (
 }
 
 /**
+ * The pre-market / after-hours line under the main price: a sunrise (pre-market)
+ * or moon (after-hours) mark, the session label, and the extended print with its
+ * move *since the regular close* — the after-bell action shown apart from the
+ * day's move on the pill above. The "As of" timestamp keeps it honest: the card
+ * fetches a snapshot, it isn't a live extended-hours tick.
+ */
+function ExtendedHoursLine({ ext }: { ext: ExtendedHours }) {
+  const { label, color, Icon } = SESSION_META[ext.session]
+  const extUp = (ext.change ?? 0) >= 0
+  const extSign = extUp ? '+' : ''
+  return (
+    <Box sx={{ mt: 1 }}>
+      <Stack
+        direction="row"
+        spacing={0.75}
+        sx={{
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          flexWrap: 'wrap',
+          rowGap: 0.25,
+        }}
+      >
+        <Icon aria-hidden sx={{ fontSize: 16, color }} />
+        <Typography
+          component="span"
+          sx={{
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            color: 'text.secondary',
+          }}
+        >
+          {label}
+        </Typography>
+        <Typography
+          component="span"
+          sx={{
+            fontSize: '0.95rem',
+            fontWeight: 700,
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          ${fmt(ext.price)}
+        </Typography>
+        <Box
+          component="span"
+          sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 0.25,
+            color: extUp ? 'success.main' : 'error.main',
+          }}
+        >
+          <Box
+            component="span"
+            aria-hidden
+            sx={{ fontSize: '0.55rem', lineHeight: 1 }}
+          >
+            {extUp ? '▲' : '▼'}
+          </Box>
+          <Typography
+            component="span"
+            sx={{
+              fontWeight: 600,
+              fontSize: '0.82rem',
+              fontVariantNumeric: 'tabular-nums',
+              lineHeight: 1,
+            }}
+          >
+            {extSign}
+            {fmt(ext.change_percent)}%
+          </Typography>
+        </Box>
+      </Stack>
+      {ext.as_of && (
+        <Typography
+          sx={{
+            mt: 0.25,
+            fontSize: '0.66rem',
+            color: 'text.disabled',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          As of {etClock(ext.as_of)}
+        </Typography>
+      )}
+    </Box>
+  )
+}
+
+/**
  * The persistent identity + live-quote band that heads the stock detail and
  * stays put above the tab strip on every tab — so whichever section you're
  * reading (Fundamentals, Analysts, Options…) the ticker, name and price never
@@ -47,7 +172,17 @@ const classificationLine = (
  * the landing page so the detail opens on a recognisably "Nama" surface.
  */
 export default function StockHeader({ stock }: { stock: TickerCard }) {
-  const up = (stock.change ?? 0) >= 0
+  // Outside the regular session the card carries an extended-hours split. When it
+  // does, the primary number becomes the regular 16:00 close and its *day* move
+  // (regular vs previous close), while the after-bell move shows on its own line
+  // below — the two-part price a broker shows after hours, instead of the single
+  // blended figure. During the regular session (ext == null) nothing changes.
+  const ext = stock.extended_hours
+  const price = ext ? ext.regular_price : stock.price
+  const change = ext ? ext.regular_change : stock.change
+  const changePercent = ext ? ext.regular_change_percent : stock.change_percent
+
+  const up = (change ?? 0) >= 0
   const changeColor = up ? 'success.main' : 'error.main'
   const sign = up ? '+' : ''
   const classification = classificationLine(stock.sector, stock.industry)
@@ -182,9 +317,11 @@ export default function StockHeader({ stock }: { stock: TickerCard }) {
                 letterSpacing: '-0.01em',
               }}
             >
-              ${fmt(stock.price)}
+              ${fmt(price)}
             </Typography>
-            {/* the day's move as a tinted pill, so direction reads at a glance */}
+            {/* the day's move as a tinted pill, so direction reads at a glance.
+                In extended hours this is the *regular*-session move (close vs the
+                prior close); the after-bell move rides the line below. */}
             <Box
               sx={{
                 mt: 0.75,
@@ -217,10 +354,11 @@ export default function StockHeader({ stock }: { stock: TickerCard }) {
                 }}
               >
                 {sign}
-                {fmt(stock.change)} ({sign}
-                {fmt(stock.change_percent)}%)
+                {fmt(change)} ({sign}
+                {fmt(changePercent)}%)
               </Typography>
             </Box>
+            {ext && <ExtendedHoursLine ext={ext} />}
           </Box>
         </Stack>
       </CardContent>

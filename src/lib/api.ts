@@ -190,6 +190,27 @@ export type AssetType = 'equity' | 'etf'
  * `options_metrics` blocks arrive only when requested via `include` and are null
  * otherwise (or when their source is down).
  */
+/**
+ * The after-hours / pre-market split of the quote, present only when the latest
+ * print is an extended-hours one (`null` during the regular session, and on the
+ * Canadian feed which doesn't split the day). Lets the header show the two-part
+ * price a broker shows outside the bell: the regular 16:00 close as the primary
+ * number (with `regular_change`, the day's move), and the extended print as a
+ * secondary line (with `change`/`change_percent`, the move since that close).
+ * `as_of` is the extended trade's timestamp. Overnight/weekends this carries the
+ * prior session's last extended print.
+ */
+export interface ExtendedHours {
+  session: 'pre_market' | 'after_hours'
+  price: number
+  change: number | null
+  change_percent: number | null
+  regular_price: number
+  regular_change: number | null
+  regular_change_percent: number | null
+  as_of: string | null
+}
+
 export interface TickerCard {
   ticker: string
   name: string | null
@@ -201,6 +222,8 @@ export interface TickerCard {
   price: number
   change: number | null
   change_percent: number | null
+  /** The extended-hours split; null during the regular session. See `ExtendedHours`. */
+  extended_hours: ExtendedHours | null
   market_cap: number | null
   dividend: TickerDividend | null
   performance: StockPerformance | null
@@ -480,7 +503,7 @@ export interface EmaLine {
 
 /**
  * The EMA overlay for a ticker — one line per requested period (e.g. the
- * 9/21/50 set), drawn on the candle chart's price axis. `lines` is in the
+ * 9/20/50 set), drawn on the candle chart's price axis. `lines` is in the
  * order the periods were requested.
  */
 export interface EmaSeries {
@@ -2208,11 +2231,13 @@ export async function getStockTrend(
 }
 
 /**
- * The default EMA overlay: the 9 / 21 / 50 fast/intermediate moving averages plus
- * the 200-period long-term line (drawn as the neutral trend baseline). The backend
- * warms the 200 from history before the visible window, so it appears on any range.
+ * The default EMA overlay: the 9 / 20 / 50 fast/intermediate moving averages plus
+ * the 200-period long-term line (drawn as the neutral trend baseline). The 20 / 50 /
+ * 200 match the trend card's short/medium/long horizons, so every horizon it reports
+ * sits exactly on this chart. The backend warms the 200 from history before the
+ * visible window, so it appears on any range.
  */
-export const DEFAULT_EMA_PERIODS = [9, 21, 50, 200] as const
+export const DEFAULT_EMA_PERIODS = [9, 20, 50, 200] as const
 
 /**
  * Fetch the EMA overlay for a ticker. Mirrors `getCandles`' window handling
