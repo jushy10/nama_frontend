@@ -33,10 +33,18 @@ const SUPPORT_STRENGTH: Record<
   strong: { width: 1.75, opacity: 0.9 },
 }
 
-// EMA overlay line colours, assigned by the line's order (20/50/200). Chosen to
-// stay distinct from the up/down candle greens/reds and the info-blue support
-// lines, and to read on both the light and dark chart backgrounds.
+// EMA overlay line colours for the fast/intermediate lines (9/21/50), assigned by
+// the line's order. Chosen to stay distinct from the up/down candle greens/reds and
+// the info-blue support lines, and to read on both the light and dark chart
+// backgrounds. The long-term 200-EMA is not one of these — it's drawn as a neutral
+// reference-baseline line (see `EMA_ANCHOR_PERIOD` below), the trading-chart
+// convention, which also keeps it clear of every colour above and the blue support.
 const EMA_COLORS = ['#f2a63b', '#8b5cf6', '#e0529c', '#2dd4bf', '#eab308']
+
+// The long-term EMA is the primary-trend baseline traders anchor on, not a peer of
+// the fast lines — so it's painted as a heavier, theme-aware neutral rather than a
+// fourth hue (which the crowded palette above + blue support have no room for).
+const EMA_ANCHOR_PERIOD = 200
 
 const fmtPrice = (n: number) =>
   n.toLocaleString('en-US', {
@@ -145,6 +153,15 @@ export default function CandleChart({
   const support = theme.palette.info.main
   const supportText = theme.palette.info.contrastText
   const intraday = !!timeframe && /Min|Hour/.test(timeframe)
+
+  // The 200-EMA anchor line: a strong neutral that reads on both surfaces (a slate
+  // ink on light, a pale slate on dark), distinct from every EMA hue and the blue
+  // support lines. Fast lines keep their fixed colour by order; only the 200 is neutral.
+  const emaAnchorColor = theme.palette.mode === 'dark' ? '#cbd5e1' : '#334155'
+  const emaStroke = (period: number, i: number) =>
+    period === EMA_ANCHOR_PERIOD
+      ? emaAnchorColor
+      : EMA_COLORS[i % EMA_COLORS.length]
 
   const geo = useMemo(() => {
     // Reclaim some of the price-axis gutter on a phone so the plot gets more
@@ -356,7 +373,7 @@ export default function CandleChart({
               component="span"
               sx={{
                 whiteSpace: 'nowrap',
-                color: EMA_COLORS[i % EMA_COLORS.length],
+                color: emaStroke(line.period, i),
                 fontWeight: 600,
               }}
             >
@@ -504,8 +521,8 @@ export default function CandleChart({
               key={`ema${e.period}`}
               d={e.d}
               fill="none"
-              stroke={EMA_COLORS[i % EMA_COLORS.length]}
-              strokeWidth={1.5}
+              stroke={emaStroke(e.period, i)}
+              strokeWidth={e.period === EMA_ANCHOR_PERIOD ? 2 : 1.5}
               strokeLinejoin="round"
               strokeLinecap="round"
               opacity={0.9}
