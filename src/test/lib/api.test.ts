@@ -553,13 +553,22 @@ describe('getStockTrend', () => {
       reference_price: 214.3,
       reading: 'uptrend_pullback',
       long_term: {
-        period: 50,
-        lookback: 50,
+        period: 200,
+        lookback: 200,
         direction: 'up',
         slope_percent: 0.22,
         change_percent: 11.4,
         price_vs_ema_percent: 6.5,
         ema: 201.2,
+      },
+      medium_term: {
+        period: 50,
+        lookback: 50,
+        direction: 'up',
+        slope_percent: 0.14,
+        change_percent: 5.1,
+        price_vs_ema_percent: 3.2,
+        ema: 209.4,
       },
       short_term: {
         period: 20,
@@ -590,6 +599,7 @@ describe('getStockTrend', () => {
     expect(requestedUrl).toContain('range=1Y')
     expect(result.reading).toBe('uptrend_pullback')
     expect(result.long_term?.direction).toBe('up')
+    expect(result.medium_term?.direction).toBe('up')
     expect(result.short_term?.direction).toBe('down')
   })
 
@@ -609,14 +619,20 @@ describe('getStockTrend', () => {
               reference_price: 214.3,
               reading: 'unknown',
               long_term: null,
+              medium_term: null,
               short_term: null,
             }),
         })
       }),
     )
 
-    await getStockTrend('AAPL', { shortPeriod: 50, longPeriod: 200 })
-    expect(requestedUrl).toContain('short_period=50')
+    await getStockTrend('AAPL', {
+      shortPeriod: 10,
+      mediumPeriod: 50,
+      longPeriod: 200,
+    })
+    expect(requestedUrl).toContain('short_period=10')
+    expect(requestedUrl).toContain('medium_period=50')
     expect(requestedUrl).toContain('long_period=200')
   })
 

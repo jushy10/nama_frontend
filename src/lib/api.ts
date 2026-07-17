@@ -493,19 +493,25 @@ export interface EmaSeries {
 export type TrendDirection = 'up' | 'down' | 'sideways'
 
 /**
- * The two horizons combined into one plain reading — the headline. The long
- * horizon sets the primary trend; the short one qualifies it (e.g. an uptrend
- * that's `uptrend_pullback` when the short term has turned down). `unknown` when
- * there isn't enough history to read a horizon.
+ * The three horizons combined into one plain reading — the headline. The long
+ * horizon sets the primary trend; the medium horizon qualifies it (a mid-term
+ * turn against the trend is the `*_weakening` / `*_recovering` early warning),
+ * and the short horizon confirms strength (all three aligned = `strong_*`).
+ * `unknown` when a horizon lacks the history to read — more common now that the
+ * long horizon defaults to 200 bars.
  */
 export type TrendReading =
+  | 'strong_uptrend'
   | 'uptrend'
   | 'uptrend_pullback'
-  | 'uptrend_consolidating'
+  | 'uptrend_weakening'
+  | 'strong_downtrend'
   | 'downtrend'
   | 'downtrend_bounce'
-  | 'downtrend_stalling'
+  | 'downtrend_recovering'
   | 'range_bound'
+  | 'range_breaking_up'
+  | 'range_breaking_down'
   | 'range_turning_up'
   | 'range_turning_down'
   | 'unknown'
@@ -528,10 +534,10 @@ export interface TrendLeg {
 }
 
 /**
- * A ticker's trend at a short and a long horizon, plus their combined `reading`.
- * `short_term` / `long_term` are null when a horizon lacks the history to warm
- * its EMA (and the reading is then `unknown`). `reference_price` is the latest
- * close the read was taken at.
+ * A ticker's trend at three horizons (short / medium / long) plus their combined
+ * `reading`. Each horizon is null when it lacks the history to warm its EMA (and
+ * the reading is then `unknown`). `reference_price` is the latest close the read
+ * was taken at.
  */
 export interface StockTrend {
   symbol: string
@@ -539,6 +545,7 @@ export interface StockTrend {
   reference_price: number
   reading: TrendReading
   short_term: TrendLeg | null
+  medium_term: TrendLeg | null
   long_term: TrendLeg | null
 }
 
@@ -2165,11 +2172,11 @@ export async function getSupportLevels(
 }
 
 /**
- * Fetch a ticker's short/long-term trend read (the direction at two EMA
- * horizons plus their combined reading). Defaults to a 1-year daily read with
- * the 20-period short vs 50-period long horizons; pass 50/200 for the classic
- * long-term read. Like support levels it's a fixed window independent of the
- * chart's range. Best-effort context: a caller treats a failure as "no read".
+ * Fetch a ticker's short/medium/long-term trend read (the direction at three EMA
+ * horizons plus their combined reading). Defaults to a 1-year daily read with the
+ * 20 / 50 / 200-period short/medium/long trio. Like support levels it's a fixed
+ * window independent of the chart's range. Best-effort context: a caller treats a
+ * failure as "no read".
  */
 export async function getStockTrend(
   symbol: string,
@@ -2177,6 +2184,7 @@ export async function getStockTrend(
     range?: ChartRange
     timeframe?: Timeframe
     shortPeriod?: number
+    mediumPeriod?: number
     longPeriod?: number
     signal?: AbortSignal
   } = {},
@@ -2185,6 +2193,7 @@ export async function getStockTrend(
   const range = opts.range ?? '1Y'
   const qs = new URLSearchParams({ timeframe, range })
   if (opts.shortPeriod) qs.set('short_period', String(opts.shortPeriod))
+  if (opts.mediumPeriod) qs.set('medium_period', String(opts.mediumPeriod))
   if (opts.longPeriod) qs.set('long_period', String(opts.longPeriod))
   const res = await fetch(
     `${API_BASE}/stocks/ticker/${encodeURIComponent(symbol)}/trend?${qs}`,
