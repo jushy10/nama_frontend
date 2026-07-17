@@ -33,7 +33,7 @@ const SUPPORT_STRENGTH: Record<
   strong: { width: 1.75, opacity: 0.9 },
 }
 
-// EMA overlay line colours for the fast/intermediate lines (9/21/50), assigned by
+// EMA overlay line colours for the fast/intermediate lines (9/20/50), assigned by
 // the line's order. Chosen to stay distinct from the up/down candle greens/reds and
 // the info-blue support lines, and to read on both the light and dark chart
 // backgrounds. The long-term 200-EMA is not one of these — it's drawn as a neutral
