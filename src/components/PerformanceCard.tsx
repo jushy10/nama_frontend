@@ -69,7 +69,12 @@ export default function PerformanceCard({
           sx={{
             mt: 2,
             display: 'grid',
-            gridTemplateColumns: { xs: 'repeat(4, 1fr)', sm: 'repeat(7, 1fr)' },
+            // minmax(0, …) lets the pill tracks shrink below their content's
+            // min-content so a narrow card never spills the row off-screen.
+            gridTemplateColumns: {
+              xs: 'repeat(4, minmax(0, 1fr))',
+              sm: 'repeat(7, minmax(0, 1fr))',
+            },
             gap: 1,
           }}
         >

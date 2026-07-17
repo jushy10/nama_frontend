@@ -142,7 +142,13 @@ export default function Stocks() {
             <Box
               sx={{
                 display: 'grid',
-                gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' },
+                // minmax(0, 1fr) — not a bare 1fr — so a track can't be forced
+                // wider than its share by a child's min-content (the Performance
+                // pills), which otherwise overflows the page on narrow phones.
+                gridTemplateColumns: {
+                  xs: 'minmax(0, 1fr)',
+                  md: 'repeat(2, minmax(0, 1fr))',
+                },
                 gap: 3,
                 alignItems: 'stretch',
               }}
