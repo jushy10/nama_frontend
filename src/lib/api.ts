@@ -540,16 +540,25 @@ export type TrendReading =
   | 'unknown'
 
 /**
- * One horizon's trend read, from the slope of its EMA. `slope_percent` is that
- * slope averaged per bar (what the sideways band is applied to); `change_percent`
- * is the same move totalled over the `lookback` bars it was measured across.
- * `price_vs_ema_percent` is where the latest close sits relative to the EMA
- * (positive = above), context the direction doesn't fold in.
+ * One horizon's trend read.
+ *
+ * `direction` is the EMA line's own *slope* over its timescale. `effective_direction`
+ * is the horizon's actual read: it folds that slope together with which side of the
+ * line price sits on, **price leading** — a line still sloping up that price has
+ * broken decisively below reads `down`, because the slope is a trailing average
+ * while price's side of the line is now. Display `effective_direction`; `direction`
+ * is the detail (the line's own heading) to show beside the price gap.
+ *
+ * `slope_percent` is that slope averaged per bar (what the sideways band is applied
+ * to); `change_percent` is the same move totalled over the `lookback` bars it was
+ * measured across. `price_vs_ema_percent` is where the latest close sits relative to
+ * the EMA (positive = above).
  */
 export interface TrendLeg {
   period: number
   lookback: number
   direction: TrendDirection
+  effective_direction: TrendDirection
   slope_percent: number
   change_percent: number
   price_vs_ema_percent: number

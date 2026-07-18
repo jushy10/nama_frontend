@@ -3,11 +3,14 @@ import { renderWithProviders, screen } from '@/test/test-utils'
 import TrendCard from '@/components/TrendCard'
 import type { StockTrend, TrendDirection } from '@/lib/api'
 
+/** A horizon whose line slope and effective read agree — the ordinary case. Pass
+ *  `effective_direction` in the overrides to build a divergent one. */
 function leg(direction: TrendDirection, overrides = {}) {
   return {
     period: direction === 'up' ? 50 : 20,
     lookback: 50,
     direction,
+    effective_direction: direction,
     slope_percent:
       direction === 'up' ? 0.22 : direction === 'down' ? -0.18 : 0.0,
     change_percent:
@@ -66,12 +69,46 @@ describe('TrendCard', () => {
     expect(screen.getByText('Rising')).toBeInTheDocument()
     expect(screen.getByText('Flat')).toBeInTheDocument()
     expect(screen.getByText('Falling')).toBeInTheDocument()
-    expect(screen.getByText('200-day EMA')).toBeInTheDocument()
-    expect(screen.getByText('50-day EMA')).toBeInTheDocument()
-    expect(screen.getByText('20-day EMA')).toBeInTheDocument()
-    // The EMA move renders as a signed percent.
+    expect(screen.getByText(/the 200-day line/)).toBeInTheDocument()
+    expect(screen.getByText(/the 50-day line/)).toBeInTheDocument()
+    expect(screen.getByText(/the 20-day line/)).toBeInTheDocument()
+    // The line's own move renders as a signed percent.
     expect(screen.getByText(/\+11\.4%/)).toBeInTheDocument()
     expect(screen.getByText(/-3\.9%/)).toBeInTheDocument()
+  })
+
+  it('leads with the effective direction, not the line slope', () => {
+    // The case the card used to get wrong: a 20-day line still sloping up while
+    // price has broken 4.2% below it. The tile must read "Falling" — the word the
+    // backend's effective_direction gives — with the line's own +11.4% shown as
+    // the labelled detail underneath, not as the headline.
+    renderWithProviders(
+      <TrendCard
+        trend={trend({
+          reading: 'uptrend_weakening',
+          long_term: leg('up', { period: 200 }),
+          medium_term: leg('up', {
+            period: 50,
+            effective_direction: 'down',
+            price_vs_ema_percent: -2.1,
+          }),
+          short_term: leg('up', {
+            period: 20,
+            effective_direction: 'down',
+            price_vs_ema_percent: -4.2,
+          }),
+        })}
+      />,
+    )
+    // Two horizons diverge from their slope and read as falling; the long one,
+    // whose price is still above its line, keeps rising.
+    expect(screen.getAllByText('Falling')).toHaveLength(2)
+    expect(screen.getByText('Rising')).toBeInTheDocument()
+    // The driver of that word is stated on the tile.
+    expect(screen.getByText(/4\.2%\s*below/)).toBeInTheDocument()
+    // And the line's own upward move is still shown, labelled as the line.
+    expect(screen.getAllByText(/\+11\.4%/).length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText(/Line/).length).toBeGreaterThanOrEqual(2)
   })
 
   it('shows the reference price the read was taken at', () => {
