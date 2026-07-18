@@ -14,7 +14,8 @@ const NEUTRAL = '#fbbf24' // amber-400
 
 // Per-direction word, colour, and the faint tile tint behind it. Colours match
 // the candle chart and sector cards (success = up, error = down) so a rising
-// trend reads the same green here as a green candle.
+// trend reads the same green here as a green candle. Used twice per tile: for the
+// horizon's effective direction (the headline) and for its line's own slope.
 const DIRECTION: Record<
   TrendDirection,
   { word: string; color: string; track: string }
@@ -150,10 +151,11 @@ function unitLabel(timeframe: string): string {
 }
 
 /**
- * The signature: a right-pointing arrow tilted by the EMA's actual per-bar
- * slope, so steepness — not just direction — reads at a glance. Two of these
- * side by side (long vs short) make a divergence like "up, but pulling back"
- * a single glance. Decorative: the direction word beside it carries the meaning.
+ * A right-pointing arrow tilted by the EMA's actual per-bar slope, so the line's
+ * steepness — not just its direction — reads at a glance. It describes the *line*,
+ * which is why it sits with the "Line +X% over N bars" row rather than the tile's
+ * headline: the headline follows price's side of that line, and the two can point
+ * opposite ways. Decorative — the percent beside it carries the meaning.
  */
 function SlopeArrow({
   slopePercent,
@@ -204,9 +206,16 @@ function SlopeArrow({
   )
 }
 
-/** One horizon (long or short) as a tile: the slope arrow + direction word lead,
- *  with the EMA that was read, how far it moved, and where price sits relative
- *  to it below. A horizon with too little history to warm its EMA reads muted. */
+/** One horizon (long, medium or short) as a tile.
+ *
+ *  The direction word leads and comes from the horizon's `effective_direction` —
+ *  price's side of the line leading its slope — so the word never contradicts the
+ *  "price below this line" figure right under it. Below that, the line's *own*
+ *  slope (arrow + percent move) is shown as clearly-labelled detail, which is why
+ *  a tile can legitimately read "Falling" over a line that moved +11%: the 20-day
+ *  average still points up, but price has dropped through it.
+ *
+ *  A horizon with too little history to warm its EMA reads muted. */
 function HorizonTile({
   label,
   leg,
@@ -216,7 +225,11 @@ function HorizonTile({
   leg: TrendLeg | null
   unit: string
 }) {
-  const meta = leg ? DIRECTION[leg.direction] : null
+  const meta = leg ? DIRECTION[leg.effective_direction] : null
+  // The line's own heading, for the slope arrow + the "line moved" row: it can
+  // disagree with the headline, and colouring it by its own direction is what
+  // makes the divergence legible rather than looking like a bug.
+  const slopeMeta = leg ? DIRECTION[leg.direction] : null
   return (
     <Box
       sx={{
@@ -240,26 +253,18 @@ function HorizonTile({
         {label}
       </Typography>
 
-      {leg && meta ? (
+      {leg && meta && slopeMeta ? (
         <>
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{ alignItems: 'center', mt: 1 }}
-          >
-            <SlopeArrow slopePercent={leg.slope_percent} color={meta.color} />
-            <Typography
-              component="span"
-              sx={{ fontWeight: 700, fontSize: '1.15rem', color: meta.color }}
-            >
-              {meta.word}
-            </Typography>
-          </Stack>
           <Typography
-            variant="caption"
-            sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}
+            component="p"
+            sx={{
+              fontWeight: 700,
+              fontSize: '1.15rem',
+              color: meta.color,
+              mt: 1,
+            }}
           >
-            {leg.period}-{unit} EMA
+            {meta.word}
           </Typography>
           <Typography
             variant="body2"
@@ -270,21 +275,41 @@ function HorizonTile({
               fontVariantNumeric: 'tabular-nums',
             }}
           >
-            {signedPct(leg.change_percent)}{' '}
+            Price {Math.abs(leg.price_vs_ema_percent).toFixed(1)}%{' '}
+            {leg.price_vs_ema_percent >= 0 ? 'above' : 'below'}{' '}
             <Box
               component="span"
               sx={{ color: 'text.secondary', fontWeight: 400 }}
             >
-              over {leg.lookback} bars
+              the {leg.period}-{unit} line
             </Box>
           </Typography>
-          <Typography
-            variant="caption"
-            sx={{ color: 'text.secondary', display: 'block', mt: 0.75 }}
+          <Stack
+            direction="row"
+            spacing={0.75}
+            sx={{ alignItems: 'center', mt: 1.25 }}
           >
-            Price {leg.price_vs_ema_percent >= 0 ? 'above' : 'below'} this line
-            by {Math.abs(leg.price_vs_ema_percent).toFixed(1)}%
-          </Typography>
+            <SlopeArrow
+              slopePercent={leg.slope_percent}
+              color={slopeMeta.color}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'text.secondary',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              Line{' '}
+              <Box
+                component="span"
+                sx={{ color: slopeMeta.color, fontWeight: 700 }}
+              >
+                {signedPct(leg.change_percent)}
+              </Box>{' '}
+              over {leg.lookback} bars
+            </Typography>
+          </Stack>
         </>
       ) : (
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
@@ -328,7 +353,7 @@ export default function TrendCard({ trend }: { trend: StockTrend }) {
               <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
                 Trend
               </Typography>
-              <InfoHint title="Read from the slope of three moving averages (EMA) — short, medium and long — off the daily candles. It describes direction — not a price target — and isn’t investment advice." />
+              <InfoHint title="Read from three moving averages (EMA) — short, medium and long — off the daily candles. Each horizon takes its direction from which side of its line price is trading on, falling back to the line’s slope when price sits on it. So a horizon can read “Falling” while its line still points up: price has dropped through the average. It describes direction — not a price target — and isn’t investment advice." />
             </Stack>
             <Typography variant="caption" color="text.secondary">
               Short, medium &amp; long-term direction
