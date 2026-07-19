@@ -17,10 +17,8 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import TodayIcon from '@mui/icons-material/Today'
 import EventBusyIcon from '@mui/icons-material/EventBusy'
-import StarIcon from '@mui/icons-material/Star'
 import WbTwilightIcon from '@mui/icons-material/WbTwilight'
 import NightsStayIcon from '@mui/icons-material/NightsStay'
-import WbSunnyIcon from '@mui/icons-material/WbSunny'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import { Link as RouterLink } from 'react-router-dom'
 import { humanizeClassification, stockLogoUrl } from '@/lib/api'
@@ -38,28 +36,22 @@ import { usePageMeta } from '@/lib/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
 import PageHero from '@/components/PageHero'
 
-// The view shows a two-week window and pages a fortnight at a time. `offset` counts weeks
-// past the first forward week; it never goes below 0 (so the calendar can't page into the
-// past) and is capped so the furthest window stays inside the backend's 92-day clamp.
-const VISIBLE_WEEKS = 2
-const WEEK_STEP = 2
-const MAX_OFFSET = 10
+// The view shows one week and pages a week at a time. `offset` counts weeks past the first
+// forward week; it never goes below 0 (so the calendar can't page into the past) and is capped
+// at roughly three months out, which keeps the furthest read inside the backend's 92-day clamp.
+const VISIBLE_WEEKS = 1
+const WEEK_STEP = 1
+const MAX_OFFSET = 12
 
-// Market-cap tiers for the "important names" highlight. Large-cap and above get emphasised;
-// mega-cap additionally earns a star. Thresholds are nominal (the anchor's cap is in the
-// listing's own currency), which is plenty precise for a visual cue.
-const LARGE_CAP = 10e9 // $10B
-const MEGA_CAP = 200e9 // $200B
+// Large-cap and above is the single "important name" threshold: those rows get the gold rule,
+// the tint and their market-cap label; everything below reads as plain text. The cap is in the
+// listing's own currency, which is plenty precise for a visual cue.
+const NOTABLE_CAP = 10e9 // $10B
 
-type CapTier = 'mega' | 'large' | null
-
-/** The highlight tier for a market cap, or `null` for sub-large-cap / unknown (no highlight,
- *  which is also what a backend that doesn't yet send `market_cap` yields). */
-function capTier(marketCap?: number | null): CapTier {
-  if (marketCap == null) return null
-  if (marketCap >= MEGA_CAP) return 'mega'
-  if (marketCap >= LARGE_CAP) return 'large'
-  return null
+/** Whether a report is one of the names worth calling out — large-cap or bigger. A missing
+ *  `market_cap` (an older backend, or a listing we have no cap for) reads as not notable. */
+function isNotable(marketCap?: number | null): boolean {
+  return marketCap != null && marketCap >= NOTABLE_CAP
 }
 
 /** A compact market-cap label, e.g. `$3.1T`, `$45B`, `$920M`. */
@@ -70,82 +62,37 @@ function formatMarketCap(n: number): string {
   return `$${Math.round(n)}`
 }
 
-interface SessionMeta {
-  key: string
-  label: string
-  Icon: ComponentType<SvgIconProps>
-  color: string
-  order: number
-}
-
-/**
- * How each reporting session reads at a glance, and the order reports sort within a day
- * (chronologically through the trading day: before open, intraday, after close, then
- * time-not-set). On brand: a gold sunrise for before-open (morning), a navy moon for
- * after-close (night) — the app's two accent colours doubling as a time-of-day cue, now
- * shown as a small per-row marker rather than a group header. `unknown` (or a stale backend
- * that omits `session`) reads as a muted "Time TBD".
- */
-const SESSION_GROUPS: readonly SessionMeta[] = [
-  {
-    key: 'bmo',
-    label: 'Before open',
-    Icon: WbTwilightIcon,
-    color: 'secondary.main',
-    order: 0,
-  },
-  {
-    key: 'during',
-    label: 'During hours',
-    Icon: WbSunnyIcon,
-    color: 'text.secondary',
-    order: 1,
-  },
-  {
-    key: 'amc',
-    label: 'After close',
-    Icon: NightsStayIcon,
-    color: 'primary.main',
-    order: 2,
-  },
-  {
-    key: 'unknown',
-    label: 'Time TBD',
-    Icon: ScheduleIcon,
-    color: 'text.disabled',
-    order: 3,
-  },
-]
-
-const SESSION_BY_KEY: Record<string, SessionMeta> = Object.fromEntries(
-  SESSION_GROUPS.map((g) => [g.key, g]),
-)
-
-/** The session meta an item reads under — anything unrecognized (or an absent session from a
- *  stale backend) falls back to `unknown` so no report is ever mis-marked or dropped. */
-function sessionOf(item: EarningsCalendarItem): SessionMeta {
-  return (
-    (item.session && SESSION_BY_KEY[item.session]) || SESSION_BY_KEY.unknown
-  )
-}
-
-/** Rank for the cap-tier sort — mega first, then large, then the rest. */
-function capRank(item: EarningsCalendarItem): number {
-  const tier = capTier(item.market_cap)
-  return tier === 'mega' ? 0 : tier === 'large' ? 1 : 2
-}
-
-/** Order a day's reports for the ungrouped list: the biggest names first (so the important
- *  ones lead), then by session through the trading day, then alphabetical. */
+/** Biggest company first, unknown caps last, ties broken alphabetically. */
 function compareItems(
   a: EarningsCalendarItem,
   b: EarningsCalendarItem,
 ): number {
   return (
-    capRank(a) - capRank(b) ||
-    sessionOf(a).order - sessionOf(b).order ||
+    (b.market_cap ?? -1) - (a.market_cap ?? -1) ||
     a.ticker.localeCompare(b.ticker)
   )
+}
+
+/** A day's reports split into the two parts the page is organised around, plus the leftovers.
+ *  `rest` holds anything the backend didn't mark as before-open or after-close (a mid-session
+ *  report, or an absent `session` from a stale backend) so no report is silently dropped. */
+interface DayParts {
+  bmo: EarningsCalendarItem[]
+  amc: EarningsCalendarItem[]
+  rest: EarningsCalendarItem[]
+}
+
+function splitSessions(items: EarningsCalendarItem[]): DayParts {
+  const parts: DayParts = { bmo: [], amc: [], rest: [] }
+  for (const item of items) {
+    if (item.session === 'bmo') parts.bmo.push(item)
+    else if (item.session === 'amc') parts.amc.push(item)
+    else parts.rest.push(item)
+  }
+  parts.bmo.sort(compareItems)
+  parts.amc.sort(compareItems)
+  parts.rest.sort(compareItems)
+  return parts
 }
 
 /** Company logo in a white rounded tile, falling back to the ticker's initial — the
@@ -174,17 +121,13 @@ function StockLogo({ symbol }: { symbol: string }) {
 }
 
 /**
- * One company row: a session marker (gold sunrise before open, navy moon after close), the
- * logo, ticker over company name, and sector. A large-cap-or-bigger name is highlighted — a
- * gold left rule and tint, plus a star and its market-cap label for mega-caps — so the
- * important reports stand out in the flat, ungrouped day list. The whole row links to the
- * stock.
+ * One company row: the logo, ticker over company name, and sector. A large-cap-or-bigger name
+ * is highlighted with a gold left rule, a tint and its market-cap label, so the reports worth
+ * noticing carry the only ornament on the page. Reporting time is the part header above the
+ * row, not a per-row marker. The whole row links to the stock.
  */
 function ReportRow({ item }: { item: EarningsCalendarItem }) {
-  const tier = capTier(item.market_cap)
-  const notable = tier !== null
-  const session = sessionOf(item)
-  const SessionIcon = session.Icon
+  const notable = isNotable(item.market_cap)
 
   return (
     <Box
@@ -210,10 +153,6 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
       }}
     >
       <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
-        <SessionIcon
-          titleAccess={session.label}
-          sx={{ fontSize: 14, color: session.color, flexShrink: 0 }}
-        />
         <StockLogo symbol={item.ticker} />
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Stack
@@ -221,26 +160,15 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
             spacing={1}
             sx={{ alignItems: 'baseline', justifyContent: 'space-between' }}
           >
-            <Stack
-              direction="row"
-              spacing={0.4}
-              sx={{ alignItems: 'center', minWidth: 0 }}
-            >
-              <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
-                {item.ticker}
-              </Typography>
-              {tier === 'mega' && (
-                <StarIcon sx={{ fontSize: 12, color: 'secondary.main' }} />
-              )}
-            </Stack>
-            {item.sector && (
+            <Typography sx={{ fontWeight: 700, lineHeight: 1.2 }} noWrap>
+              {item.ticker}
+            </Typography>
+            {notable && item.market_cap != null && (
               <Typography
                 variant="caption"
-                color="text.secondary"
-                noWrap
-                sx={{ flexShrink: 1, minWidth: 0, textAlign: 'right' }}
+                sx={{ color: 'secondary.main', fontWeight: 700, flexShrink: 0 }}
               >
-                {humanizeClassification(item.sector)}
+                {formatMarketCap(item.market_cap)}
               </Typography>
             )}
           </Stack>
@@ -261,16 +189,14 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
             ) : (
               <span />
             )}
-            {notable && item.market_cap != null && (
+            {item.sector && (
               <Typography
                 variant="caption"
-                sx={{
-                  color: 'secondary.main',
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
+                color="text.disabled"
+                noWrap
+                sx={{ flexShrink: 1, minWidth: 0, textAlign: 'right' }}
               >
-                {formatMarketCap(item.market_cap)}
+                {humanizeClassification(item.sector)}
               </Typography>
             )}
           </Stack>
@@ -280,22 +206,88 @@ function ReportRow({ item }: { item: EarningsCalendarItem }) {
   )
 }
 
+interface SessionMeta {
+  label: string
+  Icon: ComponentType<SvgIconProps>
+  /** The icon's tint. On brand: a gold sunrise for before open, a navy moon for after close,
+   *  the app's two accents doubling as a time-of-day cue. */
+  color: string
+}
+
+const BEFORE_OPEN: SessionMeta = {
+  label: 'Before open',
+  Icon: WbTwilightIcon,
+  color: 'secondary.main',
+}
+const AFTER_CLOSE: SessionMeta = {
+  label: 'After close',
+  Icon: NightsStayIcon,
+  color: 'primary.main',
+}
+const TIME_NOT_SET: SessionMeta = {
+  label: 'Time not set',
+  Icon: ScheduleIcon,
+  color: 'text.disabled',
+}
+
 /**
- * One day card: its date header (today and tomorrow called out by name, today ringed in the
- * primary accent) and the day's reports as a single, ungrouped list — largest companies
- * first, each row carrying its own before-open / after-close marker — or a muted "No reports"
- * when the day is quiet.
+ * One reporting-time part of a day: a header pairing the session's icon with its name, then
+ * its rows biggest company first. Renders nothing when the session is empty, so a day that
+ * only reports after the close shows one part rather than an empty pair.
+ */
+function SessionPart({
+  session,
+  items,
+}: {
+  session: SessionMeta
+  items: EarningsCalendarItem[]
+}) {
+  const { label, Icon, color } = session
+  if (items.length === 0) return null
+  return (
+    <Box component="section">
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{ alignItems: 'center', px: 1, pb: 0.5 }}
+      >
+        <Icon aria-hidden sx={{ fontSize: 14, color, flexShrink: 0 }} />
+        <Typography
+          variant="caption"
+          sx={{
+            fontSize: '0.65rem',
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: '0.08em',
+            color: 'text.secondary',
+          }}
+        >
+          {label}
+        </Typography>
+      </Stack>
+      <Stack spacing={0.25}>
+        {items.map((item) => (
+          <ReportRow key={item.ticker} item={item} />
+        ))}
+      </Stack>
+    </Box>
+  )
+}
+
+/**
+ * One day column: its date header (today and tomorrow called out by name, today ringed in the
+ * primary accent) and the day's reports split into a before-open part and an after-close part,
+ * each biggest company first. Anything the backend leaves unscheduled trails in a third,
+ * muted part. A quiet day reads as a single "No reports" line.
  */
 function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
   const isToday = slot.date === today
   const relative = dayRelativeLabel(slot.date, today)
-  const items = useMemo(() => [...slot.items].sort(compareItems), [slot.items])
+  const parts = useMemo(() => splitSessions(slot.items), [slot.items])
 
   return (
     <Box
       sx={{
-        flex: '1 1 190px',
-        maxWidth: { xs: '100%', sm: 300, lg: 236 },
         minWidth: 0,
         border: 1,
         borderColor: isToday ? 'primary.main' : 'divider',
@@ -344,9 +336,9 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
               {slot.monthShort}
             </Typography>
           </Stack>
-          {items.length > 0 && (
+          {slot.items.length > 0 && (
             <Chip
-              label={items.length}
+              label={slot.items.length}
               size="small"
               color={isToday ? 'primary' : 'default'}
               sx={{ height: 20, fontSize: '0.7rem', fontWeight: 700 }}
@@ -356,7 +348,7 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
       </Box>
 
       <Box sx={{ p: 0.75, flex: 1 }}>
-        {items.length === 0 ? (
+        {slot.items.length === 0 ? (
           <Typography
             variant="caption"
             color="text.disabled"
@@ -365,10 +357,10 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
             No reports
           </Typography>
         ) : (
-          <Stack spacing={0.25}>
-            {items.map((item) => (
-              <ReportRow key={item.ticker} item={item} />
-            ))}
+          <Stack spacing={1.5}>
+            <SessionPart session={BEFORE_OPEN} items={parts.bmo} />
+            <SessionPart session={AFTER_CLOSE} items={parts.amc} />
+            <SessionPart session={TIME_NOT_SET} items={parts.rest} />
           </Stack>
         )}
       </Box>
@@ -377,20 +369,12 @@ function DayCard({ slot, today }: { slot: DaySlot; today: string }) {
 }
 
 /**
- * One week section: a heading (This week / Next week / a bare date range further out) with
- * the week's report count, then that week's forward day cards — or a single muted line when
- * the whole week is quiet, so an off-season stretch stays compact instead of a wall of empty
- * columns.
+ * The shown week's forward days, one column each across the full width — or a single muted
+ * line when the week is quiet. The week is named and counted by the navigator above, so this
+ * carries no header of its own. Keyed on the week's Monday by the caller, so paging remounts
+ * it and replays the fade: the feedback that the click landed on a new week.
  */
-function WeekSection({
-  group,
-  today,
-  index,
-}: {
-  group: WeekGroup
-  today: string
-  index: number
-}) {
+function WeekSection({ group, today }: { group: WeekGroup; today: string }) {
   return (
     <Box
       component="section"
@@ -399,34 +383,10 @@ function WeekSection({
           from: { opacity: 0, transform: 'translateY(10px)' },
           to: { opacity: 1, transform: 'none' },
         },
-        animation: `weekIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both`,
-        animationDelay: `${Math.min(index, 4) * 60}ms`,
+        animation: `weekIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) both`,
         '@media (prefers-reduced-motion: reduce)': { animation: 'none' },
       }}
     >
-      <Stack
-        direction="row"
-        spacing={1.5}
-        sx={{ alignItems: 'baseline', mb: 1.5, flexWrap: 'wrap', rowGap: 0.5 }}
-      >
-        {group.heading && (
-          <Typography sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
-            {group.heading}
-          </Typography>
-        )}
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ fontWeight: group.heading ? 400 : 700 }}
-        >
-          {group.rangeLabel}
-        </Typography>
-        <Box sx={{ flex: 1 }} />
-        <Typography variant="caption" color="text.secondary">
-          {group.count} {group.count === 1 ? 'report' : 'reports'}
-        </Typography>
-      </Stack>
-
       {group.count === 0 ? (
         <Box
           sx={{
@@ -443,12 +403,19 @@ function WeekSection({
           </Typography>
         </Box>
       ) : (
+        // One column per shown weekday at desktop, so the week spans the full page width. A
+        // partial current week (say a lone Friday) gets that many columns, never five.
         <Box
           sx={{
-            display: 'flex',
-            flexWrap: 'wrap',
+            display: 'grid',
             gap: 1.5,
             alignItems: 'stretch',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, minmax(0, 1fr))',
+              md: 'repeat(3, minmax(0, 1fr))',
+              lg: `repeat(${group.slots.length}, minmax(0, 1fr))`,
+            },
           }}
         >
           {group.slots.map((slot) => (
@@ -461,11 +428,13 @@ function WeekSection({
 }
 
 /**
- * The forward week navigator: page earlier / later a fortnight at a time (earlier is disabled
- * at the current week, so the calendar never looks back), the visible date range, the window's
- * report count, and a jump back to this week.
+ * The forward week navigator, which doubles as the shown week's header: page earlier / later a
+ * week at a time (earlier is disabled at the current week, so the calendar never looks back),
+ * the week's name and date range, its report count, and a jump back to today's week. `heading`
+ * is `This week` / `Next week` / `''` further out, and is absent until the first read lands.
  */
 function WeekNav({
+  heading,
   rangeLabel,
   total,
   showCount,
@@ -476,6 +445,7 @@ function WeekNav({
   onNext,
   onReset,
 }: {
+  heading?: string
   rangeLabel: string
   total: number
   showCount: boolean
@@ -500,7 +470,7 @@ function WeekNav({
     >
       <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
         <IconButton
-          aria-label="Earlier weeks"
+          aria-label="Previous week"
           onClick={onPrev}
           disabled={!canPrev}
           size="small"
@@ -509,7 +479,7 @@ function WeekNav({
           <ChevronLeftIcon />
         </IconButton>
         <IconButton
-          aria-label="Later weeks"
+          aria-label="Next week"
           onClick={onNext}
           disabled={!canNext}
           size="small"
@@ -517,16 +487,30 @@ function WeekNav({
         >
           <ChevronRightIcon />
         </IconButton>
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: '1.05rem',
-            ml: 1,
-            whiteSpace: 'nowrap',
-          }}
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: 'baseline', ml: 1, flexWrap: 'wrap', rowGap: 0.25 }}
         >
-          {rangeLabel}
-        </Typography>
+          {heading && (
+            <Typography
+              component="h2"
+              sx={{ fontWeight: 700, fontSize: '1.05rem', m: 0 }}
+            >
+              {heading}
+            </Typography>
+          )}
+          <Typography
+            color={heading ? 'text.secondary' : undefined}
+            sx={{
+              fontWeight: heading ? 400 : 700,
+              fontSize: '1.05rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {rangeLabel}
+          </Typography>
+        </Stack>
       </Stack>
 
       <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
@@ -537,7 +521,7 @@ function WeekNav({
         )}
         <Chip
           icon={<TodayIcon />}
-          label="This week"
+          label="Today"
           variant="outlined"
           size="small"
           onClick={onReset}
@@ -549,26 +533,26 @@ function WeekNav({
   )
 }
 
-/** Skeleton while the first read lands: two placeholder week sections. */
+/** Skeleton while the first read lands: the week's five day columns on the same grid the real
+ *  week uses, so nothing shifts when the data arrives. */
 function LoadingState() {
   return (
-    <Stack spacing={4}>
-      {[0, 1].map((section) => (
-        <Box key={section}>
-          <Skeleton variant="text" width={220} height={32} sx={{ mb: 1.5 }} />
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
-            {[0, 1, 2, 3, 4].map((i) => (
-              <Skeleton
-                key={i}
-                variant="rounded"
-                height={200}
-                sx={{ flex: '1 1 190px', maxWidth: { lg: 236 } }}
-              />
-            ))}
-          </Box>
-        </Box>
+    <Box
+      sx={{
+        display: 'grid',
+        gap: 1.5,
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, minmax(0, 1fr))',
+          md: 'repeat(3, minmax(0, 1fr))',
+          lg: 'repeat(5, minmax(0, 1fr))',
+        },
+      }}
+    >
+      {[0, 1, 2, 3, 4].map((i) => (
+        <Skeleton key={i} variant="rounded" height={320} />
       ))}
-    </Stack>
+    </Box>
   )
 }
 
@@ -606,17 +590,17 @@ function EmptyState() {
 
 /**
  * Earnings calendar (`/earnings-calendar`): a forward-only agenda of which US companies are
- * scheduled to report earnings, starting **today** and paged forward a fortnight at a time —
+ * scheduled to report earnings, starting **today** and paged forward one week at a time —
  * the calendar never looks back, so a passed report drops off and the current week shows only
- * its remaining days. Each day is an ungrouped list ordered largest-company-first, with
- * before-open / after-close marked per row and large/mega-caps highlighted; every row links
- * to its stock. Best-effort — a quiet week collapses to a line, a quiet window to an empty
- * state.
+ * its remaining days. The week spans the page as one column per day, and each day splits into
+ * a before-open and an after-close part with the biggest companies first; large-cap and bigger
+ * names carry the only highlight. Every row links to its stock. Best-effort — a quiet week
+ * collapses to a line, a quiet window to an empty state.
  */
 export default function EarningsCalendar() {
   usePageMeta(
     'Earnings Calendar — Upcoming US Earnings by Day | Nama Insights',
-    'A forward calendar of upcoming US company earnings reports, grouped by week and day, biggest names first. See which S&P 500 and Nasdaq companies report next and when.',
+    'A forward calendar of upcoming US company earnings reports, grouped by week and day, split into before-open and after-close. See which S&P 500 and Nasdaq companies report next and when.',
   )
 
   const today = useMemo(() => todayIso(), [])
@@ -636,20 +620,29 @@ export default function EarningsCalendar() {
   )
   const total = data?.count ?? 0
   const atStart = offset === 0
-  const rangeLabel = useMemo(() => spanLabel(window.from, window.to), [window])
+  // The shown week's own span once it's built (which starts at today's date, or at the Monday
+  // on a paged-ahead week), falling back to the fetch window while the first read is in flight.
+  // The two differ over a weekend, when the fetch opens on today but the week shown is the next
+  // one — the navigator is the week's only header, so it has to name the days actually on screen.
+  const fetchedLabel = useMemo(
+    () => spanLabel(window.from, window.to),
+    [window],
+  )
+  const rangeLabel = groups[0]?.rangeLabel ?? fetchedLabel
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 3, sm: 5 } }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 3, sm: 5 } }}>
       <Box sx={{ mb: 3 }}>
         <PageHero
           eyebrowIcon={CalendarMonthIcon}
           eyebrow="Earnings calendar"
           title="Who reports next"
-          subtitle="Upcoming US earnings from today onward, biggest names first — page ahead week by week to see who reports and when. Dates are estimates and can change."
+          subtitle="Upcoming US earnings from today onward, split into before the open and after the close, with the largest companies leading each day. Dates are estimates and can change."
         />
       </Box>
 
       <WeekNav
+        heading={groups[0]?.heading}
         rangeLabel={rangeLabel}
         total={total}
         showCount={!isLoading && total > 0}
@@ -671,13 +664,8 @@ export default function EarningsCalendar() {
         <EmptyState />
       ) : (
         <Stack spacing={4}>
-          {groups.map((group, i) => (
-            <WeekSection
-              key={group.monday}
-              group={group}
-              today={today}
-              index={i}
-            />
+          {groups.map((group) => (
+            <WeekSection key={group.monday} group={group} today={today} />
           ))}
         </Stack>
       )}
