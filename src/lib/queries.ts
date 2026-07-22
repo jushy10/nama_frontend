@@ -41,6 +41,8 @@ import {
   getMarketSummary,
   getMarketSentiment,
   getOptionsFlow,
+  postResearch,
+  type ResearchResult,
   getAnalystInfo,
   getRsi,
   getEarningsAnalysis,
@@ -990,5 +992,21 @@ export function useEtfAnalysis(
     queryKey: ['etf-analysis', ticker],
     queryFn: ({ signal }) => getEtfAnalysis(ticker as string, { signal }),
     enabled: !!ticker,
+  })
+}
+
+/**
+ * The research agent (`POST /agents/research`) as a mutation — an imperative,
+ * metered, slow call (a multi-step tool loop), not a reactive query: call
+ * `.mutate(question)` and read `.isPending` / `.data` / `.error`. A blank
+ * question is a 400 and the per-IP rate limit a 429 — both land in `.error`.
+ */
+export function useResearch(): UseMutationResult<
+  ResearchResult,
+  Error,
+  string
+> {
+  return useMutation({
+    mutationFn: (question: string) => postResearch(question),
   })
 }

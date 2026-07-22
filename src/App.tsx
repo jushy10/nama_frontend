@@ -37,6 +37,7 @@ import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
 import CategoryOutlined from '@mui/icons-material/CategoryOutlined'
 import AccountBalanceOutlined from '@mui/icons-material/AccountBalanceOutlined'
 import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined'
+import ScienceOutlined from '@mui/icons-material/ScienceOutlined'
 import { useColorMode } from '@/ColorModeProvider'
 import { brand } from '@/theme'
 import Home from '@/pages/Home'
@@ -50,6 +51,7 @@ import MarketBrief from '@/pages/MarketBrief'
 import EarningsCalendar from '@/pages/EarningsCalendar'
 import Congress from '@/pages/Congress'
 import YieldCurve from '@/pages/YieldCurve'
+import Research from '@/pages/Research'
 import RedirectToSearch from '@/components/RedirectToSearch'
 
 // Leaves carry an icon (shown in the drawer + dropdowns) and, for grouped
@@ -73,6 +75,7 @@ const isGroup = (entry: NavEntry): entry is NavGroup => 'children' in entry
 const navItems: NavEntry[] = [
   { label: 'Brief', to: '/market/brief', icon: ArticleOutlined },
   { label: 'Search', to: '/search', icon: SearchOutlined },
+  { label: 'Research', to: '/research', icon: ScienceOutlined },
   {
     label: 'Screener',
     icon: TuneOutlined,
@@ -710,6 +713,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/search" element={<Search />} />
+          <Route path="/research" element={<Research />} />
           <Route path="/screener" element={<Screener />} />
           <Route path="/etf-screener" element={<EtfScreener />} />
           <Route path="/mag7" element={<Mag7 />} />
