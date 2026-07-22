@@ -29,6 +29,10 @@ interface Props {
   /** One-tap starter prompts. */
   examples: readonly string[]
   onExample: (example: string) => void
+  /** Submit-button label; defaults to the screeners' "Screen". */
+  submitLabel?: string
+  /** In-flight button label; defaults to "Screening…". */
+  pendingLabel?: string
 }
 
 /**
@@ -51,6 +55,8 @@ export default function AiScreenBox({
   inputAriaLabel,
   examples,
   onExample,
+  submitLabel = 'Screen',
+  pendingLabel = 'Screening…',
 }: Props) {
   return (
     <Box
@@ -133,7 +139,7 @@ export default function AiScreenBox({
           }
           sx={{ whiteSpace: 'nowrap', px: 3 }}
         >
-          {pending ? 'Screening…' : 'Screen'}
+          {pending ? pendingLabel : submitLabel}
         </Button>
       </Box>
 

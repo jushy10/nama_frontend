@@ -3608,3 +3608,42 @@ export async function getEarningsCalendar(
   }
   return data
 }
+
+/** One tool call the research agent made on its way to an answer. */
+export interface ResearchStep {
+  tool: string
+  arguments: Record<string, unknown>
+  output: string
+  is_error: boolean
+}
+
+/** The research agent's answer to one question (`POST /agents/research`). */
+export interface ResearchResult {
+  question: string
+  answer: string
+  steps: ResearchStep[]
+  disclaimer: string
+  model: string
+  generated_at: string
+}
+
+/**
+ * Ask the research agent a question (`POST /agents/research`). The agent runs a
+ * multi-step tool loop over the app's own reads (quotes, earnings, analyst
+ * coverage, …) before answering, so a call routinely takes tens of seconds. A
+ * blank question is a 400 and the per-IP rate limit a 429 — both surface as an
+ * `ApiError` carrying the server's detail.
+ */
+export async function postResearch(
+  question: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<ResearchResult> {
+  const res = await fetch(`${API_BASE}/agents/research`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+    signal: opts.signal,
+  })
+  if (!res.ok) throw await toApiError(res)
+  return (await res.json()) as ResearchResult
+}
