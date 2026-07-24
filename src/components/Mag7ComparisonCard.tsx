@@ -9,7 +9,7 @@ import {
   useTheme,
 } from '@mui/material'
 import { type ChartRange } from '@/lib/api'
-import { useManyCandles } from '@/lib/queries'
+import { useManyCandles } from '@/hooks/queries'
 import type { QuoteDef } from '@/components/QuoteGrid'
 import ChartRangeToggle from '@/components/ChartRangeToggle'
 import PerformanceComparisonChart, {

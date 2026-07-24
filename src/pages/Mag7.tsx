@@ -3,7 +3,7 @@ import AutoAwesomeOutlined from '@mui/icons-material/AutoAwesomeOutlined'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import Mag7ComparisonCard from '@/components/Mag7ComparisonCard'
 import PageHero from '@/components/PageHero'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { usePageMeta } from '@/hooks/usePageMeta'
 
 // The "Magnificent 7" mega-caps. These are tradeable tickers Alpaca quotes
 // directly, so no ETF proxy is needed — each tile is the stock itself.

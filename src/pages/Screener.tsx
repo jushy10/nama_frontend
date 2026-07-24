@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import {
   Alert,
   Avatar,
@@ -50,7 +50,7 @@ import {
   useAiStockScreen,
   useClassifications,
   useStockSearch,
-} from '@/lib/queries'
+} from '@/hooks/queries'
 import MultiSelectFilter, {
   type FilterOption,
 } from '@/components/MultiSelectFilter'
@@ -75,7 +75,7 @@ import {
   writeInt,
   writeList,
   writeString,
-} from '@/lib/urlState'
+} from '@/hooks/urlState'
 
 // Wait this long after the last keystroke before searching, so typing a ticker
 // doesn't fire a request per letter.

@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { Avatar, Box, Chip, Typography } from '@mui/material'
 import { humanizeClassification, stockLogoUrl } from '@/lib/api'
-import { useEtfSearch, useStockSearch } from '@/lib/queries'
+import { useEtfSearch, useStockSearch } from '@/hooks/queries'
 
 // The shared type-ahead over the whole screened universe, backing both the home
 // hero and the Search page. Keeping the hook, the row renderer, and the option

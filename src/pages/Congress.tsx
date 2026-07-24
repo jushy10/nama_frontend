@@ -33,8 +33,8 @@ import {
   errorMessage,
   useCongressActivity,
   useCongressLeaderboard,
-} from '@/lib/queries'
-import { usePageMeta } from '@/lib/usePageMeta'
+} from '@/hooks/queries'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import PageHero from '@/components/PageHero'
 
 const ROWS_PER_PAGE = [25, 50, 100]

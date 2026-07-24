@@ -14,7 +14,7 @@ import MarketStatusDot from '@/components/MarketStatusDot'
 import FearGreedGauge from '@/components/FearGreedGauge'
 import { fontFamilyMono } from '@/theme'
 import { getMarketStatus } from '@/lib/market'
-import { useMarketSentiment, useQuoteCards } from '@/lib/queries'
+import { useMarketSentiment, useQuoteCards } from '@/hooks/queries'
 import type { FearGreedSnapshot, Quote, VixSnapshot } from '@/lib/api'
 
 /** The three major US indices, tracked via their most liquid ETF proxies — the

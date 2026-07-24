@@ -11,7 +11,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import { errorMessage, useTickerType } from '@/lib/queries'
+import { errorMessage, useTickerType } from '@/hooks/queries'
 import {
   renderUniverseOption,
   resolveSubmittedTicker,
@@ -19,9 +19,9 @@ import {
   useDebounced,
   useUniverseSearchOptions,
   type SearchOption,
-} from '@/lib/universeSearch'
-import { trackEvent } from '@/lib/analytics'
-import { usePageMeta } from '@/lib/usePageMeta'
+} from '@/hooks/universeSearch'
+import { trackEvent } from '@/hooks/analytics'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import StockDetail from '@/components/StockDetail'
 import EtfDetail from '@/components/EtfDetail'
 import SearchRecommendations from '@/components/SearchRecommendations'

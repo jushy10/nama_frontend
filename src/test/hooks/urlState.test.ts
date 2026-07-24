@@ -10,7 +10,7 @@ import {
   writeInt,
   writeList,
   writeString,
-} from '@/lib/urlState'
+} from '@/hooks/urlState'
 
 const params = (init: string) => new URLSearchParams(init)
 

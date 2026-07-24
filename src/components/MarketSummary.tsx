@@ -2,7 +2,7 @@ import { Box, Divider, Skeleton, Stack, Typography } from '@mui/material'
 import AiReadHeader from '@/components/AiReadHeader'
 import { sleekCardSx } from '@/components/homeCard'
 import { fontFamilyMono } from '@/theme'
-import { useMarketSummary } from '@/lib/queries'
+import { useMarketSummary } from '@/hooks/queries'
 import type {
   MarketIndexReturn,
   MarketPeriod,

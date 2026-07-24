@@ -19,8 +19,8 @@ import {
   type Sector,
   type SectorWindow,
 } from '@/lib/api'
-import { errorMessage, useSectors } from '@/lib/queries'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { errorMessage, useSectors } from '@/hooks/queries'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import SectorCard from '@/components/SectorCard'
 import SectorStocksDialog from '@/components/SectorStocksDialog'
 import PageHero from '@/components/PageHero'

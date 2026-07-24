@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { usePageMeta } from '@/hooks/usePageMeta'
 
 // jsdom's document persists across tests in a file, so reset the bits the hook touches.
 beforeEach(() => {

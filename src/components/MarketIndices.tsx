@@ -20,7 +20,7 @@ import {
   useCandles,
   useEma,
   useSupportLevels,
-} from '@/lib/queries'
+} from '@/hooks/queries'
 import BandHeader from '@/components/BandHeader'
 import QuoteGrid, { type QuoteDef } from '@/components/QuoteGrid'
 import CandleChart from '@/components/CandleChart'

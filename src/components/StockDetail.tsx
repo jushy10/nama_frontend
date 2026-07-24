@@ -1,5 +1,5 @@
 import { useState, type ReactElement, type ReactNode } from 'react'
-import { readEnum, useUrlState, writeEnum } from '@/lib/urlState'
+import { readEnum, useUrlState, writeEnum } from '@/hooks/urlState'
 import {
   Alert,
   Box,
@@ -43,7 +43,7 @@ import {
   useStockTrend,
   useSupportLevels,
   useTickerCard,
-} from '@/lib/queries'
+} from '@/hooks/queries'
 import ShowChartIcon from '@mui/icons-material/ShowChart'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import NewspaperRoundedIcon from '@mui/icons-material/NewspaperRounded'
