@@ -5,7 +5,7 @@ import {
   AnalyticsProvider,
   analyticsEnabled,
   trackEvent,
-} from '@/lib/analytics'
+} from '@/hooks/analytics'
 
 // Mock the SDK so the module wires against spies — no real network — and we can
 // assert nothing is sent while analytics is disabled. vi.mock is hoisted above

@@ -7,7 +7,7 @@ import {
   Stack,
   Typography,
 } from '@mui/material'
-import { errorMessage, useEtfAnalysis, useEtfDetail } from '@/lib/queries'
+import { errorMessage, useEtfAnalysis, useEtfDetail } from '@/hooks/queries'
 import AnalysisCard from '@/components/AnalysisCard'
 import AnalysisLoadingCard from '@/components/AnalysisLoadingCard'
 import EtfCard from '@/components/EtfCard'

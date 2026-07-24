@@ -13,7 +13,7 @@ import SpeedIcon from '@mui/icons-material/Speed'
 import BandHeader from '@/components/BandHeader'
 import FearGreedGauge from '@/components/FearGreedGauge'
 import { fontFamilyMono } from '@/theme'
-import { useMarketSentiment } from '@/lib/queries'
+import { useMarketSentiment } from '@/hooks/queries'
 import type {
   FearGreedSnapshot,
   MarketSentiment as MarketSentimentData,

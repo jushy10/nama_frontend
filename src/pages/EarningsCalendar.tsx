@@ -22,7 +22,7 @@ import NightsStayIcon from '@mui/icons-material/NightsStay'
 import ScheduleIcon from '@mui/icons-material/Schedule'
 import { Link as RouterLink } from 'react-router-dom'
 import { humanizeClassification, stockLogoUrl } from '@/lib/api'
-import { errorMessage, useEarningsCalendar } from '@/lib/queries'
+import { errorMessage, useEarningsCalendar } from '@/hooks/queries'
 import {
   buildForwardWeeks,
   dayRelativeLabel,
@@ -32,7 +32,7 @@ import {
   type DaySlot,
   type WeekGroup,
 } from '@/lib/earningsWeek'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import type { EarningsCalendarItem } from '@/lib/api'
 import PageHero from '@/components/PageHero'
 

@@ -17,9 +17,9 @@ import {
   type StockIndex,
 } from '@/lib/api'
 import GridViewOutlined from '@mui/icons-material/GridViewOutlined'
-import { errorMessage, useHeatMap } from '@/lib/queries'
+import { errorMessage, useHeatMap } from '@/hooks/queries'
 import { dedupeShareClasses } from '@/lib/heatmap'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { usePageMeta } from '@/hooks/usePageMeta'
 import HeatMapChart, { HeatMapLegend } from '@/components/HeatMap'
 import PageHero from '@/components/PageHero'
 

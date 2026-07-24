@@ -14,7 +14,7 @@ import ArticleOutlinedIcon from '@mui/icons-material/ArticleOutlined'
 import AiReadHeader from '@/components/AiReadHeader'
 import { sleekCardSx } from '@/components/homeCard'
 import { fontFamilyMono } from '@/theme'
-import { useSectorAnalysis } from '@/lib/queries'
+import { useSectorAnalysis } from '@/hooks/queries'
 import type {
   SectorAnalysis,
   SectorHeadline,

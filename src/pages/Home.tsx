@@ -6,8 +6,8 @@ import MarketSummary from '@/components/MarketSummary'
 import MegaCapGrowthLeaders from '@/components/MegaCapGrowthLeaders'
 import SectorPulse from '@/components/SectorPulse'
 import Reveal from '@/components/Reveal'
-import { useMarketSummary, useSectorAnalysis } from '@/lib/queries'
-import { usePageMeta } from '@/lib/usePageMeta'
+import { useMarketSummary, useSectorAnalysis } from '@/hooks/queries'
+import { usePageMeta } from '@/hooks/usePageMeta'
 
 /**
  * Home dashboard, read top to bottom as one story that leads with the market,

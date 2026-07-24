@@ -18,7 +18,7 @@ import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import { Link as RouterLink } from 'react-router-dom'
 import { stockLogoUrl, type Sector, type TickerCard } from '@/lib/api'
-import { useTickerCards } from '@/lib/queries'
+import { useTickerCards } from '@/hooks/queries'
 
 /**
  * Top ten constituents per S&P sector, by index weight (heaviest first). The

@@ -13,7 +13,7 @@ import BandHeader from '@/components/BandHeader'
 import { sleekCardSx } from '@/components/homeCard'
 import { fontFamilyMono } from '@/theme'
 import { stockLogoUrl, type StockSearchResult } from '@/lib/api'
-import { useStockSearch } from '@/lib/queries'
+import { useStockSearch } from '@/hooks/queries'
 
 // How many names each list shows. The backend ranks the whole mega-cap slice by
 // the blend; we only ever paint the leaders. Kept to a short, scannable list so

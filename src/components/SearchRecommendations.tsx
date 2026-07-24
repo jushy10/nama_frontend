@@ -14,7 +14,7 @@ import WhatshotRoundedIcon from '@mui/icons-material/WhatshotRounded'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import { stockLogoUrl, type ScreenedStock } from '@/lib/api'
-import { useScreener } from '@/lib/queries'
+import { useScreener } from '@/hooks/queries'
 import { getRecentSymbols } from '@/lib/recentSymbols'
 
 /**

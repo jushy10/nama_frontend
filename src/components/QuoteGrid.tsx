@@ -3,7 +3,7 @@ import { Link as RouterLink } from 'react-router-dom'
 import ArrowDropUpIcon from '@mui/icons-material/ArrowDropUp'
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown'
 import { stockLogoUrl, type Quote } from '@/lib/api'
-import { useQuoteCards } from '@/lib/queries'
+import { useQuoteCards } from '@/hooks/queries'
 
 export type QuoteDef = {
   /** Friendly name shown to the user (index name or company). */

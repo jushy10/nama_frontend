@@ -15,7 +15,7 @@ import {
   useDebounced,
   useUniverseSearchOptions,
   type SearchOption,
-} from '@/lib/universeSearch'
+} from '@/hooks/universeSearch'
 
 // Keep the suggestion counts modest so the hero dropdown reads at a glance.
 const STOCK_SUGGESTIONS = 6
@@ -27,7 +27,7 @@ const ETF_SUGGESTIONS = 4
  * onto the landing page so the front door *is* the product. Typing surfaces
  * matching names and tickers; picking one (or hitting Enter on an exact symbol)
  * routes to `/search?symbol=…`, where the full detail loads. The type-ahead
- * logic itself lives in `@/lib/universeSearch`, shared with the Search page so
+ * logic itself lives in `@/hooks/universeSearch`, shared with the Search page so
  * the two can't drift; the hero stays a thin presentational shell.
  */
 export default function HomeSearchBar() {
