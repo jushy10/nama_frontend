@@ -80,6 +80,34 @@ describe('Research', () => {
     expect(screen.getByText(/not financial advice/i)).toBeInTheDocument()
   })
 
+  it('renders a markdown table in the answer as a real table', async () => {
+    const tableResult = {
+      ...resultSample,
+      answer:
+        'Ranked by revenue growth:\n\n' +
+        '| Ticker | Growth |\n|---|---|\n| AMD | 34.3% |\n| ANET | 28.6% |\n\n' +
+        '**AMD** leads.',
+    }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(tableResult),
+      }),
+    )
+
+    const { user } = renderWithProviders(<Research />)
+    await user.click(screen.getByText('How is the market feeling today?'))
+
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    expect(
+      screen.getByRole('columnheader', { name: 'Ticker' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'AMD' })).toBeInTheDocument()
+    // No raw markdown pipes leak into the prose.
+    expect(screen.queryByText(/\|/)).not.toBeInTheDocument()
+  })
+
   it('surfaces the API error inline when the agent call fails', async () => {
     vi.stubGlobal(
       'fetch',

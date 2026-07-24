@@ -15,6 +15,8 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import ScienceOutlined from '@mui/icons-material/ScienceOutlined'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import type { ResearchResult, ResearchStep } from '@/lib/api'
 import { errorMessage, useResearch } from '@/lib/queries'
 import PageHero from '@/components/PageHero'
@@ -96,14 +98,58 @@ function StepRow({ step, index }: { step: ResearchStep; index: number }) {
 }
 
 /**
- * The agent is instructed to answer in plain text, but the model habitually
- * bolds key figures with `**…**` — render those as real emphasis instead of
- * literal asterisks. Anything else passes through untouched.
+ * The agent's prose answer, rendered as markdown. The model naturally reaches
+ * for GFM — tables for rankings, bold for key figures, lists for takeaways —
+ * so render it properly instead of leaking raw pipes and asterisks. Styling is
+ * theme-aware via child selectors; a wide table scrolls inside the card rather
+ * than breaking it.
  */
-function renderEmphasis(text: string) {
-  return text
-    .split(/\*\*(.+?)\*\*/g)
-    .map((part, i) => (i % 2 === 1 ? <strong key={i}>{part}</strong> : part))
+function AnswerBody({ answer }: { answer: string }) {
+  return (
+    <Box
+      sx={{
+        lineHeight: 1.7,
+        maxWidth: '75ch',
+        overflowWrap: 'break-word',
+        '& > :first-of-type': { mt: 0 },
+        '& > :last-child': { mb: 0 },
+        '& p': { my: 1 },
+        '& ul, & ol': { my: 1, pl: 3 },
+        '& li': { mb: 0.5 },
+        '& h1, & h2, & h3, & h4': {
+          fontSize: '1.05rem',
+          fontWeight: 700,
+          mt: 2,
+          mb: 1,
+        },
+        '& table': {
+          display: 'block',
+          overflowX: 'auto',
+          borderCollapse: 'collapse',
+          my: 1.5,
+        },
+        '& th, & td': {
+          border: '1px solid',
+          borderColor: 'divider',
+          px: 1.25,
+          py: 0.75,
+          textAlign: 'left',
+          fontSize: '0.875rem',
+          whiteSpace: 'nowrap',
+        },
+        '& th': { bgcolor: 'action.hover', fontWeight: 600 },
+        '& code': {
+          fontFamily: fontFamilyMono,
+          fontSize: '0.85em',
+          bgcolor: 'action.hover',
+          px: 0.5,
+          borderRadius: 0.5,
+        },
+      }}
+    >
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{answer}</ReactMarkdown>
+    </Box>
+  )
 }
 
 /** The finished answer: the question echoed, the prose, and the work shown. */
@@ -135,12 +181,7 @@ function AnswerCard({ result }: { result: ResearchResult }) {
           {result.question}
         </Typography>
 
-        <Typography
-          variant="body1"
-          sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7, maxWidth: '75ch' }}
-        >
-          {renderEmphasis(result.answer)}
-        </Typography>
+        <AnswerBody answer={result.answer} />
 
         {result.steps.length > 0 && (
           <Accordion
